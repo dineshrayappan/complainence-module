@@ -46,7 +46,7 @@ export const LoginPage = () => {
           </div>
           <div>
             <div className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg leading-tight">
-              Complaints Module
+              Compliance Module
             </div>
             <div className="text-[10.5px] font-medium text-slate-500 tracking-wide uppercase">
               Quality Management & Action Tracking
@@ -68,7 +68,7 @@ export const LoginPage = () => {
           <div className="mb-4">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/90">
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-              Complaints Module
+              Compliance Module
             </span>
           </div>
 
@@ -77,7 +77,7 @@ export const LoginPage = () => {
             Welcome back!
           </h1>
           <p className="text-xs sm:text-[13px] text-slate-500 mt-1 mb-6 leading-relaxed">
-            Please sign in to access your complaints & audit workspace.
+            Please sign in to access your compliance & audit workspace.
           </p>
 
           {/* Error Alert */}
@@ -175,7 +175,7 @@ export const LoginPage = () => {
         {/* Professional Tagline Below Login Card */}
         <div className="mt-6 text-center z-10 px-4">
           <p className="text-xs sm:text-sm font-semibold text-white tracking-wide drop-shadow-xs">
-            Complaint Management & Action Tracking
+            Compliance Management & Action Tracking
           </p>
           <p className="text-[11px] text-white/80 mt-1 drop-shadow-2xs">
             Enterprise QMS • ISO 9001:2015 & Buyer Compliance Platform
