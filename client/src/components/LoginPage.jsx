@@ -37,28 +37,7 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full relative flex flex-col justify-between bg-slate-50 font-sans overflow-x-hidden selection:bg-indigo-500 selection:text-white">
-      {/* ----------------- UPPER LIGHT SECTION ----------------- */}
-      <div className="w-full pt-6 sm:pt-8 px-4 sm:px-8 z-10 flex items-center justify-between max-w-7xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
-            <ShieldCheck className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg leading-tight">
-              Compliance Module
-            </div>
-            <div className="text-[10.5px] font-medium text-slate-500 tracking-wide uppercase">
-              Quality Management & Action Tracking
-            </div>
-          </div>
-        </div>
-
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/90 text-slate-600 border border-slate-200/80 shadow-2xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Enterprise Portal</span>
-        </div>
-      </div>
+    <div className="min-h-screen w-full relative flex flex-col justify-center items-center bg-slate-50 font-sans overflow-x-hidden selection:bg-indigo-500 selection:text-white">
 
       {/* ----------------- CENTERED LOGIN CARD ----------------- */}
       <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12">
