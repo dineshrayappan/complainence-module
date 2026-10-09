@@ -66,6 +66,19 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
   const [newAuditDate, setNewAuditDate] = useState('');
   const [newAuditType, setNewAuditType] = useState('Social & Labor');
 
+  // Auditor Department Task Scheduling Modal State
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [newTaskForm, setNewTaskForm] = useState({
+    title: '',
+    department: 'Production',
+    description: '',
+    dueDate: '',
+    priority: 'MEDIUM',
+    assignedToUserId: 'DEPT_POOL',
+  });
+  const [savingNewTask, setSavingNewTask] = useState(false);
+  const [newTaskError, setNewTaskError] = useState(null);
+
   const loadAudits = async (showSpinner = false) => {
     try {
       if (showSpinner) setLoading(true);
@@ -101,11 +114,44 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
 
   useEffect(() => {
     loadAudits(true);
-  }, []);
-
-  useEffect(() => {
-    loadAudits(false);
+    const interval = setInterval(() => {
+      loadAudits(false);
+    }, 10000);
+    return () => clearInterval(interval);
   }, [taskDeptFilter]);
+
+  const handleAuditorCreateTask = async (e) => {
+    e.preventDefault();
+    if (!newTaskForm.title.trim()) return;
+    setSavingNewTask(true);
+    setNewTaskError(null);
+    try {
+      const res = await taskService.createTask({
+        title: newTaskForm.title.trim(),
+        department: newTaskForm.department,
+        description: newTaskForm.description.trim(),
+        dueDate: newTaskForm.dueDate || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        priority: newTaskForm.priority || 'MEDIUM',
+        assignedToUserId: newTaskForm.assignedToUserId === 'DEPT_POOL' ? undefined : newTaskForm.assignedToUserId,
+      });
+      if (res.data?.success) {
+        setIsNewTaskModalOpen(false);
+        setNewTaskForm({
+          title: '',
+          department: taskDeptFilter !== 'ALL' ? taskDeptFilter : 'Production',
+          description: '',
+          dueDate: '',
+          priority: 'MEDIUM',
+          assignedToUserId: 'DEPT_POOL',
+        });
+        loadAudits(false);
+      }
+    } catch (err) {
+      setNewTaskError(err.response?.data?.message || 'Failed to assign task.');
+    } finally {
+      setSavingNewTask(false);
+    }
+  };
 
   // Update item status in active audit
   const handleSetItemStatus = async (status) => {
@@ -741,6 +787,27 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
 
               {/* Department & Status Filters */}
               <div className="flex flex-wrap items-center gap-2">
+                {(isAuditor || isAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewTaskForm({
+                        title: '',
+                        department: taskDeptFilter !== 'ALL' ? taskDeptFilter : 'Production',
+                        description: '',
+                        dueDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
+                        priority: 'MEDIUM',
+                        assignedToUserId: 'DEPT_POOL',
+                      });
+                      setIsNewTaskModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    <span>+ Assign Task</span>
+                  </button>
+                )}
+
                 <div className="flex items-center gap-1.5">
                   <Filter className="w-3.5 h-3.5 text-slate-400" />
                   <select
@@ -1767,6 +1834,165 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                 Close Proof
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* ============================================================ */}
+      {/* 8. AUDITOR TASK ASSIGNMENT MODAL WITH BUSY WORKER VISIBILITY  */}
+      {/* ============================================================ */}
+      {isNewTaskModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 dark:bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden my-auto p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                    Assign Task to {newTaskForm.department}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Verify employee availability before assigning new floor work
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewTaskModalOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {newTaskError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/70 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-200 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{newTaskError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAuditorCreateTask} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Task Title *
+                </label>
+                <input
+                  required
+                  value={newTaskForm.title}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, title: e.target.value })}
+                  placeholder="e.g. Line 3 Needle Guard Verification, Emergency Exit Clearance Audit"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={newTaskForm.department}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, department: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    {['Production', 'Quality', 'Maintenance', 'Store', 'EHS', 'EDP', 'HR', 'Central Quality Audit'].map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Priority Level
+                  </label>
+                  <select
+                    value={newTaskForm.priority}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, priority: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    <option value="LOW">Low Priority</option>
+                    <option value="MEDIUM">Medium Priority</option>
+                    <option value="HIGH">High Priority</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Assignee / Worker Selection (Check Availability)
+                </label>
+                <select
+                  value={newTaskForm.assignedToUserId}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, assignedToUserId: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <option value="DEPT_POOL">
+                    🌟 Entire Department Pool (Open to All {newTaskForm.department} Workers)
+                  </option>
+                  {(liveStatusData?.employees || [])
+                    .filter((e) => (e.department || '').toLowerCase() === (newTaskForm.department || '').toLowerCase())
+                    .map((emp) => {
+                      const isBusy = emp.status === 'In Progress / Busy';
+                      return (
+                        <option key={emp.employeeId || emp.userId} value={emp.userId || emp.employeeId}>
+                          {emp.name} ({emp.employeeId}) — {isBusy ? '🔴 BUSY (Already Working)' : '🟢 AVAILABLE'}
+                        </option>
+                      );
+                    })}
+                </select>
+
+                {(() => {
+                  const selectedWorker = (liveStatusData?.employees || []).find(
+                    (e) => (e.userId === newTaskForm.assignedToUserId || e.employeeId === newTaskForm.assignedToUserId) && e.status === 'In Progress / Busy'
+                  );
+                  if (selectedWorker) {
+                    return (
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-300 mt-2 flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-bold">Auditor Notice:</span> {selectedWorker.name} is currently occupied working on "{selectedWorker.assignedTask?.title || 'active floor task'}". Consider assigning to an Available employee to avoid overloading them.
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Inspection Scope / Checkpoints
+                </label>
+                <textarea
+                  rows={2}
+                  value={newTaskForm.description}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, description: e.target.value })}
+                  placeholder="Checkpoints, standard requirements, or specific areas to verify..."
+                  className="w-full p-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsNewTaskModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingNewTask}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 cursor-pointer disabled:opacity-50"
+                >
+                  {savingNewTask ? 'Assigning...' : 'Assign Task'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

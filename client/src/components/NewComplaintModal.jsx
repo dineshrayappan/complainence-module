@@ -27,7 +27,7 @@ import {
   UserCheck,
   AlertCircle,
 } from 'lucide-react';
-import { userService, complaintService } from '../services/api';
+import { userService, complaintService, taskService } from '../services/api';
 import { compressImage, formatFileSize } from '../utils/imageCompressor';
 
 // Exact department matching helper ensuring strict department isolation
@@ -340,6 +340,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   // Stage 5: Assign Responsible Person
   const [assignedToUserId, setAssignedToUserId] = useState('');
   const [contactSearch, setContactSearch] = useState('');
+  const [liveEmployees, setLiveEmployees] = useState([]);
 
   // Stage 6: Set Due Date & SLA
   const [deadlineHours, setDeadlineHours] = useState(16);
@@ -388,6 +389,16 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             }
           }
           setSupervisors(list);
+
+          // Fetch live employee busy/available statuses
+          try {
+            const liveRes = await taskService.getLiveStatus();
+            if (liveRes.data?.success && Array.isArray(liveRes.data.employees)) {
+              setLiveEmployees(liveRes.data.employees);
+            }
+          } catch (e) {
+            console.warn('Could not load live employee statuses:', e.message);
+          }
 
           // Find first matching supervisor strictly for initial department
           const deptMatches = list.filter((s) => isDeptMatch(s.department, department));
@@ -1197,40 +1208,70 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   {departmentEmployees.length === 0 ? (
                     <option value="">No employees found</option>
                   ) : (
-                    departmentEmployees.map((s) => (
-                      <option key={s._id || s.id} value={s._id || s.id}>
-                        {s.name} ({s.employeeId}) — {s.designation || 'In-Charge'}
-                      </option>
-                    ))
+                    departmentEmployees.map((s) => {
+                      const empId = (s.employeeId || '').toUpperCase();
+                      const sId = String(s._id || s.id || '');
+                      const liveEmp = liveEmployees.find(
+                        (e) => (e.employeeId && e.employeeId.toUpperCase() === empId) || (e.userId && String(e.userId) === sId)
+                      );
+                      const isBusy = liveEmp?.status === 'In Progress / Busy';
+
+                      return (
+                        <option key={s._id || s.id} value={s._id || s.id}>
+                          {s.name} ({s.employeeId}) — {s.designation || 'In-Charge'} {isBusy ? '🔴 (Busy - Working on task)' : '🟢 (Available)'}
+                        </option>
+                      );
+                    })
                   )}
                 </select>
               </div>
 
               {/* Selected Assignee Banner */}
               {selectedSupervisor ? (
-                <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
-                      {selectedSupervisor.name?.charAt(0) || 'S'}
-                    </div>
-                    <div>
-                      <div className="font-extrabold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                        <span>{selectedSupervisor.name}</span>
-                        <span className="font-mono text-[10px] text-indigo-700 dark:text-indigo-300">
-                          ({selectedSupervisor.employeeId})
-                        </span>
+                <>
+                  <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
+                        {selectedSupervisor.name?.charAt(0) || 'S'}
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{selectedSupervisor.department}</span>
-                        {selectedSupervisor.designation ? ` • ${selectedSupervisor.designation}` : ''}
-                        {selectedSupervisor.mobileNumber ? ` • ${selectedSupervisor.mobileNumber}` : ''}
+                      <div>
+                        <div className="font-extrabold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                          <span>{selectedSupervisor.name}</span>
+                          <span className="font-mono text-[10px] text-indigo-700 dark:text-indigo-300">
+                            ({selectedSupervisor.employeeId})
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="font-semibold text-indigo-700 dark:text-indigo-300">{selectedSupervisor.department}</span>
+                          {selectedSupervisor.designation ? ` • ${selectedSupervisor.designation}` : ''}
+                          {selectedSupervisor.mobileNumber ? ` • ${selectedSupervisor.mobileNumber}` : ''}
+                        </div>
                       </div>
                     </div>
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      Accountable In-Charge
+                    </span>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    Accountable In-Charge
-                  </span>
-                </div>
+
+                  {(() => {
+                    const empId = (selectedSupervisor.employeeId || '').toUpperCase();
+                    const sId = String(selectedSupervisor._id || selectedSupervisor.id || '');
+                    const liveEmp = liveEmployees.find(
+                      (e) => (e.employeeId && e.employeeId.toUpperCase() === empId) || (e.userId && String(e.userId) === sId)
+                    );
+                    if (liveEmp?.status === 'In Progress / Busy') {
+                      return (
+                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold">Auditor Notice:</span> {selectedSupervisor.name} is currently occupied working on "{liveEmp.assignedTask?.title || 'active floor task'}". Please note they are busy to avoid unnecessary duplicate task loading.
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </>
               ) : (
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
