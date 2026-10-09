@@ -48,9 +48,9 @@ const startOfToday = () => {
   return d;
 };
 
-const emptyForm = (defaultUserId = '') => ({
+const emptyForm = (defaultDept = 'Production', defaultUserId = '') => ({
   title: '',
-  department: 'Central Quality Audit',
+  department: defaultDept,
   description: '',
   dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
   recurrence: 'NONE',
@@ -66,7 +66,7 @@ export const MyTasksPanel = ({ compact = false }) => {
   const [busyId, setBusyId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(() => emptyForm('Production', ''));
   const [error, setError] = useState(null);
   const [usersList, setUsersList] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -126,23 +126,31 @@ export const MyTasksPanel = ({ compact = false }) => {
     return Array.from(depts);
   }, [usersList, tasks]);
 
-  // Grouped user categories for Assignee dropdown
+  // Filter workers strictly matching the currently selected department
+  const departmentWorkers = useMemo(() => {
+    if (!form.department) return [];
+    const targetDept = form.department.trim().toLowerCase();
+    return usersList.filter(
+      (u) => (u.department || '').trim().toLowerCase() === targetDept
+    );
+  }, [usersList, form.department]);
+
+  // Quality auditors who can audit all departments
   const auditors = useMemo(
     () => usersList.filter((u) => u.role === 'AUDITOR'),
     [usersList]
   );
-  const supervisors = useMemo(
-    () => usersList.filter((u) => u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR'),
-    [usersList]
-  );
-  const administrators = useMemo(
-    () => usersList.filter((u) => u.role === 'ADMIN'),
-    [usersList]
-  );
-  const otherUsers = useMemo(
-    () => usersList.filter((u) => !['AUDITOR', 'ACTION_PERSON', 'SUPERVISOR', 'ADMIN'].includes(u.role)),
-    [usersList]
-  );
+
+  // Other plant workers outside the currently selected department
+  const otherWorkers = useMemo(() => {
+    if (!form.department) return [];
+    const targetDept = form.department.trim().toLowerCase();
+    return usersList.filter(
+      (u) =>
+        (u.department || '').trim().toLowerCase() !== targetDept &&
+        u.role !== 'AUDITOR'
+    );
+  }, [usersList, form.department]);
 
   // Grouped tasks with optional department filter
   const groups = useMemo(() => {
@@ -194,13 +202,35 @@ export const MyTasksPanel = ({ compact = false }) => {
 
   const openCreate = () => {
     setEditing(null);
-    const myId = user?.id || user?._id || user?.employeeId || '';
-    setForm(emptyForm(myId));
+    const initialDept =
+      user?.department && user.department !== 'Plant Operations & Executive Oversight'
+        ? user.department
+        : 'Production';
+
+    const matchingWorkers = usersList.filter(
+      (u) => (u.department || '').trim().toLowerCase() === initialDept.trim().toLowerCase()
+    );
+
+    const defaultUserId =
+      matchingWorkers.length > 0
+        ? matchingWorkers[0].id || matchingWorkers[0]._id || matchingWorkers[0].employeeId
+        : user?.id || user?._id || user?.employeeId || '';
+
+    setForm({
+      title: '',
+      department: initialDept,
+      description: '',
+      dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      recurrence: 'NONE',
+      priority: 'MEDIUM',
+      assignedToUserId: defaultUserId,
+    });
     setShowForm(true);
   };
 
   const openEdit = (task) => {
     setEditing(task);
+    const targetDept = task.department || 'Production';
     const matchedUser = usersList.find(
       (u) =>
         u.employeeId === task.assignedTo?.employeeId ||
@@ -216,7 +246,7 @@ export const MyTasksPanel = ({ compact = false }) => {
 
     setForm({
       title: task.title || '',
-      department: task.department || 'Central Quality Audit',
+      department: targetDept,
       description: task.description || '',
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '',
       recurrence: task.recurrence || 'NONE',
@@ -226,25 +256,28 @@ export const MyTasksPanel = ({ compact = false }) => {
     setShowForm(true);
   };
 
-  const handleAssigneeChange = (e) => {
-    const selectedVal = e.target.value;
-    const selectedUser = usersList.find(
-      (u) =>
-        (u.id && u.id === selectedVal) ||
-        (u._id && u._id === selectedVal) ||
-        u.employeeId === selectedVal
+  // When Department is changed, dynamically update and pre-select that department's workers
+  const handleDepartmentChange = (e) => {
+    const selectedDept = e.target.value;
+    const matchingWorkers = usersList.filter(
+      (u) => (u.department || '').trim().toLowerCase() === selectedDept.trim().toLowerCase()
     );
 
     setForm((prev) => {
-      const next = { ...prev, assignedToUserId: selectedVal };
-      // If user belongs to a specific factory department, default the department dropdown accordingly
-      if (
-        selectedUser?.department &&
-        selectedUser.department !== 'Plant Operations & Executive Oversight'
-      ) {
-        next.department = selectedUser.department;
+      let nextAssigneeId = '';
+      if (matchingWorkers.length > 0) {
+        // Pre-select the first worker of this selected department
+        nextAssigneeId = matchingWorkers[0].id || matchingWorkers[0]._id || matchingWorkers[0].employeeId;
+      } else {
+        // Fallback to self or blank if no dedicated worker
+        nextAssigneeId = user?.id || user?._id || user?.employeeId || '';
       }
-      return next;
+
+      return {
+        ...prev,
+        department: selectedDept,
+        assignedToUserId: nextAssigneeId,
+      };
     });
   };
 
@@ -395,78 +428,23 @@ export const MyTasksPanel = ({ compact = false }) => {
             />
           </div>
 
-          {/* Row 1: Assignee Dropdown (Auditor / Department Staff) and Department Dropdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center justify-between">
+          {/* Linked Department & Worker Selection: Step 1 Department -> Step 2 That Department's Workers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800">
+            {/* 1. Department Dropdown */}
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-indigo-500" />
-                  Assign To (Auditor / Department Staff)
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>1. Select Department</span>
                 </span>
-                {loadingUsers && (
-                  <span className="text-[9px] text-indigo-500 font-normal animate-pulse">Loading users...</span>
-                )}
-              </span>
-              <select
-                value={form.assignedToUserId}
-                onChange={handleAssigneeChange}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-500 cursor-pointer transition-colors"
-              >
-                <option value="">
-                  {user ? `Assign to Myself (${user.name} - ${user.role})` : 'Select Assignee...'}
-                </option>
-
-                {auditors.length > 0 && (
-                  <optgroup label="── Quality Auditors ──">
-                    {auditors.map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || 'Auditor'} ({u.department || 'Central QA'}) [{u.employeeId}]
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-
-                {supervisors.length > 0 && (
-                  <optgroup label="── Department In-Charges & Supervisors ──">
-                    {supervisors.map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || 'Supervisor'} ({u.department}) [{u.employeeId}]
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-
-                {administrators.length > 0 && (
-                  <optgroup label="── Plant Leadership & Admins ──">
-                    {administrators.map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || 'Admin'} ({u.department || 'Operations'}) [{u.employeeId}]
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-
-                {otherUsers.length > 0 && (
-                  <optgroup label="── Other Plant Staff ──">
-                    {otherUsers.map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || u.role} ({u.department}) [{u.employeeId}]
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-                Target Department
+                <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                  Step 1
+                </span>
               </span>
               <select
                 value={form.department}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-500 cursor-pointer transition-colors"
+                onChange={handleDepartmentChange}
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm transition-colors"
               >
                 {availableDepartments.map((dept) => (
                   <option key={dept} value={dept}>
@@ -474,6 +452,75 @@ export const MyTasksPanel = ({ compact = false }) => {
                   </option>
                 ))}
               </select>
+              <span className="text-[10px] text-slate-500 font-medium">
+                Select department to dynamically show its workers
+              </span>
+            </label>
+
+            {/* 2. Worker / Staff Dropdown: Shows that department's workers */}
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>2. Department Workers ({form.department})</span>
+                </span>
+                {loadingUsers ? (
+                  <span className="text-[9px] text-indigo-500 font-normal animate-pulse">Loading workers...</span>
+                ) : (
+                  <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                    {departmentWorkers.length} {departmentWorkers.length === 1 ? 'Worker' : 'Workers'} Found
+                  </span>
+                )}
+              </span>
+              <select
+                value={form.assignedToUserId}
+                onChange={(e) => setForm({ ...form, assignedToUserId: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm transition-colors"
+              >
+                {departmentWorkers.length > 0 ? (
+                  <optgroup label={`── Workers in ${form.department} (${departmentWorkers.length}) ──`}>
+                    {departmentWorkers.map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || u.role} [{u.employeeId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option value="">No dedicated worker registered in {form.department}</option>
+                )}
+
+                {/* Quality Auditors option group */}
+                <optgroup label="── Quality Auditors (Central Audit Team) ──">
+                  {user && (
+                    <option value={user.id || user._id || user.employeeId}>
+                      Assign to Myself ({user.name} - {user.role})
+                    </option>
+                  )}
+                  {auditors
+                    .filter((a) => (a.id || a._id) !== (user?.id || user?._id))
+                    .map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || 'Auditor'} [{u.employeeId}]
+                      </option>
+                    ))}
+                </optgroup>
+
+                {/* Other plant staff */}
+                {otherWorkers.length > 0 && (
+                  <optgroup label="── Other Plant Workers ──">
+                    {otherWorkers.map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || u.role} ({u.department}) [{u.employeeId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <span className="text-[10px] text-slate-500 font-medium">
+                {departmentWorkers.length > 0
+                  ? `Showing workers belonging to ${form.department}`
+                  : `Assign to a Quality Auditor or Myself for this audit`}
+              </span>
             </label>
           </div>
 
