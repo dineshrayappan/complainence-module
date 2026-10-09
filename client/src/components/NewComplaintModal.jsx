@@ -246,36 +246,7 @@ const VERIFICATION_METHODS = [
   },
 ];
 
-// Sample defect proofs for 1-click test capture
-const SAMPLE_PROOFS = [
-  {
-    id: 'stitch',
-    name: 'Skipped Stitches',
-    category: 'Stitching Fault',
-    department: 'Production',
-    requirement: 'AQL 1.5 Workmanship Standard',
-    description: 'Machine #14: 8 skipped stitches per 10cm along collar seam line. Needle deflecting on bulky interlining.',
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="560" height="340" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="40" y="65" fill="%23ef4444" font-family="sans-serif" font-size="18" font-weight="bold">AUDIT PROOF: SKIPPED STITCHES</text><text x="40" y="92" fill="%2394a3b8" font-family="sans-serif" font-size="12">Production • Sewing Section • Collar Join</text><line x1="60" y1="200" x2="540" y2="200" stroke="%23ef4444" stroke-width="4" stroke-dasharray="16,10"/><circle cx="300" cy="200" r="45" fill="%23ef4444" fill-opacity="0.2" stroke="%23ef4444" stroke-width="2.5"/><text x="300" y="275" fill="%23f8fafc" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">DEFECT ZONE: 8 SKIPPED STITCHES</text><text x="300" y="325" fill="%2364748b" font-family="sans-serif" font-size="11" text-anchor="middle">QMS AUDIT EVIDENCE CAPTURED</text></svg>`,
-  },
-  {
-    id: 'oil',
-    name: 'Needle Bar Oil Leak',
-    category: 'Oil & Soil Contamination',
-    department: 'Maintenance',
-    requirement: 'Buyer Technical Audit Standard',
-    description: 'Dark lubricant drip stain on right sleeve cuff panel caused by saturated felt wick on needle bar assembly.',
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="560" height="340" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="40" y="65" fill="%23f59e0b" font-family="sans-serif" font-size="18" font-weight="bold">AUDIT PROOF: NEEDLE BAR OIL DRIP</text><text x="40" y="92" fill="%2394a3b8" font-family="sans-serif" font-size="12">Maintenance • Machine Assembly • Sleeve Line</text><ellipse cx="300" cy="200" rx="60" ry="40" fill="%23d97706" fill-opacity="0.7"/><circle cx="300" cy="200" r="55" fill="none" stroke="%23f59e0b" stroke-width="2" stroke-dasharray="6,4"/><text x="300" y="275" fill="%23f8fafc" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">DEFECT ZONE: LUBRICANT CONTAMINATION</text><text x="300" y="325" fill="%2364748b" font-family="sans-serif" font-size="11" text-anchor="middle">QMS AUDIT EVIDENCE CAPTURED</text></svg>`,
-  },
-  {
-    id: 'tear',
-    name: 'Fabric Roll Shading',
-    category: 'Fabric Flaw',
-    department: 'Store',
-    requirement: 'Fabric 4-Point System Standard',
-    description: 'Fabric Roll #F-4412 shows center-to-selvedge shade variation (> 4.5 Delta E) exceeding buyer 4-point tolerance.',
-    svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="380" viewBox="0 0 600 380"><rect width="100%" height="100%" fill="%230f172a"/><rect x="20" y="20" width="560" height="340" rx="16" fill="%231e293b" stroke="%23334155" stroke-width="2"/><text x="40" y="65" fill="%23ef4444" font-family="sans-serif" font-size="18" font-weight="bold">AUDIT PROOF: FABRIC ROLL SHADING</text><text x="40" y="92" fill="%2394a3b8" font-family="sans-serif" font-size="12">Store • Roll %23F-4412 • 4-Point Inspection</text><path d="M 220 185 Q 300 240 380 185" fill="none" stroke="%23ef4444" stroke-width="4"/><circle cx="300" cy="215" r="40" fill="%23ef4444" fill-opacity="0.2" stroke="%23ef4444" stroke-width="2"/><text x="300" y="280" fill="%23f8fafc" font-family="monospace" font-size="13" font-weight="bold" text-anchor="middle">DEFECT ZONE: COLOR SHADING VARIANCE</text><text x="300" y="325" fill="%2364748b" font-family="sans-serif" font-size="11" text-anchor="middle">QMS AUDIT EVIDENCE CAPTURED</text></svg>`,
-  },
-];
+
 
 // Workflow Stage Definitions matching the requested flow
 const WORKFLOW_STEPS = [
@@ -459,19 +430,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     }
   };
 
-  // Apply a sample defect proof preset for instant auditing
-  const applySampleProof = (sample) => {
-    setPreviewUrl(sample.svg);
-    setPhotoBase64(sample.svg);
-    setBeforeFile(null);
-    setCategory(sample.category);
-    setDepartment(sample.department);
-    setRequirement(sample.requirement);
-    if (!description.trim()) {
-      setDescription(sample.description);
-    }
-    setImageMeta({ originalSize: 32000, compressedSize: 18000 });
-  };
+
 
   if (!isOpen) return null;
 
@@ -1560,35 +1519,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 </div>
               )}
 
-              {/* 1-Click Sample Defect Proofs for Fast Auditing */}
-              <div className="pt-2">
-                <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 flex items-center justify-between">
-                  <span>Fast Audit Test Samples (1-Click Defect Proof):</span>
-                  <span className="font-mono text-[10px]">Desktop / Testing Preset</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {SAMPLE_PROOFS.map((sample) => (
-                    <button
-                      key={sample.id}
-                      type="button"
-                      onClick={() => applySampleProof(sample)}
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-400 text-left transition-all cursor-pointer flex items-center gap-2.5"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center shrink-0 text-xs font-bold font-mono">
-                        SVG
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                          {sample.name}
-                        </div>
-                        <div className="text-[10px] text-slate-400 truncate">
-                          {sample.category}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+
             </section>
           )}
 

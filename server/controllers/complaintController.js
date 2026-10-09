@@ -34,75 +34,6 @@ const setWorkflowStatusInDescription = (desc, status) => {
   return `[Workflow Status: ${status}] ${text}`;
 };
 
-const sampleSvgTemplates = {
-  'sample-before-stitch.svg': {
-    title: 'DEFECT PROOF: SKIPPED STITCHES',
-    badge: 'BEFORE RECTIFICATION',
-    accent: '#ef4444',
-    detail: 'Machine #14 - 8 skipped stitches per 10cm along collar seam line.',
-  },
-  'sample-after-stitch.svg': {
-    title: 'CORRECTED: RE-STITCHED & TENSION BALANCED',
-    badge: 'AFTER PROOF (RESOLVED)',
-    accent: '#10b981',
-    detail: 'Needle replaced with Groz-Beckert 75/11; looper timing calibrated.',
-  },
-  'sample-before-oil.svg': {
-    title: 'DEFECT PROOF: NEEDLE BAR OIL DRIP',
-    badge: 'BEFORE RECTIFICATION',
-    accent: '#f59e0b',
-    detail: 'Sewing Line 2 - Dark lubricant stain on right sleeve cuff panel.',
-  },
-  'sample-after-oil.svg': {
-    title: 'CORRECTED: SPOT CLEANED & WIPED',
-    badge: 'AFTER PROOF (RESOLVED)',
-    accent: '#10b981',
-    detail: 'Ultrasonic stain remover spray applied; felt wick oiler adjusted.',
-  },
-  'sample-before-cut.svg': {
-    title: 'DEFECT PROOF: NEEDLE CUT / KNIT RUN',
-    badge: 'BEFORE RECTIFICATION',
-    accent: '#ef4444',
-    detail: 'Spreading & Cutting - Micro tears at seam allowance of interlock rib.',
-  },
-  'sample-after-cut.svg': {
-    title: 'CORRECTED: BALL-POINT NEEDLE TESTED',
-    badge: 'AFTER PROOF (RESOLVED)',
-    accent: '#10b981',
-    detail: 'Swapped to SES ball-point needle; 100 pcs 100% defect-free.',
-  },
-};
-
-const generateSampleSvgDataUrl = (filename) => {
-  const img = sampleSvgTemplates[filename];
-  if (!img) return null;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
-  <defs>
-    <linearGradient id="grad-${filename}" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
-    </linearGradient>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.8" stroke-opacity="0.4"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#grad-${filename})" />
-  <rect width="100%" height="100%" fill="url(#grid)" />
-  <rect x="40" y="40" width="720" height="520" rx="16" fill="#1e293b" fill-opacity="0.8" stroke="#475569" stroke-width="2" />
-  <rect x="70" y="70" width="220" height="38" rx="8" fill="${img.accent}" />
-  <text x="180" y="94" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="bold" text-anchor="middle" letter-spacing="1.2">${img.badge}</text>
-  <text x="730" y="95" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" text-anchor="end">GARMENT QMS AUDIT PROOF</text>
-  <text x="70" y="150" fill="#f8fafc" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="800">${img.title}</text>
-  <rect x="70" y="180" width="660" height="260" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1.5" />
-  <line x1="100" y1="310" x2="700" y2="310" stroke="${img.accent}" stroke-width="4" stroke-dasharray="12,8" />
-  <circle cx="400" cy="310" r="45" fill="${img.accent}" fill-opacity="0.2" stroke="${img.accent}" stroke-width="2.5" />
-  <text x="400" y="315" fill="#f8fafc" font-family="monospace" font-size="14" font-weight="bold" text-anchor="middle">INSPECTION ZONE</text>
-  <text x="70" y="480" fill="#cbd5e1" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="500">${img.detail}</text>
-  <text x="70" y="520" fill="#64748b" font-family="monospace" font-size="12">METRO TEXTILE APPAREL QMS • REAR SENSOR CAMERA VERIFIED</text>
-</svg>`;
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-};
-
 // Helper to convert any image path (including disk files in /uploads) into a self-contained data URL
 const ensureDataUrl = (photoPath) => {
   if (!photoPath) return photoPath;
@@ -129,8 +60,6 @@ const ensureDataUrl = (photoPath) => {
         // fallback
       }
     }
-    const sampleSvg = generateSampleSvgDataUrl(filename);
-    if (sampleSvg) return sampleSvg;
   }
   return photoPath;
 };

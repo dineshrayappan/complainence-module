@@ -21,49 +21,7 @@ import CountdownBadge from './CountdownBadge';
 const FALLBACK_BEFORE_IMG =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Crect width='160' height='160' fill='%23fee2e2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' font-weight='bold' fill='%23b91c1c'%3EBefore Photo%3C/text%3E%3C/svg%3E";
 
-// Industry QMS CAP Presets for One-Click Demonstration & Fast Filing
-const CAP_PRESETS = [
-  {
-    id: 'exit',
-    name: 'Emergency Exit (EHS)',
-    badge: 'EHS Safety',
-    immediateCorrection: 'Remove cartons from emergency exit immediately and clear entire egress aisle.',
-    rootCause: 'Storage layout not controlled and temporary stacking exceeding designated yellow line.',
-    correctiveAction: 'Revise storage location, repaint reflective yellow floor perimeter markings, and install physical barrier.',
-    preventiveAction: 'Add weekly emergency-exit inspection checklist and train store handlers on egress compliance.',
-    verificationReadinessNotes: 'Conduct physical walk-through to confirm exit corridor is 100% unobstructed and markings are visible.',
-  },
-  {
-    id: 'stitch',
-    name: 'Skipped Stitches (Production/QA)',
-    badge: 'Workmanship',
-    immediateCorrection: 'Quarantine bundle #14B (24 pcs) and re-stitch skipped collar seams according to AQL 1.5 standard.',
-    rootCause: 'Needle deflection on bulky interlining seam caused by incorrect needle point size and worn looper timing.',
-    correctiveAction: 'Replace needle with Groz-Beckert 75/11 Ballpoint, adjust looper clearance to 0.05mm, and recalibrate feed dog.',
-    preventiveAction: 'Establish mandatory 8-hour needle replacement log and operator mock training on collar join.',
-    verificationReadinessNotes: 'Perform stretch test on 10 random garments under 200W inspection light; ensure 0 skipped stitches.',
-  },
-  {
-    id: 'oil',
-    name: 'Needle Bar Oil Leak (Maintenance)',
-    badge: 'Maintenance',
-    immediateCorrection: 'Spot clean contaminated cuff panels with ultrasonic solvent and wipe needle bar dry.',
-    rootCause: 'Saturated felt wick oiler and defective needle bar upper seal allowing lubricant migration under high RPM.',
-    correctiveAction: 'Replace felt wick oiler, renew needle bar rubber seal, and calibrate lubrication pump metering valve.',
-    preventiveAction: 'Incorporate weekly felt wick saturation audit into TPM preventive maintenance schedule.',
-    verificationReadinessNotes: 'Run machine on white test fabric at 4,500 RPM for 3 minutes; verify zero oil micro-sprays.',
-  },
-  {
-    id: 'shade',
-    name: 'Fabric Roll Shading (Store)',
-    badge: 'Materials',
-    immediateCorrection: 'Segregate fabric roll #F-4412 and halt spreading on cutting table 2.',
-    rootCause: 'Dye lot inconsistency from dye house not caught during initial warehouse inward receipt.',
-    correctiveAction: 'Perform 100% 4-point inspection, cut shade bands, and establish center-to-selvedge grouping.',
-    preventiveAction: 'Mandate spectrophotometer Delta-E verification for every fabric roll prior to warehouse binning.',
-    verificationReadinessNotes: 'Inspect shade bands under D65 standard light box; verify Delta E < 1.0 between cut panels.',
-  },
-];
+
 
 export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
   const fileInputRef = useRef(null);
@@ -118,14 +76,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
 
   if (!isOpen || !complaint) return null;
 
-  // Handle Preset Selection
-  const applyPreset = (preset) => {
-    setImmediateCorrection(preset.immediateCorrection);
-    setRootCause(preset.rootCause);
-    setCorrectiveAction(preset.correctiveAction);
-    setPreventiveAction(preset.preventiveAction);
-    setVerificationReadinessNotes(preset.verificationReadinessNotes);
-  };
+
 
   // Handle Rear Camera / Photo Selection with Client Canvas Compression
   const handlePhotoCapture = async (e) => {
@@ -326,36 +277,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Quick Industrial Presets Bar */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                Quick Industry CAP Presets (Click to autofill structured fields):
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">QMS 8D Standard</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {CAP_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => applyPreset(preset)}
-                  className="p-2 text-left rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-400 dark:hover:border-cyan-500 transition-all text-xs group cursor-pointer shadow-2xs"
-                >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-cyan-400 font-bold uppercase">
-                      {preset.badge}
-                    </span>
-                    <ArrowRight className="w-3 h-3 text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-transform group-hover:translate-x-0.5" />
-                  </div>
-                  <div className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                    {preset.name}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+
 
           {/* CAP Visual Hierarchy Diagram */}
           <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">

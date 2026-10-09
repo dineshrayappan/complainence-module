@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Menu,
   Bell,
@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   X,
   ChevronDown,
+  Maximize,
+  Minimize,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -24,36 +26,70 @@ export const Header = ({
   onOpenNewComplaint,
   onRefresh,
   isRefreshing,
-  overdueCount = 6,
+  overdueCount = 0,
   onSelectOverdue,
 }) => {
   const { user, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const notifications = [
-    {
-      id: 1,
-      type: 'overdue',
-      title: '6 NCs Exceeded SLA',
-      detail: 'Stores & Production lines have 6 items pending immediate escalation.',
-      time: '12m ago',
-    },
-    {
-      id: 2,
-      type: 'cap',
-      title: 'CAP Submitted: NC-2024-001',
-      detail: 'Line 2 Supervisor submitted photo proof for review.',
-      time: '34m ago',
-    },
-    {
-      id: 3,
-      type: 'audit',
-      title: 'Buyer Audit Scheduled',
-      detail: 'ISO 9001 internal audit round starts at 10:00 AM tomorrow.',
-      time: '2h ago',
-    },
-  ];
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          await document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+          await document.msExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Fullscreen toggle failed or not permitted by browser:', err);
+    }
+  };
+
+  const notifications = useMemo(() => {
+    const list = [];
+    if (overdueCount > 0) {
+      list.push({
+        id: 'alert-overdue',
+        type: 'overdue',
+        title: `${overdueCount} NC${overdueCount > 1 ? 's' : ''} Exceeded SLA`,
+        detail: 'Immediate attention required for non-conformance records past resolution deadline.',
+        time: 'Live',
+      });
+    }
+    return list;
+  }, [overdueCount]);
 
   return (
     <header className="bg-white/95 dark:bg-slate-900/95 border-b border-slate-200/90 dark:border-slate-800/90 sticky top-0 z-30 backdrop-blur-md transition-colors">
@@ -156,35 +192,47 @@ export const Header = ({
                     </div>
 
                     <div className="space-y-2 mt-3 max-h-72 overflow-y-auto no-scrollbar">
-                      {notifications.map((n) => (
-                        <div
-                          key={n.id}
-                          className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-start gap-2.5 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        >
-                          <div className="mt-0.5">
-                            {n.type === 'overdue' ? (
-                              <Flame className="w-4 h-4 text-rose-500 shrink-0" />
-                            ) : n.type === 'cap' ? (
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                            ) : (
-                              <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-900 dark:text-white truncate">
-                                {n.title}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                {n.time}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
-                              {n.detail}
-                            </p>
-                          </div>
+                      {notifications.length === 0 ? (
+                        <div className="py-6 px-3 text-center">
+                          <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            All Systems In Compliance
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            Zero overdue items or active escalation alerts.
+                          </p>
                         </div>
-                      ))}
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-start gap-2.5 text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          >
+                            <div className="mt-0.5">
+                              {n.type === 'overdue' ? (
+                                <Flame className="w-4 h-4 text-rose-500 shrink-0" />
+                              ) : n.type === 'cap' ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                              ) : (
+                                <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-900 dark:text-white truncate">
+                                  {n.title}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {n.time}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
+                                {n.detail}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
 
                     {onSelectOverdue && (
@@ -205,6 +253,22 @@ export const Header = ({
                 </>
               )}
             </div>
+
+            {/* Fullscreen Mode Toggle Button */}
+            <button
+              type="button"
+              id="fullscreen-toggle-btn"
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+              title={isFullscreen ? 'Exit Fullscreen Mode (Esc)' : 'Enter Fullscreen Mode'}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center justify-center"
+            >
+              {isFullscreen ? (
+                <Minimize className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />
+              ) : (
+                <Maximize className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+              )}
+            </button>
 
             {/* Theme Toggle Button */}
             <button
