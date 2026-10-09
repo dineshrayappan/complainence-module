@@ -35,7 +35,7 @@ export const SidebarNavigation = ({
     },
     {
       id: 'my-tasks',
-      label: 'My Tasks',
+      label: 'My Tasks (Start/Stop)',
       icon: ClipboardCheck,
       badge: counts.myTasks || null,
       badgeColor: 'bg-rose-500 text-white',
@@ -71,7 +71,7 @@ export const SidebarNavigation = ({
     { isDivider: true },
     {
       id: 'departments',
-      label: 'Departments',
+      label: 'Departments (Live Status)',
       icon: Building2,
       badge: counts.deptCount !== undefined && counts.deptCount !== null && counts.deptCount > 0 ? String(counts.deptCount) : null,
       badgeColor: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200',

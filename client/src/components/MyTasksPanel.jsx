@@ -466,6 +466,37 @@ export const MyTasksPanel = ({ compact = false }) => {
         </div>
       </div>
 
+      {/* Visual Work Action Guidance Banner */}
+      <div className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 border border-indigo-500/20 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Play className="w-4 h-4 fill-current ml-0.5" />
+          </div>
+          <div>
+            <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>Work Tracking Buttons</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-cyan-300">
+                Start & Stop / Complete
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Click <strong className="text-indigo-600 dark:text-indigo-400">▶ Start Work</strong> on any task below when beginning work. When finished, click <strong className="text-emerald-600 dark:text-emerald-400">✓ Stop / Complete</strong> to upload mandatory photo proof.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shadow-xs">
+            <Play className="w-3 h-3 fill-current" />
+            <span>Start Work</span>
+          </span>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-xs">
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Stop / Complete</span>
+          </span>
+        </div>
+      </div>
+
       {error && (
         <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-[11px] font-semibold text-rose-700 dark:text-rose-300 flex items-start gap-2">
           <span className="flex-1">{error}</span>

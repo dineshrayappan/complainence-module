@@ -29,9 +29,12 @@ import {
   Trophy,
   Award,
   Filter,
+  Camera,
+  Upload,
 } from 'lucide-react';
 import { complaintService, taskService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { compressImage } from '../utils/imageCompressor';
 
 // Department icon mapping
 const getDeptIcon = (deptName) => {
@@ -72,6 +75,87 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
   const [savingThresholds, setSavingThresholds] = useState(false);
   const [configSuccess, setConfigSuccess] = useState(false);
   const [configError, setConfigError] = useState(null);
+
+  // Task Work Tracking Actions (Start Work & Stop/Complete Work with Proof)
+  const [completeModalTask, setCompleteModalTask] = useState(null);
+  const [proofPhoto, setProofPhoto] = useState('');
+  const [proofPhotoPreview, setProofPhotoPreview] = useState(null);
+  const [proofNotes, setProofNotes] = useState('');
+  const [proofError, setProofError] = useState(null);
+  const [submittingProof, setSubmittingProof] = useState(false);
+  const [actionBusyId, setActionBusyId] = useState(null);
+
+  const handleStartWork = async (taskId) => {
+    setActionBusyId(taskId);
+    try {
+      await taskService.startTask(taskId);
+      loadData(false);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not start task.');
+    } finally {
+      setActionBusyId(null);
+    }
+  };
+
+  const openCompleteModal = (task, employee) => {
+    setCompleteModalTask({ ...task, employeeName: employee.name, employeeId: employee.employeeId });
+    setProofPhoto('');
+    setProofPhotoPreview(null);
+    setProofNotes('');
+    setProofError(null);
+  };
+
+  const handleProofImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressed = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.8 });
+      setProofPhoto(compressed.dataUrl || compressed.previewUrl);
+      setProofPhotoPreview(compressed.previewUrl || compressed.dataUrl);
+      setProofError(null);
+    } catch (err) {
+      console.error('Image compression error:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setProofPhoto(event.target.result);
+        setProofPhotoPreview(event.target.result);
+        setProofError(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitProof = async (e) => {
+    e.preventDefault();
+    if (!completeModalTask) return;
+
+    if (!proofPhoto || !proofPhoto.trim()) {
+      setProofError('Completion photo proof is required! Please attach or capture a photo before stopping/completing work.');
+      return;
+    }
+
+    if (!proofNotes || !proofNotes.trim()) {
+      setProofError('Completion notes/details are required to document proof.');
+      return;
+    }
+
+    setSubmittingProof(true);
+    setProofError(null);
+
+    try {
+      await taskService.completeTask(completeModalTask.id, {
+        proofPhoto,
+        proofNotes: proofNotes.trim(),
+      });
+      setCompleteModalTask(null);
+      loadData(false);
+    } catch (err) {
+      setProofError(err.response?.data?.message || 'Failed to complete task.');
+    } finally {
+      setSubmittingProof(false);
+    }
+  };
 
   const loadData = useCallback(async (showSpinner = false) => {
     try {
@@ -487,13 +571,14 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
                   <th className="py-3.5 px-3 font-bold">Start Time</th>
                   <th className="py-3.5 px-3 font-bold">Completion Time</th>
                   <th className="py-3.5 px-4 font-bold text-center">Proof Status</th>
-                  <th className="py-3.5 px-4 font-bold text-right">Finish Rank</th>
+                  <th className="py-3.5 px-3 font-bold text-center">Finish Rank</th>
+                  <th className="py-3.5 px-4 font-bold text-right">Work Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
                 {(!liveStatusData?.employees || liveStatusData.employees.length === 0) ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 text-xs font-mono">
+                    <td colSpan={9} className="py-12 text-center text-slate-400 text-xs font-mono">
                       No employees listed for this department.
                     </td>
                   </tr>
@@ -637,7 +722,7 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
                         </td>
 
                         {/* 8. Finish Rank */}
-                        <td className="py-3.5 px-4 text-right whitespace-nowrap font-mono">
+                        <td className="py-3.5 px-3 text-center whitespace-nowrap font-mono">
                           {emp.completionRank ? (
                             <span
                               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black ${
@@ -654,6 +739,42 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
                             <span className="text-slate-400 text-xs">—</span>
                           )}
                         </td>
+
+                        {/* 9. Work Action Buttons: Start Work & Stop / Complete Work */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          {isBusy && emp.assignedTask ? (
+                            <button
+                              onClick={() => openCompleteModal(emp.assignedTask, emp)}
+                              disabled={actionBusyId === emp.assignedTask.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                              title="Stop & Complete Work (Mandatory Photo Upload)"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Stop / Complete</span>
+                            </button>
+                          ) : emp.assignedTask && !isDone ? (
+                            <button
+                              onClick={() => handleStartWork(emp.assignedTask.id)}
+                              disabled={actionBusyId === emp.assignedTask.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                              title="Start Work on Task (Sets status to In Progress / Busy)"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <span>Start Work</span>
+                            </button>
+                          ) : isDone && emp.proofPhoto ? (
+                            <button
+                              onClick={() => setViewProofItem(emp)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+                              title="View Completed Proof"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>View Proof</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] font-mono text-slate-400">Available</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })
@@ -661,6 +782,140 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
               </tbody>
             </table>
           </div>
+
+          {/* Complete Task Modal with Mandatory Photo Proof */}
+          {completeModalTask && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
+              <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                        Stop / Complete Work & Upload Proof
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Mandatory photo proof & verification details required
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setCompleteModalTask(null)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                    Task Title
+                  </span>
+                  <p className="font-bold text-slate-900 dark:text-white">
+                    {completeModalTask.title}
+                  </p>
+                  <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-slate-500">
+                    <span>Worker: {completeModalTask.employeeName || 'Assigned Worker'}</span>
+                    <span>• Dept: {completeModalTask.department}</span>
+                  </div>
+                </div>
+
+                {proofError && (
+                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{proofError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmitProof} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                      1. Work Completion Photo Proof <span className="text-rose-500">* (Mandatory)</span>
+                    </label>
+                    <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl p-4 text-center transition-colors">
+                      {proofPhotoPreview ? (
+                        <div className="space-y-3">
+                          <div className="relative mx-auto max-w-xs rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                            <img
+                              src={proofPhotoPreview}
+                              alt="Proof preview"
+                              className="w-full h-44 object-cover"
+                            />
+                          </div>
+                          <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Retake / Change Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={handleProofImageChange}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center gap-2 py-4 cursor-pointer">
+                          <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                            <Camera className="w-6 h-6" />
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                              Click to capture or upload photo proof
+                            </span>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              High-resolution JPEG or PNG (automatically compressed)
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleProofImageChange}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                      2. Work Completion Notes & Details <span className="text-rose-500">* (Mandatory)</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={proofNotes}
+                      onChange={(e) => setProofNotes(e.target.value)}
+                      placeholder="Describe work performed, equipment checked, measurements taken, or findings..."
+                      className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setCompleteModalTask(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingProof}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{submittingProof ? 'Verifying & Saving...' : 'Submit & Complete Work'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
