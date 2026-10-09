@@ -220,7 +220,13 @@ export const MyTasksPanel = ({ compact = false }) => {
       const res = await taskService.startTask(task.id);
       load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not start work on task.');
+      if (err.response?.data?.code === 'EMPLOYEE_ALREADY_BUSY') {
+        alert(`⚠️ Already Busy: ${err.response.data.message}`);
+      } else if (err.response?.data?.code === 'UNAUTHORIZED_DEPARTMENT') {
+        alert(`⛔ Department Access Denied: ${err.response.data.message}`);
+      } else {
+        setError(err.response?.data?.message || 'Could not start work on task.');
+      }
     } finally {
       setBusyId(null);
     }
@@ -228,7 +234,11 @@ export const MyTasksPanel = ({ compact = false }) => {
 
   // Open the mandatory Proof of Completion Modal
   const openProofModal = (task) => {
-    setProofModalTask(task);
+    const otherWorkers = Array.isArray(task?.activeWorkers)
+      ? task.activeWorkers.filter((w) => (w.employeeId || '').toUpperCase() !== (user?.employeeId || '').toUpperCase())
+      : [];
+
+    setProofModalTask({ ...task, otherWorkers });
     setProofPhoto('');
     setProofPhotoPreview(null);
     setProofNotes('');
@@ -291,8 +301,10 @@ export const MyTasksPanel = ({ compact = false }) => {
       }
     } catch (err) {
       if (err.response?.status === 409) {
-        setProofError(`⚠️ ${err.response.data?.message || 'Another employee submitted completion proof first! You cannot claim this task.'}`);
+        setProofError(`⛔ Task Already Completed: ${err.response.data?.message || 'Another employee submitted completion proof first! You cannot claim this task.'}`);
         load();
+      } else if (err.response?.data?.code === 'UNAUTHORIZED_DEPARTMENT') {
+        setProofError(`⛔ Unauthorized Department: ${err.response.data.message}`);
       } else {
         setProofError(err.response?.data?.message || 'Failed to submit completion proof.');
       }
@@ -596,11 +608,22 @@ export const MyTasksPanel = ({ compact = false }) => {
 
                 {departmentWorkers.length > 0 ? (
                   <optgroup label={`── Dedicated Workers in ${form.department} (${departmentWorkers.length}) ──`}>
-                    {departmentWorkers.map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || u.role} [{u.employeeId}]
-                      </option>
-                    ))}
+                    {departmentWorkers.map((u) => {
+                      const isWorkerBusy = tasks.some(
+                        (t) =>
+                          t.status !== 'Completed' &&
+                          t.workStatus !== 'COMPLETED' &&
+                          Array.isArray(t.activeWorkers) &&
+                          t.activeWorkers.some(
+                            (w) => (w.employeeId || '').toUpperCase() === (u.employeeId || '').toUpperCase()
+                          )
+                      );
+                      return (
+                        <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                          {u.name} — {u.designation || u.role} [{u.employeeId}] {isWorkerBusy ? '🔴 (Busy - Working)' : '🟢 (Available)'}
+                        </option>
+                      );
+                    })}
                   </optgroup>
                 ) : null}
 
@@ -613,21 +636,43 @@ export const MyTasksPanel = ({ compact = false }) => {
                   )}
                   {auditors
                     .filter((a) => (a.id || a._id) !== (user?.id || user?._id))
-                    .map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || 'Auditor'} [{u.employeeId}]
-                      </option>
-                    ))}
+                    .map((u) => {
+                      const isWorkerBusy = tasks.some(
+                        (t) =>
+                          t.status !== 'Completed' &&
+                          t.workStatus !== 'COMPLETED' &&
+                          Array.isArray(t.activeWorkers) &&
+                          t.activeWorkers.some(
+                            (w) => (w.employeeId || '').toUpperCase() === (u.employeeId || '').toUpperCase()
+                          )
+                      );
+                      return (
+                        <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                          {u.name} — {u.designation || 'Auditor'} [{u.employeeId}] {isWorkerBusy ? '🔴 (Busy - Working)' : '🟢 (Available)'}
+                        </option>
+                      );
+                    })}
                 </optgroup>
 
                 {/* Other plant staff */}
                 {otherWorkers.length > 0 && (
                   <optgroup label="── Other Plant Workers ──">
-                    {otherWorkers.map((u) => (
-                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
-                        {u.name} — {u.designation || u.role} ({u.department}) [{u.employeeId}]
-                      </option>
-                    ))}
+                    {otherWorkers.map((u) => {
+                      const isWorkerBusy = tasks.some(
+                        (t) =>
+                          t.status !== 'Completed' &&
+                          t.workStatus !== 'COMPLETED' &&
+                          Array.isArray(t.activeWorkers) &&
+                          t.activeWorkers.some(
+                            (w) => (w.employeeId || '').toUpperCase() === (u.employeeId || '').toUpperCase()
+                          )
+                      );
+                      return (
+                        <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                          {u.name} — {u.designation || u.role} ({u.department}) [{u.employeeId}] {isWorkerBusy ? '🔴 (Busy - Working)' : '🟢 (Available)'}
+                        </option>
+                      );
+                    })}
                   </optgroup>
                 )}
               </select>
@@ -735,6 +780,25 @@ export const MyTasksPanel = ({ compact = false }) => {
               {group.items.map((task) => {
                 const style = STATE_STYLE[task.state] || STATE_STYLE.Upcoming;
                 const isDone = task.state === 'Completed';
+
+                const isElevatedUser = user?.role === 'ADMIN' || user?.role === 'AUDITOR' || user?.isUniversal;
+                const userDept = (user?.department || '').trim().toLowerCase();
+                const taskDept = (task.department || '').trim().toLowerCase();
+                const isDirectlyAssigned =
+                  (task.assignedTo?.employeeId || '').toUpperCase() === (user?.employeeId || '').toUpperCase() ||
+                  task.assignedTo?.userId === user?.id;
+                const isDeptEligible = isElevatedUser || isDirectlyAssigned || (userDept && taskDept && userDept === taskDept);
+
+                const myBusyTask = tasks.find(
+                  (t) =>
+                    String(t.id) !== String(task.id) &&
+                    t.state !== 'Completed' &&
+                    t.status !== 'Completed' &&
+                    t.workStatus !== 'COMPLETED' &&
+                    Array.isArray(t.activeWorkers) &&
+                    t.activeWorkers.some((w) => (w.employeeId || '').toUpperCase() === (user?.employeeId || '').toUpperCase())
+                );
+
                 return (
                   <div
                     key={task.id}
@@ -837,6 +901,24 @@ export const MyTasksPanel = ({ compact = false }) => {
                                 <span>Stop / Complete</span>
                               </button>
                             </div>
+                          ) : !isDeptEligible ? (
+                            /* Unauthorized department: Lock button */
+                            <span
+                              title={`Only authorized employees of the ${task.department} department can work on this task.`}
+                              className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[10px] font-bold font-mono"
+                            >
+                              🔒 {task.department} Only
+                            </span>
+                          ) : myBusyTask ? (
+                            /* Already busy with another task */
+                            <button
+                              disabled
+                              title={`You are currently busy working on "${myBusyTask.title}". Finish or complete that task before starting another.`}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 text-[11px] font-bold cursor-not-allowed opacity-80"
+                            >
+                              <Clock className="w-3 h-3 text-amber-500" />
+                              <span>Busy on Other Task</span>
+                            </button>
                           ) : (
                             /* Start Work Button */
                             <button
@@ -927,6 +1009,21 @@ export const MyTasksPanel = ({ compact = false }) => {
                 </p>
               </div>
             </div>
+
+            {/* Concurrent Work Notice: If another employee is actively completing/working on the same task */}
+            {proofModalTask.otherWorkers && proofModalTask.otherWorkers.length > 0 && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-200 animate-pulse">
+                <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-extrabold uppercase text-[10px] tracking-wider block text-amber-700 dark:text-amber-300">
+                    ⚡ Concurrent Work Notice
+                  </span>
+                  <p className="text-[11px] leading-relaxed">
+                    Another employee ({proofModalTask.otherWorkers.map((w) => `${w.name} [${w.employeeId}]`).join(', ')}) is also actively working on this task. Only the first eligible employee to submit valid proof is recorded as the completed task owner.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {proofError && (
               <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs font-bold text-rose-700 dark:text-rose-300 flex items-center gap-2">

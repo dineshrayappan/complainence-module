@@ -91,14 +91,29 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
       await taskService.startTask(taskId);
       loadData(false);
     } catch (err) {
-      alert(err.response?.data?.message || 'Could not start task.');
+      if (err.response?.data?.code === 'EMPLOYEE_ALREADY_BUSY') {
+        alert(`⚠️ Already Busy: ${err.response.data.message}`);
+      } else if (err.response?.data?.code === 'UNAUTHORIZED_DEPARTMENT') {
+        alert(`⛔ Department Access Denied: ${err.response.data.message}`);
+      } else {
+        alert(err.response?.data?.message || 'Could not start task.');
+      }
     } finally {
       setActionBusyId(null);
     }
   };
 
   const openCompleteModal = (task, employee) => {
-    setCompleteModalTask({ ...task, employeeName: employee.name, employeeId: employee.employeeId });
+    const otherWorkers = Array.isArray(task?.activeWorkers)
+      ? task.activeWorkers.filter((w) => (w.employeeId || '').toUpperCase() !== (employee?.employeeId || '').toUpperCase())
+      : [];
+
+    setCompleteModalTask({
+      ...task,
+      employeeName: employee.name,
+      employeeId: employee.employeeId,
+      otherWorkers,
+    });
     setProofPhoto('');
     setProofPhotoPreview(null);
     setProofNotes('');
@@ -156,8 +171,10 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
       }
     } catch (err) {
       if (err.response?.status === 409) {
-        setProofError(`⚠️ ${err.response.data?.message || 'Another employee submitted completion proof first! You cannot claim this task.'}`);
+        setProofError(`⛔ Task Already Completed: ${err.response.data?.message || 'Another employee submitted completion proof first! The first completer is permanently recorded.'}`);
         loadData(false);
+      } else if (err.response?.data?.code === 'UNAUTHORIZED_DEPARTMENT') {
+        setProofError(`⛔ Unauthorized Department: ${err.response.data.message}`);
       } else {
         setProofError(err.response?.data?.message || 'Failed to complete task.');
       }
@@ -830,6 +847,21 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
                     <span>• Dept: {completeModalTask.department}</span>
                   </div>
                 </div>
+
+                {/* Concurrent Work Notice: If another employee is actively completing/working on the same task */}
+                {completeModalTask.otherWorkers && completeModalTask.otherWorkers.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5 animate-pulse">
+                    <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                    <div>
+                      <span className="font-extrabold uppercase text-[10px] tracking-wider block text-amber-700 dark:text-amber-300">
+                        ⚡ Active Competition Notice
+                      </span>
+                      <span>
+                        Another employee ({completeModalTask.otherWorkers.map((w) => `${w.name} [${w.employeeId}]`).join(', ')}) is also actively working on this task. Only the first eligible employee to submit valid proof is recorded as the completed task owner.
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {proofError && (
                   <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-2">
