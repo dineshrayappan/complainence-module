@@ -91,14 +91,18 @@ export const SidebarNavigation = ({
       badge: null,
       badgeColor: '',
     },
-    { isDivider: true },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Settings,
-      badge: isAdmin ? 'Admin' : null,
-      badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
-    },
+    ...(isAdmin
+      ? [
+          { isDivider: true },
+          {
+            id: 'settings',
+            label: 'Settings',
+            icon: Settings,
+            badge: 'Admin',
+            badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+          },
+        ]
+      : []),
   ];
 
   const handleItemClick = (id) => {

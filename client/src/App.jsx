@@ -603,12 +603,7 @@ export const App = () => {
           ) : currentNavSection === 'settings' ? (
             isAdmin ? (
               <AdminUserManagement />
-            ) : (
-              <DepartmentComplianceDashboard
-                onSelectDepartment={handleDrilldownDepartment}
-                onClose={() => setCurrentNavSection('dashboard')}
-              />
-            )
+            ) : null
           ) : currentNavSection === 'audits' ? (
             <AuditManagementDashboard
               onOpenNewComplaint={handleOpenNewComplaintWithPrefill}
