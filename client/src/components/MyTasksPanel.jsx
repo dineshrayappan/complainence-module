@@ -8,8 +8,11 @@ import {
   X,
   ChevronRight,
   Repeat,
+  User,
+  Building2,
+  Filter,
 } from 'lucide-react';
-import { taskService } from '../services/api';
+import { taskService, userService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const STATE_STYLE = {
@@ -22,6 +25,18 @@ const STATE_STYLE = {
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
 const RECURRENCES = ['NONE', 'DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY'];
 
+const FACTORY_DEPARTMENTS = [
+  'Central Quality Audit',
+  'Production',
+  'Quality',
+  'Maintenance',
+  'Store',
+  'EHS',
+  'EDP',
+  'HR',
+  'Plant Operations & Executive Oversight',
+];
+
 const fmtDay = (iso) => {
   const d = new Date(iso);
   return `${String(d.getDate()).padStart(2, '0')}-${d.toLocaleString('en-GB', { month: 'short' })}`;
@@ -33,14 +48,14 @@ const startOfToday = () => {
   return d;
 };
 
-const emptyForm = () => ({
+const emptyForm = (defaultUserId = '') => ({
   title: '',
   department: 'Central Quality Audit',
   description: '',
   dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
   recurrence: 'NONE',
   priority: 'MEDIUM',
-  assignedToUserId: '',
+  assignedToUserId: defaultUserId || '',
 });
 
 export const MyTasksPanel = ({ compact = false }) => {
@@ -53,8 +68,33 @@ export const MyTasksPanel = ({ compact = false }) => {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState(null);
+  const [usersList, setUsersList] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [deptFilter, setDeptFilter] = useState('ALL');
 
   const canSchedule = Boolean(isAdmin || isAuditor);
+
+  // Fetch users for Auditor and Department dropdown lists
+  useEffect(() => {
+    let isMounted = true;
+    const loadUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const res = await userService.getAllUsers();
+        if (isMounted && res.data?.success && Array.isArray(res.data.users)) {
+          setUsersList(res.data.users.filter((u) => u.isActive !== false));
+        }
+      } catch (err) {
+        console.warn('[MyTasksPanel] Could not load users for task assignment:', err);
+      } finally {
+        if (isMounted) setLoadingUsers(false);
+      }
+    };
+    loadUsers();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -74,15 +114,47 @@ export const MyTasksPanel = ({ compact = false }) => {
     load();
   }, [load]);
 
-  // Overdue and due-today both belong in "Today" — an overdue item is more
-  // urgent than one merely due, not a separate bucket to triage separately.
+  // Dynamic set of available departments
+  const availableDepartments = useMemo(() => {
+    const depts = new Set(FACTORY_DEPARTMENTS);
+    usersList.forEach((u) => {
+      if (u.department) depts.add(u.department);
+    });
+    tasks.forEach((t) => {
+      if (t.department) depts.add(t.department);
+    });
+    return Array.from(depts);
+  }, [usersList, tasks]);
+
+  // Grouped user categories for Assignee dropdown
+  const auditors = useMemo(
+    () => usersList.filter((u) => u.role === 'AUDITOR'),
+    [usersList]
+  );
+  const supervisors = useMemo(
+    () => usersList.filter((u) => u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR'),
+    [usersList]
+  );
+  const administrators = useMemo(
+    () => usersList.filter((u) => u.role === 'ADMIN'),
+    [usersList]
+  );
+  const otherUsers = useMemo(
+    () => usersList.filter((u) => !['AUDITOR', 'ACTION_PERSON', 'SUPERVISOR', 'ADMIN'].includes(u.role)),
+    [usersList]
+  );
+
+  // Grouped tasks with optional department filter
   const groups = useMemo(() => {
     const today = startOfToday();
     const weekEnd = new Date(today);
     weekEnd.setDate(weekEnd.getDate() + 7);
 
-    const open = tasks.filter((t) => t.state !== 'Completed');
-    const done = tasks.filter((t) => t.state === 'Completed');
+    const filteredByDept =
+      deptFilter === 'ALL' ? tasks : tasks.filter((t) => t.department === deptFilter);
+
+    const open = filteredByDept.filter((t) => t.state !== 'Completed');
+    const done = filteredByDept.filter((t) => t.state === 'Completed');
 
     return [
       { key: 'today', label: 'Today', items: open.filter((t) => ['Overdue', 'Due Today'].includes(t.state)) },
@@ -102,14 +174,12 @@ export const MyTasksPanel = ({ compact = false }) => {
       },
       { key: 'done', label: 'Completed', items: done },
     ].filter((g) => g.items.length > 0);
-  }, [tasks]);
+  }, [tasks, deptFilter]);
 
   const handleComplete = async (task) => {
     setBusyId(task.id);
     try {
       const res = await taskService.completeTask(task.id);
-      // Recurring tasks book their own next occurrence, so always re-list
-      // rather than patching state locally.
       load();
       if (res.data?.nextTask) {
         // eslint-disable-next-line no-alert
@@ -124,42 +194,78 @@ export const MyTasksPanel = ({ compact = false }) => {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm());
+    const myId = user?.id || user?._id || user?.employeeId || '';
+    setForm(emptyForm(myId));
     setShowForm(true);
   };
 
   const openEdit = (task) => {
     setEditing(task);
+    const matchedUser = usersList.find(
+      (u) =>
+        u.employeeId === task.assignedTo?.employeeId ||
+        (u.id && u.id === task.assignedTo?.userId) ||
+        (u._id && u._id === task.assignedTo?.userId)
+    );
+    const assignedId =
+      matchedUser?.id ||
+      matchedUser?._id ||
+      task.assignedTo?.userId ||
+      task.assignedTo?.employeeId ||
+      '';
+
     setForm({
       title: task.title || '',
-      department: task.department || '',
+      department: task.department || 'Central Quality Audit',
       description: task.description || '',
       dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '',
       recurrence: task.recurrence || 'NONE',
       priority: task.priority || 'MEDIUM',
-      assignedToUserId: task.assignedTo?.employeeId || '',
+      assignedToUserId: assignedId,
     });
     setShowForm(true);
+  };
+
+  const handleAssigneeChange = (e) => {
+    const selectedVal = e.target.value;
+    const selectedUser = usersList.find(
+      (u) =>
+        (u.id && u.id === selectedVal) ||
+        (u._id && u._id === selectedVal) ||
+        u.employeeId === selectedVal
+    );
+
+    setForm((prev) => {
+      const next = { ...prev, assignedToUserId: selectedVal };
+      // If user belongs to a specific factory department, default the department dropdown accordingly
+      if (
+        selectedUser?.department &&
+        selectedUser.department !== 'Plant Operations & Executive Oversight'
+      ) {
+        next.department = selectedUser.department;
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     try {
+      const payload = {
+        title: form.title.trim(),
+        department: form.department,
+        description: form.description.trim(),
+        dueDate: new Date(form.dueDate).toISOString(),
+        recurrence: form.recurrence,
+        priority: form.priority,
+        assignedToUserId: form.assignedToUserId || undefined,
+      };
+
       if (editing) {
-        await taskService.updateTask(editing.id, {
-          title: form.title,
-          department: form.department,
-          description: form.description,
-          dueDate: new Date(form.dueDate).toISOString(),
-          recurrence: form.recurrence,
-          priority: form.priority,
-        });
+        await taskService.updateTask(editing.id, payload);
       } else {
-        await taskService.createTask({
-          ...form,
-          dueDate: new Date(form.dueDate).toISOString(),
-        });
+        await taskService.createTask(payload);
       }
       setShowForm(false);
       setEditing(null);
@@ -182,7 +288,7 @@ export const MyTasksPanel = ({ compact = false }) => {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />
           <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">
@@ -194,7 +300,25 @@ export const MyTasksPanel = ({ compact = false }) => {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Department Filter Dropdown */}
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px]">
+            <Filter className="w-3 h-3 text-slate-400" />
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              className="bg-transparent text-[11px] font-semibold text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
+            >
+              <option value="ALL">All Departments</option>
+              {availableDepartments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={load}
             className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
@@ -207,7 +331,7 @@ export const MyTasksPanel = ({ compact = false }) => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold shadow-md shadow-indigo-600/30 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              Schedule
+              Schedule Task
             </button>
           )}
         </div>
@@ -226,11 +350,12 @@ export const MyTasksPanel = ({ compact = false }) => {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3"
+          className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3.5 shadow-sm"
         >
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-              {editing ? 'Edit Task' : 'Schedule Task'}
+          <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+            <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-indigo-600" />
+              {editing ? 'Edit Scheduled Task' : 'Schedule New Task'}
             </h3>
             <button
               type="button"
@@ -238,61 +363,160 @@ export const MyTasksPanel = ({ compact = false }) => {
                 setShowForm(false);
                 setEditing(null);
               }}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer p-1"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          <input
-            required
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="Task title"
-            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:border-indigo-500"
-          />
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              Task Title
+            </label>
+            <input
+              required
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="e.g., Weekly Needle Guard Safety Audit, PPE Verification, ISO Clause 8.5 Check"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
+            />
+          </div>
 
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="What must be checked?"
-            rows={2}
-            className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500"
-          />
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+              Inspection Details / Checklist Scope
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder="What must be checked? (Key clauses, inspection checkpoints, floor areas, or items to verify)"
+              rows={2}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 outline-none focus:border-indigo-500 transition-colors"
+            />
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+          {/* Row 1: Assignee Dropdown (Auditor / Department Staff) and Department Dropdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Due</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-indigo-500" />
+                  Assign To (Auditor / Department Staff)
+                </span>
+                {loadingUsers && (
+                  <span className="text-[9px] text-indigo-500 font-normal animate-pulse">Loading users...</span>
+                )}
+              </span>
+              <select
+                value={form.assignedToUserId}
+                onChange={handleAssigneeChange}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-500 cursor-pointer transition-colors"
+              >
+                <option value="">
+                  {user ? `Assign to Myself (${user.name} - ${user.role})` : 'Select Assignee...'}
+                </option>
+
+                {auditors.length > 0 && (
+                  <optgroup label="── Quality Auditors ──">
+                    {auditors.map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || 'Auditor'} ({u.department || 'Central QA'}) [{u.employeeId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {supervisors.length > 0 && (
+                  <optgroup label="── Department In-Charges & Supervisors ──">
+                    {supervisors.map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || 'Supervisor'} ({u.department}) [{u.employeeId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {administrators.length > 0 && (
+                  <optgroup label="── Plant Leadership & Admins ──">
+                    {administrators.map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || 'Admin'} ({u.department || 'Operations'}) [{u.employeeId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {otherUsers.length > 0 && (
+                  <optgroup label="── Other Plant Staff ──">
+                    {otherUsers.map((u) => (
+                      <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
+                        {u.name} — {u.designation || u.role} ({u.department}) [{u.employeeId}]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-indigo-500" />
+                Target Department
+              </span>
+              <select
+                value={form.department}
+                onChange={(e) => setForm({ ...form, department: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-900 dark:text-white outline-none focus:border-indigo-500 cursor-pointer transition-colors"
+              >
+                {availableDepartments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {/* Row 2: Due Date, Repeats, Priority */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Due Date & Time
+              </span>
               <input
                 type="datetime-local"
                 required
                 value={form.dueDate}
                 onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white outline-none focus:border-indigo-500"
               />
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Repeats</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Repeats
+              </span>
               <select
                 value={form.recurrence}
                 onChange={(e) => setForm({ ...form, recurrence: e.target.value })}
-                className="px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white outline-none focus:border-indigo-500 cursor-pointer"
               >
                 {RECURRENCES.map((r) => (
                   <option key={r} value={r}>
-                    {r === 'NONE' ? 'One-off' : r[0] + r.slice(1).toLowerCase()}
+                    {r === 'NONE' ? 'One-off Task' : r[0] + r.slice(1).toLowerCase()}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Priority</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Priority
+              </span>
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                className="px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white outline-none focus:border-indigo-500"
+                className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white outline-none focus:border-indigo-500 cursor-pointer"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
@@ -301,21 +525,12 @@ export const MyTasksPanel = ({ compact = false }) => {
                 ))}
               </select>
             </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Department</span>
-              <input
-                value={form.department}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
-                className="px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-900 dark:text-white outline-none focus:border-indigo-500"
-              />
-            </label>
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-2">
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-sm shadow-indigo-600/30 transition-colors"
             >
               {editing ? 'Save Changes' : 'Schedule Task'}
             </button>
@@ -325,7 +540,7 @@ export const MyTasksPanel = ({ compact = false }) => {
                 setShowForm(false);
                 setEditing(null);
               }}
-              className="px-4 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-bold cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold cursor-pointer transition-colors"
             >
               Cancel
             </button>
@@ -340,7 +555,7 @@ export const MyTasksPanel = ({ compact = false }) => {
         <div className="p-10 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
           <p className="text-xs font-bold text-slate-900 dark:text-white">No tasks scheduled</p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-            {canSchedule ? 'Use Schedule to book a recurring inspection.' : 'Nothing assigned to you right now.'}
+            {canSchedule ? 'Use Schedule Task to book a recurring inspection.' : 'Nothing assigned to you right now.'}
           </p>
         </div>
       ) : (
@@ -370,7 +585,7 @@ export const MyTasksPanel = ({ compact = false }) => {
                     <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot} ${isDone ? '' : 'animate-pulse'}`} />
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span
                           className={`text-xs font-bold truncate ${
                             isDone
@@ -384,6 +599,16 @@ export const MyTasksPanel = ({ compact = false }) => {
                           <span className="flex items-center gap-0.5 text-[9px] font-mono font-bold text-slate-400">
                             <Repeat className="w-2.5 h-2.5" />
                             {task.recurrence}
+                          </span>
+                        )}
+                        {task.department && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800">
+                            {task.department}
+                          </span>
+                        )}
+                        {task.assignedTo?.name && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                            👤 {task.assignedTo.name}
                           </span>
                         )}
                       </div>

@@ -229,7 +229,7 @@ const updateTask = async (req, res) => {
       return res.status(403).json({ success: false, message: 'You can only edit tasks assigned to you.' });
     }
 
-    const { title, description, dueDate, recurrence, priority, department } = req.body;
+    const { title, description, dueDate, recurrence, priority, department, assignedToUserId, assignedToEmployeeId } = req.body;
     const updates = { updatedAt: new Date().toISOString() };
 
     if (title !== undefined) updates.title = String(title).trim();
@@ -254,6 +254,32 @@ const updateTask = async (req, res) => {
         return res.status(400).json({ success: false, message: `Priority must be one of: ${PRIORITIES.join(', ')}` });
       }
       updates.priority = pri;
+    }
+
+    const lookupId = assignedToUserId || assignedToEmployeeId;
+    if (lookupId !== undefined && lookupId !== '') {
+      let owner = null;
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('*')
+            .or(`id.eq.${lookupId},employeeId.eq.${lookupId},email.eq.${lookupId}`)
+            .limit(1);
+          if (data && data.length) owner = data[0];
+        } catch (e) {
+          console.warn('[TaskController:updateTask] assignee lookup notice:', e.message);
+        }
+      }
+      if (!owner) owner = mockStore.findUserById(lookupId) || mockStore.getUsers().find((u) => u.employeeId === lookupId || u.id === lookupId || u._id === lookupId);
+      if (owner) {
+        updates.assignedTo = {
+          userId: owner.id || owner._id || '',
+          employeeId: owner.employeeId || '',
+          name: owner.name || '',
+          department: owner.department || updates.department || task.department || '',
+        };
+      }
     }
 
     if (isSupabaseConfigured && supabase) {
