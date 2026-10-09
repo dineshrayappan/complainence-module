@@ -25,6 +25,8 @@ import {
   Camera,
   Trophy,
   Play,
+  UserCheck,
+  ClipboardList,
 } from 'lucide-react';
 import { complaintService, taskService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +40,10 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
   const [tasks, setTasks] = useState([]);
   const [activeAuditTab, setActiveAuditTab] = useState('rounds'); // 'rounds' | 'department-tasks'
   const [taskDeptFilter, setTaskDeptFilter] = useState('ALL');
+  const [liveStatusData, setLiveStatusData] = useState(null);
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState('ALL');
+  const [taskStatusFilter, setTaskStatusFilter] = useState('ALL');
+  const [tasksSearchQuery, setTasksSearchQuery] = useState('');
   const [viewProofTask, setViewProofTask] = useState(null);
   const [stats, setStats] = useState({
     completedAudits: 0,
@@ -65,9 +71,10 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
       if (showSpinner) setLoading(true);
       else setIsRefreshing(true);
 
-      const [auditRes, taskRes] = await Promise.allSettled([
+      const [auditRes, taskRes, liveRes] = await Promise.allSettled([
         complaintService.getAudits(),
         taskService.getTasks(),
+        taskService.getLiveStatus({ department: taskDeptFilter }),
       ]);
 
       if (auditRes.status === 'fulfilled' && auditRes.value.data?.success) {
@@ -80,8 +87,12 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
       if (taskRes.status === 'fulfilled' && taskRes.value.data?.success) {
         setTasks(taskRes.value.data.tasks || []);
       }
+
+      if (liveRes.status === 'fulfilled' && liveRes.value.data?.success) {
+        setLiveStatusData(liveRes.value.data);
+      }
     } catch (err) {
-      console.warn('Failed to fetch audits/tasks from server:', err);
+      console.warn('Failed to fetch audits/tasks/live status from server:', err);
     } finally {
       if (showSpinner) setLoading(false);
       setIsRefreshing(false);
@@ -91,6 +102,10 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
   useEffect(() => {
     loadAudits(true);
   }, []);
+
+  useEffect(() => {
+    loadAudits(false);
+  }, [taskDeptFilter]);
 
   // Update item status in active audit
   const handleSetItemStatus = async (status) => {
@@ -246,6 +261,53 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
         };
     }
   };
+
+  // Filtered employees from live telemetry
+  const allEmployees = liveStatusData?.employees || [];
+  const filteredEmployees = allEmployees
+    .filter((emp) => {
+      if (employeeStatusFilter === 'AVAILABLE') return emp.status === 'Available';
+      if (employeeStatusFilter === 'BUSY') return emp.status === 'In Progress / Busy';
+      if (employeeStatusFilter === 'COMPLETED') return emp.status === 'Completed';
+      return true;
+    })
+    .filter((emp) => {
+      if (!tasksSearchQuery.trim()) return true;
+      const q = tasksSearchQuery.toLowerCase();
+      return (
+        emp.name?.toLowerCase().includes(q) ||
+        emp.employeeId?.toLowerCase().includes(q) ||
+        emp.department?.toLowerCase().includes(q) ||
+        emp.assignedTask?.title?.toLowerCase().includes(q)
+      );
+    });
+
+  // Filtered compliance tasks
+  const filteredTasks = tasks
+    .filter((t) => {
+      if (taskDeptFilter !== 'ALL' && t.department !== taskDeptFilter) return false;
+      const isDone = t.status === 'Completed' || t.workStatus === 'COMPLETED';
+      const isBusy = t.workStatus === 'IN_PROGRESS' || (t.status === 'In Progress' && !isDone);
+      if (taskStatusFilter === 'IN_PROGRESS') return isBusy;
+      if (taskStatusFilter === 'COMPLETED') return isDone;
+      if (taskStatusFilter === 'PENDING') return !isDone && !isBusy;
+      return true;
+    })
+    .filter((t) => {
+      if (!tasksSearchQuery.trim()) return true;
+      const q = tasksSearchQuery.toLowerCase();
+      const winnerName = t.completedBy?.name || t.firstCompleter?.name || '';
+      const winnerId = t.completedBy?.employeeId || t.firstCompleter?.employeeId || '';
+      const assigneeName = t.assignedTo?.name || '';
+      return (
+        t.title?.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q) ||
+        t.department?.toLowerCase().includes(q) ||
+        winnerName.toLowerCase().includes(q) ||
+        winnerId.toLowerCase().includes(q) ||
+        assigneeName.toLowerCase().includes(q)
+      );
+    });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -428,8 +490,22 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                   : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
               }`}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Department Tasks & Verified Proofs ({tasks.length})</span>
+              <ClipboardList className="w-4 h-4" />
+              <span>Department Tasks & Live Employee Work</span>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
+                  activeAuditTab === 'department-tasks'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                }`}
+              >
+                {tasks.length}
+              </span>
+              {liveStatusData?.summary?.inProgress > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-amber-400 text-slate-950 animate-pulse">
+                  {liveStatusData.summary.inProgress} BUSY
+                </span>
+              )}
             </button>
           </div>
 
@@ -522,70 +598,484 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
           </div>
         </div>
       ) : (
-        /* 2. DEPARTMENT COMPLIANCE TASKS & VERIFIED PROOFS OVERSIGHT */
-        <div className="space-y-4">
-          {/* Department Filter & Summary Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Filter Department:
+        /* ========================================================================= */
+        /* 2. DEPARTMENT TASKS & LIVE EMPLOYEE WORK (USER REQUIREMENTS 1,2,3,4,5)    */
+        /* ========================================================================= */
+        <div className="space-y-6 animate-fade-in">
+          {/* Summary KPI Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Total Department Staff
               </span>
-              <select
-                value={taskDeptFilter}
-                onChange={(e) => setTaskDeptFilter(e.target.value)}
-                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
-              >
-                <option value="ALL">All Departments (Entire Plant)</option>
-                {['Production', 'Quality', 'Maintenance', 'Store', 'EHS', 'EDP', 'HR', 'Central Quality Audit'].map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
+              <div className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-600" />
+                <span>{liveStatusData?.summary?.totalEmployees ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Active plant workers</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-400">
-                {tasks.filter((t) => taskDeptFilter === 'ALL' || t.department === taskDeptFilter).length} Tasks
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mb-1">
+                Available Workers
               </span>
-              <button
-                type="button"
-                onClick={() => loadAudits(false)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                <span>Refresh Tasks</span>
-              </button>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span>{liveStatusData?.summary?.available ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Ready for assignment</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block mb-1">
+                In Progress / Busy
+              </span>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping" />
+                <span>{liveStatusData?.summary?.inProgress ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Currently on floor tasks</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-cyan-400 block mb-1">
+                Tasks Completed
+              </span>
+              <div className="text-2xl font-black text-indigo-600 dark:text-cyan-400 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-indigo-600 dark:text-cyan-400" />
+                <span>{liveStatusData?.summary?.completed ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">With verified photo proof</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 block mb-1">
+                Compliance Tasks
+              </span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-purple-600" />
+                <span>{tasks.length}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                {tasks.filter((t) => t.workStatus === 'IN_PROGRESS' || t.status === 'In Progress').length} in progress
+              </span>
             </div>
           </div>
 
-          {/* Tasks Table */}
-          <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-50/90 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[10px] sm:text-[11px] border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3.5 px-4 font-bold">Task Title & Details</th>
-                  <th className="py-3.5 px-4 font-bold">Department</th>
-                  <th className="py-3.5 px-4 font-bold text-center">Work Status</th>
-                  <th className="py-3.5 px-4 font-bold">Task Owner / 1st Completer</th>
-                  <th className="py-3.5 px-3 font-bold">Completion Time</th>
-                  <th className="py-3.5 px-4 font-bold text-right">Proof Verification</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
-                {tasks
-                  .filter((t) => taskDeptFilter === 'ALL' || t.department === taskDeptFilter)
-                  .length === 0 ? (
+          {/* First Finisher 🏆 Banner (Identifies who completed task first) */}
+          {liveStatusData?.firstFinisher && (
+            <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-700/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-2xl shadow-md shadow-amber-500/30 shrink-0">
+                  🏆
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">
+                      1st Finisher Recognized
+                    </span>
+                    <span className="text-xs font-mono text-amber-800 dark:text-amber-300 font-bold">
+                      Completed 1st in Department
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+                    {liveStatusData.firstFinisher.name} ({liveStatusData.firstFinisher.employeeId})
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Dept: <span className="font-bold">{liveStatusData.firstFinisher.department}</span> • Task:{' '}
+                    <span className="font-semibold">
+                      {liveStatusData.firstFinisher.assignedTask?.title || 'Floor Task'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end sm:self-center">
+                <div className="text-right">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 block uppercase">
+                    Completion Timestamp
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {liveStatusData.firstFinisher.completionTime
+                      ? new Date(liveStatusData.firstFinisher.completionTime).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })
+                      : '—'}
+                  </span>
+                </div>
+                {liveStatusData.firstFinisher.proofPhoto && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setViewProofTask({
+                        title: liveStatusData.firstFinisher.assignedTask?.title || 'Completed Task',
+                        department: liveStatusData.firstFinisher.department,
+                        completedBy: liveStatusData.firstFinisher,
+                        completedAt: liveStatusData.firstFinisher.completionTime,
+                        proofPhoto: liveStatusData.firstFinisher.proofPhoto,
+                        proofNotes: liveStatusData.firstFinisher.proofNotes,
+                      })
+                    }
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-xs cursor-pointer transition-all active:scale-95"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>View Proof</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SECTION 1: LIVE EMPLOYEE WORK STATUS TABLE (REQUIREMENT 1 & 3) */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-indigo-600" />
+                  <span>1. Live Employee Availability & Work Tracking</span>
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Instant visibility into available vs busy staff, who started work, and fast finisher rankings.
+                </p>
+              </div>
+
+              {/* Department & Status Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={taskDeptFilter}
+                    onChange={(e) => setTaskDeptFilter(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                  >
+                    <option value="ALL">All Departments</option>
+                    {['Production', 'Quality', 'Maintenance', 'Store', 'EHS', 'EDP', 'HR', 'Central Quality Audit'].map(
+                      (d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                <select
+                  value={employeeStatusFilter}
+                  onChange={(e) => setEmployeeStatusFilter(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="AVAILABLE">Available (Idle)</option>
+                  <option value="BUSY">In Progress / Busy</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search employee / task..."
+                    value={tasksSearchQuery}
+                    onChange={(e) => setTasksSearchQuery(e.target.value)}
+                    className="pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white outline-none w-44"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Employee Table */}
+            <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50/90 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[10px] sm:text-[11px] border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 text-xs font-mono">
-                      No compliance tasks scheduled for this department.
-                    </td>
+                    <th className="py-3.5 px-4 font-bold">Employee Name & ID</th>
+                    <th className="py-3.5 px-4 font-bold">Department</th>
+                    <th className="py-3.5 px-4 font-bold text-center">Availability Status</th>
+                    <th className="py-3.5 px-4 font-bold">Assigned Task</th>
+                    <th className="py-3.5 px-3 font-bold">Start Time</th>
+                    <th className="py-3.5 px-3 font-bold">Completion Time</th>
+                    <th className="py-3.5 px-4 font-bold text-center">Proof Status</th>
+                    <th className="py-3.5 px-3 font-bold text-center">Finish Rank</th>
+                    <th className="py-3.5 px-4 font-bold text-right">Proof Oversight</th>
                   </tr>
-                ) : (
-                  tasks
-                    .filter((t) => taskDeptFilter === 'ALL' || t.department === taskDeptFilter)
-                    .map((task) => {
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {filteredEmployees.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-slate-400 text-xs font-mono">
+                        No employees found matching the current filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredEmployees.map((emp) => {
+                      const isBusy = emp.status === 'In Progress / Busy';
+                      const isDone = emp.status === 'Completed';
+                      const isAvailable = emp.status === 'Available';
+
+                      return (
+                        <tr
+                          key={emp.employeeId || emp.userId}
+                          className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors ${
+                            isBusy ? 'bg-amber-500/5' : ''
+                          }`}
+                        >
+                          {/* Name & ID */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                                  isBusy
+                                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40'
+                                    : isDone
+                                    ? 'bg-indigo-500/20 text-indigo-700 dark:text-cyan-300 border border-indigo-500/30'
+                                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                                }`}
+                              >
+                                {emp.name ? emp.name[0] : 'U'}
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                  <span>{emp.name}</span>
+                                  {emp.completionRank === 1 && (
+                                    <span title="First Finisher in Department">🏆</span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] font-mono text-slate-400">
+                                  {emp.employeeId} • {emp.designation || 'Staff'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Department */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                              {emp.department}
+                            </span>
+                          </td>
+
+                          {/* Availability Status */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {isBusy ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 animate-pulse">
+                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                <span>In Progress / Busy</span>
+                              </span>
+                            ) : isDone ? (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Completed</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span>Available</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Assigned Task */}
+                          <td className="py-3.5 px-4">
+                            {emp.assignedTask ? (
+                              <div className="max-w-xs">
+                                <div className="font-bold text-slate-900 dark:text-white truncate">
+                                  {emp.assignedTask.title}
+                                </div>
+                                {emp.assignedTask.priority && (
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    Priority: {emp.assignedTask.priority}
+                                  </span>
+                                )}
+                              </div>
+                            ) : emp.openTask ? (
+                              <span className="text-[11px] text-slate-500 italic">
+                                Open task ready to start
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">—</span>
+                            )}
+                          </td>
+
+                          {/* Start Time */}
+                          <td className="py-3.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {emp.startTime ? (
+                              <div>
+                                <div className="font-bold text-slate-800 dark:text-slate-200">
+                                  {new Date(emp.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                                <span className="text-[9px] text-slate-400">
+                                  {new Date(emp.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* Completion Time */}
+                          <td className="py-3.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {emp.completionTime ? (
+                              <div>
+                                <div className="font-bold text-indigo-600 dark:text-cyan-400">
+                                  {new Date(emp.completionTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                                <span className="text-[9px] text-slate-400">
+                                  {new Date(emp.completionTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* Proof Status */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap font-mono text-xs">
+                            {emp.proofStatus === 'Verified / Uploaded' || emp.proofPhoto ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Photo Verified</span>
+                              </span>
+                            ) : isBusy ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                <Clock className="w-3 h-3" />
+                                <span>Pending Upload</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* Finish Rank */}
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                            {emp.completionRank === 1 ? (
+                              <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-amber-400 text-slate-950 shadow-2xs">
+                                🏆 1st
+                              </span>
+                            ) : emp.completionRank ? (
+                              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                #{emp.completionRank}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono">—</span>
+                            )}
+                          </td>
+
+                          {/* Proof Oversight Action */}
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            {emp.proofPhoto ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setViewProofTask({
+                                    title: emp.assignedTask?.title || 'Completed Work',
+                                    department: emp.department,
+                                    completedBy: emp,
+                                    completedAt: emp.completionTime,
+                                    proofPhoto: emp.proofPhoto,
+                                    proofNotes: emp.proofNotes,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition-all active:scale-95 cursor-pointer"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>View Proof</span>
+                              </button>
+                            ) : isBusy ? (
+                              <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold">
+                                In Progress
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* SECTION 2: DEPARTMENT COMPLIANCE TASKS REGISTER (REQUIREMENT 2, 3, 4, 5) */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-indigo-600" />
+                  <span>2. Department Compliance Tasks & In-Progress Work Register</span>
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Current status of every assigned task, active in-progress workers, and recognized first completers.
+                </p>
+              </div>
+
+              {/* Task Status Filter Pills */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: 'ALL', label: 'All Tasks', count: tasks.length },
+                  {
+                    id: 'IN_PROGRESS',
+                    label: 'In Progress',
+                    count: tasks.filter((t) => t.workStatus === 'IN_PROGRESS' || t.status === 'In Progress').length,
+                  },
+                  {
+                    id: 'COMPLETED',
+                    label: 'Completed',
+                    count: tasks.filter((t) => t.status === 'Completed' || t.workStatus === 'COMPLETED').length,
+                  },
+                  {
+                    id: 'PENDING',
+                    label: 'Pending',
+                    count: tasks.filter(
+                      (t) =>
+                        t.status !== 'Completed' &&
+                        t.workStatus !== 'COMPLETED' &&
+                        t.workStatus !== 'IN_PROGRESS' &&
+                        t.status !== 'In Progress'
+                    ).length,
+                  },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setTaskStatusFilter(f.id)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      taskStatusFilter === f.id
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tasks Register Table */}
+            <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50/90 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[10px] sm:text-[11px] border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4 font-bold">Task Title & Details</th>
+                    <th className="py-3.5 px-4 font-bold">Department</th>
+                    <th className="py-3.5 px-4 font-bold text-center">Current Task Status</th>
+                    <th className="py-3.5 px-4 font-bold">Task Owner / 1st Completer</th>
+                    <th className="py-3.5 px-3 font-bold">Completion Time</th>
+                    <th className="py-3.5 px-4 font-bold text-right">Proof Verification</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {filteredTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-12 text-center text-slate-400 text-xs font-mono">
+                        No compliance tasks found matching the filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTasks.map((task) => {
                       const isDone = task.status === 'Completed' || task.workStatus === 'COMPLETED';
                       const isBusy = task.workStatus === 'IN_PROGRESS' || (task.status === 'In Progress' && !isDone);
                       const winner = task.completedBy || task.firstCompleter || task.assignedTo;
@@ -597,7 +1087,7 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                             isDone ? 'bg-emerald-500/5' : isBusy ? 'bg-amber-500/5' : ''
                           }`}
                         >
-                          {/* 1. Title & Details */}
+                          {/* Task Title & Details */}
                           <td className="py-3.5 px-4">
                             <div className="max-w-md">
                               <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -622,14 +1112,14 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                             </div>
                           </td>
 
-                          {/* 2. Department */}
+                          {/* Department */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               {task.department}
                             </span>
                           </td>
 
-                          {/* 3. Work Status Badge */}
+                          {/* Current Task Status (Requirement 2 & 5) */}
                           <td className="py-3.5 px-4 text-center whitespace-nowrap">
                             {isDone ? (
                               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
@@ -643,9 +1133,15 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                                   <span>In Progress / Busy</span>
                                 </span>
                                 {Array.isArray(task.activeWorkers) && task.activeWorkers.length > 0 && (
-                                  <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 mt-1">
-                                    {task.activeWorkers.length} Active {task.activeWorkers.length === 1 ? 'Worker' : 'Workers'}
-                                  </span>
+                                  <div className="mt-1 flex flex-col items-center">
+                                    <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 font-bold">
+                                      {task.activeWorkers.length} Active{' '}
+                                      {task.activeWorkers.length === 1 ? 'Worker' : 'Workers'}
+                                    </span>
+                                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-mono">
+                                      {task.activeWorkers.map((w) => w.name || w.employeeId).join(', ')}
+                                    </span>
+                                  </div>
                                 )}
                               </div>
                             ) : (
@@ -655,7 +1151,7 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                             )}
                           </td>
 
-                          {/* 4. Task Owner / 1st Completer */}
+                          {/* Task Owner / 1st Completer (Requirement 3) */}
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             {isDone ? (
                               <div className="flex items-center gap-2">
@@ -689,7 +1185,7 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                             )}
                           </td>
 
-                          {/* 5. Completion Time */}
+                          {/* Completion Time (Requirement 4) */}
                           <td className="py-3.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
                             {task.completedAt ? (
                               <div>
@@ -705,7 +1201,7 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                             )}
                           </td>
 
-                          {/* 6. Proof Verification Action */}
+                          {/* Proof Verification Action (Requirement 4) */}
                           <td className="py-3.5 px-4 text-right whitespace-nowrap">
                             {task.proofPhoto ? (
                               <button
@@ -727,9 +1223,10 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                         </tr>
                       );
                     })
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
