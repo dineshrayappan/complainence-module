@@ -24,24 +24,51 @@ import {
   ListChecks,
   Sliders,
   HelpCircle,
+  UserCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { userService, complaintService } from '../services/api';
 import { compressImage, formatFileSize } from '../utils/imageCompressor';
 
+// Exact department matching helper ensuring strict department isolation
+const isDeptMatch = (userDept, targetDept) => {
+  if (!userDept || !targetDept) return false;
+  const u = userDept.trim().toLowerCase();
+  const t = targetDept.trim().toLowerCase();
+  if (u === t) return true;
+
+  if (t === 'quality' || t === 'qa') {
+    return u === 'quality' || u === 'qa' || u === 'quality assurance' || u === 'quality control';
+  }
+  if (t === 'production' || t === 'prd') {
+    return u === 'production' || u === 'prd' || u.startsWith('production ');
+  }
+  if (t === 'maintenance' || t === 'mnt') {
+    return u === 'maintenance' || u === 'mnt' || u.startsWith('maintenance ');
+  }
+  if (t === 'store' || t === 'str') {
+    return u === 'store' || u === 'str' || u === 'stores' || u.startsWith('store ');
+  }
+  if (t === 'ehs') {
+    return u === 'ehs' || u === 'environment, health & safety' || u.startsWith('ehs ');
+  }
+  if (t === 'edp') {
+    return u === 'edp' || u === 'it' || u === 'electronic data processing' || u.startsWith('edp ');
+  }
+  if (t === 'hr') {
+    return u === 'hr' || u === 'human resources' || u.startsWith('hr ');
+  }
+  if (t === 'central quality audit' || t === 'cqa') {
+    return u === 'central quality audit' || u === 'cqa' || u === 'quality audit';
+  }
+  return false;
+};
+
 // Backward compatibility export
 export const DUMMY_SUPERVISORS = [];
 
-// 7 Specific Industrial Factory Departments & Roles
+// Specific Industrial Factory Departments & Roles
 const AUDIT_DEPARTMENTS = [
-  {
-    id: 'Production',
-    name: 'Production',
-    group: 'Manufacturing',
-    code: 'PRD',
-    desc: 'Sewing, Stitching Lines, Cutting, Finishing & Assembly Operations',
-    focus: 'Stitching defects, needle deflection, line balance & workmanship',
-    defaultLocation: 'Production Floor - Sewing Section',
-  },
   {
     id: 'Quality',
     name: 'Quality',
@@ -50,6 +77,15 @@ const AUDIT_DEPARTMENTS = [
     desc: 'Quality Assurance, In-Line QC, End-Line & Pre-Shipment AQL Audits',
     focus: 'AQL 1.5 standards, measurement tolerance & visual inspection',
     defaultLocation: 'QA Inspection Table - AQL Room',
+  },
+  {
+    id: 'Production',
+    name: 'Production',
+    group: 'Manufacturing',
+    code: 'PRD',
+    desc: 'Sewing, Stitching Lines, Cutting, Finishing & Assembly Operations',
+    focus: 'Stitching defects, needle deflection, line balance & workmanship',
+    defaultLocation: 'Production Floor - Sewing Section',
   },
   {
     id: 'Maintenance',
@@ -95,6 +131,15 @@ const AUDIT_DEPARTMENTS = [
     desc: 'Human Resources, Labor Compliance, Operator Training & Working Hours',
     focus: 'Operator skill matrices, attendance compliance & social audit standards',
     defaultLocation: 'HR Department & Training Center',
+  },
+  {
+    id: 'Central Quality Audit',
+    name: 'Central Quality Audit',
+    group: 'QA / Internal Audit',
+    code: 'CQA',
+    desc: 'QA System Audits, Verification Protocols, Calibration Standards & Audit Checklists',
+    focus: 'Audit checklists, SOP adherence, gauge calibration & verification protocols',
+    defaultLocation: 'QA Audit Office & Standards Room',
   },
 ];
 
@@ -295,7 +340,6 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   // Stage 5: Assign Responsible Person
   const [assignedToUserId, setAssignedToUserId] = useState('');
   const [contactSearch, setContactSearch] = useState('');
-  const [filterDeptOnly, setFilterDeptOnly] = useState(false);
 
   // Stage 6: Set Due Date & SLA
   const [deadlineHours, setDeadlineHours] = useState(16);
@@ -328,16 +372,29 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       const loadSupervisors = async () => {
         setLoadingSupervisors(true);
         try {
-          const res = await userService.getLineSupervisors();
-          if (res.data?.success && Array.isArray(res.data.supervisors)) {
-            const list = res.data.supervisors;
-            setSupervisors(list);
-            if (list.length > 0) {
-              setAssignedToUserId((prev) => {
-                const found = list.some((s) => (s._id || s.id) === prev);
-                return found ? prev : list[0]._id || list[0].id;
-              });
+          let list = [];
+          try {
+            const allRes = await userService.getAllUsers();
+            if (allRes.data?.success && Array.isArray(allRes.data.users)) {
+              list = allRes.data.users.filter((u) => u.isActive !== false);
             }
+          } catch (e) {
+            console.warn('userService.getAllUsers failed, trying getLineSupervisors:', e.message);
+          }
+          if (list.length === 0) {
+            const res = await userService.getLineSupervisors();
+            if (res.data?.success && Array.isArray(res.data.supervisors)) {
+              list = res.data.supervisors;
+            }
+          }
+          setSupervisors(list);
+
+          // Find first matching supervisor strictly for initial department
+          const deptMatches = list.filter((s) => isDeptMatch(s.department, department));
+          if (deptMatches.length > 0) {
+            setAssignedToUserId(deptMatches[0]._id || deptMatches[0].id);
+          } else {
+            setAssignedToUserId('');
           }
         } catch (err) {
           console.warn('Failed to load line supervisors:', err.message);
@@ -376,7 +433,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, prefillData]);
 
-  // When department changes, sync location suggestion & auto-suggest matching supervisor
+  // When department changes, sync location suggestion & dynamically auto-select matching supervisor strictly for this department
   const handleDepartmentChange = (deptId) => {
     setDepartment(deptId);
     const targetDept = AUDIT_DEPARTMENTS.find((d) => d.id === deptId);
@@ -386,11 +443,13 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       setLocation(`${deptId} - Section Area`);
     }
 
-    // Auto-match supervisor for this department if available
+    // Auto-match supervisor strictly for this selected department
     if (supervisors && supervisors.length > 0) {
-      const match = supervisors.find((s) => (s.department || '').toLowerCase().includes(deptId.toLowerCase()));
+      const match = supervisors.find((s) => isDeptMatch(s.department, deptId));
       if (match) {
         setAssignedToUserId(match._id || match.id);
+      } else {
+        setAssignedToUserId('');
       }
     }
   };
@@ -430,22 +489,24 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     }
   };
 
-
-
   if (!isOpen) return null;
 
-  // Selected supervisor lookup
-  const effectiveAssignedId = assignedToUserId || supervisors[0]?._id || supervisors[0]?.id || '';
-  const selectedSupervisor = supervisors.find((s) => (s._id || s.id) === effectiveAssignedId) || supervisors[0] || null;
+  // Filter employees strictly belonging to the currently selected department (no other departments shown)
+  const departmentEmployees = (supervisors || []).filter((s) => isDeptMatch(s.department, department));
 
-  // Filter supervisors for contact directory
-  const filteredSupervisors = supervisors.filter((s) => {
-    if (filterDeptOnly && department) {
-      const d = (s.department || '').toLowerCase();
-      if (!d.includes(department.toLowerCase().split(' ')[0])) {
-        return false;
-      }
-    }
+  // Selected supervisor lookup strictly constrained to the chosen department
+  const effectiveAssignedId =
+    assignedToUserId && departmentEmployees.some((s) => (s._id || s.id) === assignedToUserId)
+      ? assignedToUserId
+      : departmentEmployees[0]?._id || departmentEmployees[0]?.id || '';
+
+  const selectedSupervisor =
+    departmentEmployees.find((s) => (s._id || s.id) === effectiveAssignedId) ||
+    departmentEmployees[0] ||
+    null;
+
+  // Filter supervisors for contact directory search within this department only
+  const filteredSupervisors = departmentEmployees.filter((s) => {
     if (!contactSearch.trim()) return true;
     const term = contactSearch.toLowerCase();
     return (
@@ -534,7 +595,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       ? (customRequirement.trim() || requirement)
       : requirement;
 
-    const assignedId = assignedToUserId || selectedSupervisor?._id || selectedSupervisor?.id;
+    const assignedId = effectiveAssignedId || assignedToUserId || selectedSupervisor?._id || selectedSupervisor?.id || '';
 
     try {
       setSubmitting(true);
@@ -709,8 +770,35 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 </span>
               </div>
 
-              {/* Department Cards Grid - 7 Factory Departments */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-2">
+              {/* Department Dropdown / Select List */}
+              <div className="pt-1">
+                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Department (Dropdown)</span>
+                  </span>
+                  <span className="text-[10.5px] text-indigo-600 dark:text-indigo-400 font-semibold">
+                    Updates Responsible Person list automatically
+                  </span>
+                </label>
+                <select
+                  value={department}
+                  onChange={(e) => handleDepartmentChange(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-bold cursor-pointer"
+                >
+                  {AUDIT_DEPARTMENTS.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.name} — {dept.desc} ({dept.code})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-1">
+                  Selecting a department dynamically updates Stage 5 to show only responsible employees who belong strictly to that department.
+                </p>
+              </div>
+
+              {/* Department Cards Grid - Factory Departments */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-1">
                 {AUDIT_DEPARTMENTS.map((dept) => {
                   const isSelected = department === dept.id;
                   return (
@@ -1117,10 +1205,49 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     </p>
                   </div>
                 </div>
+
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  <UserCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+                  <span>{department} Department</span>
+                </div>
+              </div>
+
+              {/* Responsible Person Dropdown - Strictly for the selected department */}
+              <div className="pt-1">
+                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+                    <span>Responsible Person</span>
+                    <span className="text-indigo-600 dark:text-cyan-400 font-extrabold">
+                      ({department} Department Only)
+                    </span>
+                  </span>
+                  <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">
+                    {departmentEmployees.length} {departmentEmployees.length === 1 ? 'staff member' : 'staff members'}
+                  </span>
+                </label>
+                <select
+                  value={effectiveAssignedId}
+                  onChange={(e) => setAssignedToUserId(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-bold cursor-pointer"
+                >
+                  {departmentEmployees.length === 0 ? (
+                    <option value="">No employees registered under {department} department</option>
+                  ) : (
+                    departmentEmployees.map((s) => (
+                      <option key={s._id || s.id} value={s._id || s.id}>
+                        {s.name} ({s.employeeId}) — {s.department} • {s.designation || 'In-Charge'}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-1">
+                  Only employees belonging to the <strong>{department}</strong> department are listed. Unrelated departments are excluded.
+                </p>
               </div>
 
               {/* Selected Assignee Banner */}
-              {selectedSupervisor && (
+              {selectedSupervisor ? (
                 <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
@@ -1134,7 +1261,9 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                         </span>
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {selectedSupervisor.department} • {selectedSupervisor.designation} • {selectedSupervisor.mobileNumber}
+                        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{selectedSupervisor.department}</span>
+                        {selectedSupervisor.designation ? ` • ${selectedSupervisor.designation}` : ''}
+                        {selectedSupervisor.mobileNumber ? ` • ${selectedSupervisor.mobileNumber}` : ''}
                       </div>
                     </div>
                   </div>
@@ -1142,62 +1271,65 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     Accountable In-Charge
                   </span>
                 </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span>No registered employees currently found under the <strong>{department}</strong> department.</span>
+                </div>
               )}
 
-              {/* Supervisor Directory Search & List */}
+              {/* Supervisor Directory Search & List - Strictly Filtered to Department */}
               <div className="pt-1 space-y-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between">
                   <div className="relative flex-1">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
                       value={contactSearch}
                       onChange={(e) => setContactSearch(e.target.value)}
-                      placeholder="Search supervisor by name, employee ID, line, or mobile..."
+                      placeholder={`Search ${department} personnel by name, ID, or phone...`}
                       className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setFilterDeptOnly(!filterDeptOnly)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-colors cursor-pointer whitespace-nowrap ${
-                      filterDeptOnly
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                    }`}
-                  >
-                    {filterDeptOnly ? `Only ${department}` : 'All Lines'}
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                  {filteredSupervisors.map((s) => {
-                    const isSelected = (s._id || s.id) === effectiveAssignedId;
-                    return (
-                      <div
-                        key={s._id || s.employeeId}
-                        onClick={() => setAssignedToUserId(s._id || s.id)}
-                        className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between text-xs ${
-                          isSelected
-                            ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/70 font-semibold'
-                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="min-w-0 pr-2">
-                          <div className="font-bold text-slate-900 dark:text-white truncate">
-                            {s.name} <span className="font-mono text-[10px] text-slate-400">({s.employeeId})</span>
+                  {filteredSupervisors.length === 0 ? (
+                    <div className="col-span-full py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                      No matching personnel in {department} department.
+                    </div>
+                  ) : (
+                    filteredSupervisors.map((s) => {
+                      const isSelected = (s._id || s.id) === effectiveAssignedId;
+                      return (
+                        <div
+                          key={s._id || s.employeeId}
+                          onClick={() => setAssignedToUserId(s._id || s.id)}
+                          className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between text-xs ${
+                            isSelected
+                              ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/70 font-semibold shadow-xs'
+                              : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="font-bold text-slate-900 dark:text-white truncate">
+                              {s.name} <span className="font-mono text-[10px] text-slate-400">({s.employeeId})</span>
+                            </div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                              <span className="font-semibold text-indigo-600 dark:text-indigo-400">{s.department}</span>
+                              {s.designation ? ` • ${s.designation}` : ''}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                            {s.department} • {s.designation}
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            {s.mobileNumber && (
+                              <span className="font-mono text-[10px] text-slate-400">{s.mobileNumber}</span>
+                            )}
+                            {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />}
                           </div>
                         </div>
-                        <div className="shrink-0 flex items-center gap-1.5">
-                          <span className="font-mono text-[10px] text-slate-400">{s.mobileNumber}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </section>
@@ -1636,7 +1768,9 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                       Assigned Line In-Charge
                     </span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {selectedSupervisor ? `${selectedSupervisor.name} (${selectedSupervisor.employeeId})` : 'Unassigned'}
+                      {selectedSupervisor
+                        ? `${selectedSupervisor.name} (${selectedSupervisor.employeeId}) • ${selectedSupervisor.department}`
+                        : `No ${department} employee assigned`}
                     </span>
                   </div>
 
