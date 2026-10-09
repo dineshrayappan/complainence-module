@@ -152,34 +152,6 @@ const initialComplaints = [];
 let mockUsers = [...initialUsers];
 let mockComplaints = [...initialComplaints];
 
-// Seed helper for compliance_tasks fallback. `dayOffset` is relative to today so
-// the demo always shows a live OVERDUE / Due Today / This Week mix.
-const mockTask = (id, title, department, description, employeeId, dayOffset, status, recurrence, priority) => {
-  const owner = mockUsers.find((u) => u.employeeId === employeeId) || {};
-  const due = new Date();
-  due.setHours(17, 0, 0, 0);
-  due.setDate(due.getDate() + dayOffset);
-  return {
-    id,
-    title,
-    department,
-    description,
-    assignedTo: {
-      userId: owner._id || '',
-      employeeId: employeeId,
-      name: owner.name || '',
-      department: owner.department || '',
-    },
-    dueDate: due.toISOString(),
-    status,
-    completedAt: status === 'Completed' ? due.toISOString() : null,
-    completedBy: status === 'Completed' ? { employeeId, name: owner.name || '' } : null,
-    recurrence,
-    priority,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-};
 
 module.exports = {
   getUsers: () => [...mockUsers],
@@ -297,7 +269,7 @@ module.exports = {
         {
           action: 'CREATED',
           performedBy: data.createdBy,
-          notes: 'Defect logged into system.',
+          notes: '',
           timestamp: new Date(),
         },
       ],
@@ -394,19 +366,19 @@ module.exports = {
       departments: ['HR', 'Production', 'EHS'],
       checklist: {
         HR: [
-          { id: 'hr-1', label: 'Employee files', status: 'COMPLIANT', notes: 'Personal records verified.' },
-          { id: 'hr-2', label: 'Attendance', status: 'COMPLIANT', notes: 'Shift records matched.' },
-          { id: 'hr-3', label: 'Payroll', status: 'COMPLIANT', notes: 'Pay slips distributed on schedule.' },
+          { id: 'hr-1', label: 'Employee files', status: 'PENDING', notes: '' },
+          { id: 'hr-2', label: 'Attendance', status: 'PENDING', notes: '' },
+          { id: 'hr-3', label: 'Payroll', status: 'PENDING', notes: '' },
           { id: 'hr-4', label: 'Overtime records', status: 'PENDING', notes: '' },
         ],
         Production: [
-          { id: 'prd-1', label: 'Working hours', status: 'COMPLIANT', notes: 'Shift limits adhered to.' },
+          { id: 'prd-1', label: 'Working hours', status: 'PENDING', notes: '' },
           { id: 'prd-2', label: 'Machine safety', status: 'PENDING', notes: '' },
-          { id: 'prd-3', label: 'PPE', status: 'COMPLIANT', notes: 'Protective gear worn.' },
+          { id: 'prd-3', label: 'PPE', status: 'PENDING', notes: '' },
         ],
         EHS: [
-          { id: 'ehs-1', label: 'Fire safety', status: 'COMPLIANT', notes: 'Hose reels pressure tested.' },
-          { id: 'ehs-2', label: 'Emergency exits', status: 'COMPLIANT', notes: 'Gangways unobstructed.' },
+          { id: 'ehs-1', label: 'Fire safety', status: 'PENDING', notes: '' },
+          { id: 'ehs-2', label: 'Emergency exits', status: 'PENDING', notes: '' },
           { id: 'ehs-3', label: 'Chemical management', status: 'PENDING', notes: '' },
         ],
       },

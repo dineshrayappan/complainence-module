@@ -71,7 +71,7 @@ export const SidebarNavigation = ({
     { isDivider: true },
     {
       id: 'departments',
-      label: 'Departments (Live Status)',
+      label: 'Departments',
       icon: Building2,
       badge: counts.deptCount !== undefined && counts.deptCount !== null && counts.deptCount > 0 ? String(counts.deptCount) : null,
       badgeColor: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200',

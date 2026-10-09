@@ -450,24 +450,16 @@ const createComplaint = async (req, res) => {
       supervisor =
         mockStore.findUserById(lookupSupervisorId) ||
         mockStore.getUsers().find((u) => u.employeeId === lookupSupervisorId) ||
-        mockStore.getUsers().find((u) => u.role === 'ACTION_PERSON') || {
-          _id: 'usr-sup-001',
-          id: 'usr-sup-001',
-          employeeId: 'SUP-001',
-          name: 'Rajesh Kumar',
-          department: department || 'Production',
-          designation: 'Production Floor In-Charge',
-          mobileNumber: '+91 98111 22334',
-        };
+        mockStore.getUsers().find((u) => u.role === 'ACTION_PERSON') || null;
     }
 
     const assignedToData = {
-      userId: supervisor.id || supervisor._id || 'usr-sup-001',
-      employeeId: supervisor.employeeId || 'SUP-001',
-      name: supervisor.name || 'Rajesh Kumar',
-      department: supervisor.department || department || 'Production',
-      designation: supervisor.designation || 'Production Floor In-Charge',
-      mobileNumber: supervisor.mobileNumber || '+91 98111 22334',
+      userId: supervisor?.id || supervisor?._id || '',
+      employeeId: supervisor?.employeeId || '',
+      name: supervisor?.name || '',
+      department: supervisor?.department || department || '',
+      designation: supervisor?.designation || '',
+      mobileNumber: supervisor?.mobileNumber || '',
     };
 
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
@@ -1044,12 +1036,12 @@ const submitAction = async (req, res) => {
     }
     if (!respPerson) {
       respPerson = {
-        userId: req.user?.id || req.user?._id || 'usr-sup-001',
-        employeeId: req.user?.employeeId || 'SUP-001',
-        name: req.user?.name || 'Line Supervisor',
+        userId: req.user?.id || req.user?._id || '',
+        employeeId: req.user?.employeeId || '',
+        name: req.user?.name || '',
         role: req.user?.role || 'ACTION_PERSON',
-        department: req.user?.department || 'Production',
-        designation: req.user?.designation || 'In-Charge',
+        department: req.user?.department || '',
+        designation: req.user?.designation || '',
       };
     }
 
@@ -2031,12 +2023,12 @@ const reassignComplaint = async (req, res) => {
     }
 
     const assignedTo = {
-      userId: supervisor.id || supervisor._id || 'usr-sup-001',
-      employeeId: supervisor.employeeId || 'SUP-001',
-      name: supervisor.name || 'Rajesh Kumar',
-      department: supervisor.department || 'Production',
-      designation: supervisor.designation || 'Production Floor In-Charge',
-      mobileNumber: supervisor.mobileNumber || '+91 98111 22334',
+      userId: supervisor?.id || supervisor?._id || '',
+      employeeId: supervisor?.employeeId || '',
+      name: supervisor?.name || '',
+      department: supervisor?.department || '',
+      designation: supervisor?.designation || '',
+      mobileNumber: supervisor?.mobileNumber || '',
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -2461,14 +2453,46 @@ const updateComplianceThresholds = async (req, res) => {
 // @access  Private
 const getAudits = async (req, res) => {
   try {
-    const audits = mockStore.getAudits();
+    let audits = [];
+    let complaints = [];
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const [auditsRes, complaintsRes] = await Promise.all([
+          supabase.from('audits').select('*').order('created_at', { ascending: false }),
+          supabase.from('complaints').select('status'),
+        ]);
+        if (!auditsRes.error && auditsRes.data) {
+          audits = auditsRes.data;
+        }
+        if (!complaintsRes.error && complaintsRes.data) {
+          complaints = complaintsRes.data;
+        }
+      } catch (e) {
+        console.warn('[ComplaintController:getAudits] Supabase query notice:', e.message);
+      }
+    }
+
+    if (audits.length === 0) {
+      audits = mockStore.getAudits();
+    }
+    if (complaints.length === 0) {
+      complaints = mockStore.getComplaints();
+    }
+
+    const completedAudits = audits.filter((a) => a.status === 'Completed').length;
+    const openAudits = audits.filter((a) => a.status !== 'Completed').length;
+    const ncsFound = complaints.length;
+    const closedCount = complaints.filter((c) => c.status === 'Closed' || c.status === 'Verified').length;
+    const ncClosureRate = ncsFound > 0 ? Math.round((closedCount / ncsFound) * 100) : 100;
+
     return res.status(200).json({
       success: true,
       stats: {
-        completedAudits: 24,
-        openAudits: audits.filter((a) => a.status !== 'Completed').length || 3,
-        ncsFound: 87,
-        ncClosureRate: 91,
+        completedAudits,
+        openAudits,
+        ncsFound,
+        ncClosureRate,
       },
       audits,
     });

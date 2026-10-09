@@ -320,20 +320,10 @@ INSERT INTO public.users (id, "employeeId", name, email, password, role, departm
 
 
 -- ------------------------------------------------------------------------------
--- 13. SEED DAILY COMPLIANCE TASKS
--- ------------------------------------------------------------------------------
-INSERT INTO public.compliance_tasks (id, title, department, description, "assignedTo", "dueDate", status, recurrence, priority) VALUES
-('tsk-001', 'Needle Detector 9-Point Calibration Log', 'Quality', 'Verify daily sensitivity calibration at 1.0mm ferrous ball standard across conveyor belt.', '{"name": "Kavita Nair", "department": "Quality"}'::jsonb, NOW() + INTERVAL '4 hours', 'Pending', 'Daily', 'HIGH'),
-('tsk-002', 'Daily Eye Guard & Pulley Safety Inspection', 'Production', 'Physical verification that all sewing machine eye shields and finger guards are securely in place.', '{"name": "Rajesh Kumar", "department": "Production"}'::jsonb, NOW() + INTERVAL '6 hours', 'In Progress', 'Daily', 'HIGH'),
-('tsk-003', 'Emergency Exit Aisle Clearance Check', 'EHS', 'Ensure clear passageways, unblocked fire alarm pulls, and zero fabric carton obstruction in egress corridors.', '{"name": "Sunil Verma", "department": "EHS"}'::jsonb, NOW() + INTERVAL '8 hours', 'Pending', 'Daily', 'CRITICAL'),
-('tsk-004', 'Sewing Machine Oil Wick Drip Check', 'Maintenance', 'Inspect Line 1 to 5 needle bar wicks to eliminate oil drip risk onto garment cuffs and collars.', '{"name": "Vikram Singh", "department": "Maintenance"}'::jsonb, NOW() + INTERVAL '12 hours', 'Pending', 'Daily', 'MEDIUM');
+-- 13. COMPLIANCE TASKS: Clean initialized state (Zero demo records)
 
 -- ------------------------------------------------------------------------------
--- 14. SEED AUDIT ROUNDS
--- ------------------------------------------------------------------------------
-INSERT INTO public.audits (id, title, audit_number, department, status, auditor, findings_count, scheduled_date) VALUES
-('aud-001', 'Q3 Factory-Wide Workmanship AQL 1.5 Audit', 'AUD-2026-Q3-01', 'Production', 'In Progress', '{"name": "Sarah Auditor", "role": "AUDITOR"}'::jsonb, 3, NOW() - INTERVAL '1 day'),
-('aud-002', 'ISO 9001:2015 Social & Safety Compliance Review', 'AUD-2026-ISO-02', 'EHS', 'Scheduled', '{"name": "Dinesh Rayappan", "role": "AUDITOR"}'::jsonb, 1, NOW() + INTERVAL '2 days');
+-- 14. AUDIT ROUNDS: Clean initialized state (Zero demo records)
 
 -- ------------------------------------------------------------------------------
 -- VERIFY EXECUTION: TABLE ROW COUNTS

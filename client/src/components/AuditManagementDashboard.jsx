@@ -450,9 +450,7 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
             <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-sans">
               {stats.ncClosureRate}%
             </span>
-            <span className="text-xs text-emerald-600 dark:text-emerald-400 ml-1.5 font-bold">
-              +3.4%
-            </span>
+            
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
             Closed-Loop CAP Effectiveness
