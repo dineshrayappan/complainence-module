@@ -9,7 +9,6 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
-import { useTheme } from './context/ThemeContext';
 import { complaintService, taskService } from './services/api';
 import { supabase } from './services/supabase';
 import Header from './components/Header';
@@ -62,7 +61,6 @@ const safePersistCache = (items, user) => {
 
 export const App = () => {
   const { user, isAdmin, isAuditor, isActionPerson } = useAuth();
-  const { isDark } = useTheme();
 
   // Data State with user-scoped hydration to keep supervisor tasks & photos visible across logins
   const [complaints, setComplaints] = useState(() => {

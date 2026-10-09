@@ -12,15 +12,6 @@
     --text-muted: #94a3b8;
   }
 
-  .dark {
-    --bg-page: #090d16;
-    --bg-card: #111827;
-    --border-card: #1f2937;
-    --text-primary: #f9fafb;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
-  }
-
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
@@ -49,9 +40,7 @@
   border-radius: 9999px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-}
+
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
@@ -87,10 +76,7 @@
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
 }
 
-.dark .qms-card:hover {
-  border-color: #374151;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-}
+
 
 /* Ensure mobile touch targets */
 button, input, select, textarea {

@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Menu,
   Bell,
-  Sun,
-  Moon,
   LogOut,
   ShieldCheck,
   Wrench,
@@ -19,7 +17,6 @@ import {
   Minimize,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 
 export const Header = ({
   onToggleSidebar,
@@ -30,7 +27,6 @@ export const Header = ({
   onSelectOverdue,
 }) => {
   const { user, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -270,21 +266,6 @@ export const Header = ({
               )}
             </button>
 
-            {/* Theme Toggle Button */}
-            <button
-              type="button"
-              id="theme-toggle-btn"
-              onClick={toggleTheme}
-              aria-label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/90 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all shadow-xs cursor-pointer flex items-center justify-center"
-            >
-              {isDark ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-600" />
-              )}
-            </button>
 
             {/* User Profile Pill ("Admin" / Auditor / Supervisor) */}
             <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/90 shadow-2xs">

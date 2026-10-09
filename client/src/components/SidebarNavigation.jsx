@@ -13,11 +13,8 @@ import {
   ChevronRight,
   Flame,
   X,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 
 export const SidebarNavigation = ({
   currentSection,
@@ -27,7 +24,6 @@ export const SidebarNavigation = ({
   onClose,
 }) => {
   const { isAdmin, isAuditor } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
 
   const navItems = [
     {
@@ -197,28 +193,8 @@ export const SidebarNavigation = ({
           </nav>
         </div>
 
-        {/* Sidebar Footer Plant Status & Theme Switcher */}
+        {/* Sidebar Footer Plant Status */}
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2 shrink-0 space-y-2">
-          {/* Theme Quick Toggle */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            id="sidebar-theme-toggle-btn"
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200/90 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/80 active:scale-[0.99] transition-all cursor-pointer"
-            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-          >
-            <div className="flex items-center gap-2">
-              {isDark ? (
-                <Sun className="w-4 h-4 text-amber-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-              )}
-              <span>{isDark ? 'Dark Mode' : 'Light Mode'}</span>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-              {isDark ? 'Active' : 'Active'}
-            </span>
-          </button>
 
           <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
