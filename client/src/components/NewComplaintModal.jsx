@@ -772,13 +772,10 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
               {/* Department Dropdown / Select List */}
               <div className="pt-1">
-                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5 flex items-center justify-between">
+                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5">
                   <span className="flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Department (Dropdown)</span>
-                  </span>
-                  <span className="text-[10.5px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                    Updates Responsible Person list automatically
+                    <span>Department</span>
                   </span>
                 </label>
                 <select
@@ -788,13 +785,10 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 >
                   {AUDIT_DEPARTMENTS.map((dept) => (
                     <option key={dept.id} value={dept.id}>
-                      {dept.name} — {dept.desc} ({dept.code})
+                      {dept.name} ({dept.code})
                     </option>
                   ))}
                 </select>
-                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-1">
-                  Selecting a department dynamically updates Stage 5 to show only responsible employees who belong strictly to that department.
-                </p>
               </div>
 
               {/* Department Cards Grid - Factory Departments */}
@@ -876,7 +870,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
               {/* Requirement Dropdown / Select List */}
               <div className="pt-1">
                 <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5">
-                  Requirement Standard (Select from dropdown or choose "None of Other" / Manual Entry)
+                  Requirement Standard
                 </label>
                 <select
                   value={requirement}
@@ -941,28 +935,16 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
               {/* Manual Entry field when None of Other, Custom Audit Requirement, or custom value */}
               {(requirement === 'None of Other' || requirement === 'Custom Audit Requirement' || isManualRequirement) ? (
                 <div className="pt-2 animate-fadeIn">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs">
-                      {requirement === 'None of Other'
-                        ? 'Specify Custom Requirement Standard / Clause (Manual Entry)'
-                        : 'Custom Audit Standard / Contract Clause Details'}
-                    </label>
-                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                      Manual Input Enabled
-                    </span>
-                  </div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
+                    Custom Requirement Standard
+                  </label>
                   <input
                     type="text"
                     value={customRequirement}
                     onChange={(e) => setCustomRequirement(e.target.value)}
-                    placeholder="e.g. Buyer Specific Tolerance Manual Rev 4.2 - Seam Integrity Sec 3 or None of Other"
+                    placeholder="Enter custom requirement standard..."
                     className="w-full p-2.5 text-xs rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                   />
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    {requirement === 'None of Other'
-                      ? 'Type custom standard above to save in database, or leave blank to save as "None of Other".'
-                      : 'Enter the custom clause/standard to be saved in the database.'}
-                  </p>
                 </div>
               ) : (
                 <div className="pt-1">
@@ -974,7 +956,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     }}
                     className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold inline-flex items-center gap-1 cursor-pointer"
                   >
-                    + Option not listed? Select "None of Other" to enter custom requirement manually
+                    + Enter Custom Requirement
                   </button>
                 </div>
               )}
@@ -1043,7 +1025,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   }}
                   className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-medium"
                 >
-                  <option value="">-- Select from predefined findings list --</option>
+                  <option value="">-- Select finding observation --</option>
                   {PREDEFINED_FINDINGS.map((finding) => (
                     <option key={finding} value={finding}>
                       {finding}
@@ -1052,24 +1034,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 </select>
               </div>
 
-              {selectedFinding === 'None of Others' && (
-                <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs">
-                  <div className="font-bold text-indigo-900 dark:text-indigo-200">
-                    Option: None of Others Selected
-                  </div>
-                  <div className="text-[11px] text-indigo-700 dark:text-indigo-300 mt-0.5">
-                    Option not available in the predefined list. You can manually enter or edit your finding observation below.
-                  </div>
-                </div>
-              )}
-
               {/* Text Description / Manual Entry Area */}
               <div className="pt-1">
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="mb-1.5">
                   <label className="font-bold text-slate-700 dark:text-slate-300 text-xs">
-                    Objective Audit Finding Details & Rectification Directives {selectedFinding === 'None of Others' ? '(Manual Entry)' : ''}
+                    Finding Description
                   </label>
-                  <span className="text-[10px] text-slate-400">Mandatory audit observation</span>
                 </div>
                 <textarea
                   rows="3"
@@ -1082,7 +1052,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                       }
                     }
                   }}
-                  placeholder="e.g. Machine #14 observed with 8 skipped stitches per 10cm along the collar joint seam. Thread tension disc is clogged with lint. Immediate re-stitching and looper recalibration required."
+                  placeholder="Enter defect finding observation details..."
                   className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 text-xs leading-relaxed font-sans"
                 />
 
@@ -1206,24 +1176,17 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  <UserCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
-                  <span>{department} Department</span>
-                </div>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                  {department}
+                </span>
               </div>
 
               {/* Responsible Person Dropdown - Strictly for the selected department */}
               <div className="pt-1">
-                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5 flex items-center justify-between">
+                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5">
                   <span className="flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
                     <span>Responsible Person</span>
-                    <span className="text-indigo-600 dark:text-cyan-400 font-extrabold">
-                      ({department} Department Only)
-                    </span>
-                  </span>
-                  <span className="text-[10.5px] font-medium text-slate-500 dark:text-slate-400">
-                    {departmentEmployees.length} {departmentEmployees.length === 1 ? 'staff member' : 'staff members'}
                   </span>
                 </label>
                 <select
@@ -1232,18 +1195,15 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-bold cursor-pointer"
                 >
                   {departmentEmployees.length === 0 ? (
-                    <option value="">No employees registered under {department} department</option>
+                    <option value="">No employees found</option>
                   ) : (
                     departmentEmployees.map((s) => (
                       <option key={s._id || s.id} value={s._id || s.id}>
-                        {s.name} ({s.employeeId}) — {s.department} • {s.designation || 'In-Charge'}
+                        {s.name} ({s.employeeId}) — {s.designation || 'In-Charge'}
                       </option>
                     ))
                   )}
                 </select>
-                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-1">
-                  Only employees belonging to the <strong>{department}</strong> department are listed. Unrelated departments are excluded.
-                </p>
               </div>
 
               {/* Selected Assignee Banner */}
@@ -1274,7 +1234,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
               ) : (
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <span>No registered employees currently found under the <strong>{department}</strong> department.</span>
+                  <span>No registered employees found for this department.</span>
                 </div>
               )}
 
@@ -1287,7 +1247,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                       type="text"
                       value={contactSearch}
                       onChange={(e) => setContactSearch(e.target.value)}
-                      placeholder={`Search ${department} personnel by name, ID, or phone...`}
+                      placeholder="Search by name, ID, or phone..."
                       className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
@@ -1296,7 +1256,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                   {filteredSupervisors.length === 0 ? (
                     <div className="col-span-full py-4 text-center text-xs text-slate-500 dark:text-slate-400">
-                      No matching personnel in {department} department.
+                      No matching personnel found.
                     </div>
                   ) : (
                     filteredSupervisors.map((s) => {
@@ -1489,42 +1449,30 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
               {capRequired && (
                 <div className="pt-3 space-y-3 animate-fadeIn">
-                  {/* Visual CAP Tree Guide */}
-                  <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 text-[11px] text-slate-700 dark:text-slate-300">
-                    <span className="font-mono font-bold text-indigo-700 dark:text-cyan-400 block mb-0.5">
-                      CAP Structure Activated (ISO 9001 Clause 10.2):
-                    </span>
-                    <span className="font-mono text-[10.5px] text-slate-600 dark:text-slate-400">
-                      NC ──► Immediate Correction ──► Root Cause ──► Corrective Action ──► Preventive Action ──► Responsible Person ──► Target Date ──► Evidence ──► Verification
-                    </span>
-                  </div>
-
                   {/* Immediate Correction Directive */}
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1 flex items-center justify-between">
-                      <span>1. Immediate Correction Directive (Containment Action)</span>
-                      <span className="text-[10px] text-rose-600 dark:text-rose-400 font-mono font-semibold">Immediate Containment</span>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
+                      1. Immediate Containment Action
                     </label>
                     <input
                       type="text"
                       value={immediateContainment}
                       onChange={(e) => setImmediateContainment(e.target.value)}
-                      placeholder="e.g. Remove cartons immediately / Quarantine defective bundle #14B / Stop cutting table 2"
+                      placeholder="e.g. Quarantine defective bundle / halt operation"
                       className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
                   {/* Root Cause & Corrective Guidance */}
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1 flex items-center justify-between">
-                      <span>2. Auditor Root Cause &amp; Preventive Action Directives</span>
-                      <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-semibold">5-Why / Recurrence</span>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
+                      2. Corrective &amp; Preventive Action
                     </label>
                     <input
                       type="text"
                       value={capDirective}
                       onChange={(e) => setCapDirective(e.target.value)}
-                      placeholder="e.g. Revise floor storage marking, replace needle with ballpoint, adjust felt wick oiler, conduct weekly inspection."
+                      placeholder="e.g. Conduct recalibration and weekly inspection"
                       className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
@@ -1588,7 +1536,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
-                      Evidence (Mandatory Before Photo Proof)
+                      Evidence Photo
                     </h3>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       High-resolution visual evidence of non-conformance before rectification begins.
@@ -1598,7 +1546,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
                 {imageMeta && (
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
-                    Compressed: {formatFileSize(imageMeta.compressedSize)}
+                    {formatFileSize(imageMeta.compressedSize)}
                   </span>
                 )}
               </div>
@@ -1622,7 +1570,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3.5">
                     <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white shadow">
-                      Audit Evidence Captured
+                      Evidence Captured
                     </span>
                     <button
                       type="button"
@@ -1643,10 +1591,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     <Camera className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
-                    {compressing ? 'Compressing WebP Photo...' : 'Tap to Open Camera / Upload Evidence Photo'}
-                  </span>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
-                    Direct Rear Camera on Mobile • Auto-Compress WebP
+                    {compressing ? 'Compressing photo...' : 'Tap to capture or upload photo'}
                   </span>
                 </div>
               )}
