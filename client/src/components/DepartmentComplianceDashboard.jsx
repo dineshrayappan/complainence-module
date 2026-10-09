@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Building2,
   TrendingUp,
@@ -21,8 +21,16 @@ import {
   Clock,
   LayoutGrid,
   List,
+  UserCheck,
+  User,
+  Users,
+  Play,
+  Eye,
+  Trophy,
+  Award,
+  Filter,
 } from 'lucide-react';
-import { complaintService } from '../services/api';
+import { complaintService, taskService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 // Department icon mapping
@@ -46,6 +54,12 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
+  // View tabs: 'scorecard' | 'live-work'
+  const [activeTab, setActiveTab] = useState('live-work'); // Default to live-work per user request so Admin & Auditor immediately see it!
+  const [liveStatusData, setLiveStatusData] = useState(null);
+  const [liveDeptFilter, setLiveDeptFilter] = useState('ALL');
+  const [viewProofItem, setViewProofItem] = useState(null);
+
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('score-desc'); // 'score-desc', 'score-asc', 'overdue-desc', 'open-desc'
@@ -59,19 +73,28 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
   const [configSuccess, setConfigSuccess] = useState(false);
   const [configError, setConfigError] = useState(null);
 
-  const loadData = async (showSpinner = false) => {
+  const loadData = useCallback(async (showSpinner = false) => {
     try {
       if (showSpinner) setLoading(true);
       else setIsRefreshing(true);
       setError(null);
 
-      const res = await complaintService.getDepartmentCompliance();
-      if (res.data?.success) {
-        setData(res.data);
-        if (res.data.thresholds) {
-          setHighThreshold(res.data.thresholds.highThreshold ?? 90);
-          setModerateThreshold(res.data.thresholds.moderateThreshold ?? 75);
+      // Fetch compliance scorecard and live work status concurrently
+      const [compRes, liveRes] = await Promise.allSettled([
+        complaintService.getDepartmentCompliance(),
+        taskService.getLiveStatus({ department: liveDeptFilter }),
+      ]);
+
+      if (compRes.status === 'fulfilled' && compRes.value.data?.success) {
+        setData(compRes.value.data);
+        if (compRes.value.data.thresholds) {
+          setHighThreshold(compRes.value.data.thresholds.highThreshold ?? 90);
+          setModerateThreshold(compRes.value.data.thresholds.moderateThreshold ?? 75);
         }
+      }
+
+      if (liveRes.status === 'fulfilled' && liveRes.value.data?.success) {
+        setLiveStatusData(liveRes.value.data);
       }
     } catch (err) {
       console.error('Failed to load department compliance data:', err);
@@ -80,11 +103,11 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
       if (showSpinner) setLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [liveDeptFilter]);
 
   useEffect(() => {
     loadData(true);
-  }, []);
+  }, [loadData]);
 
   // Save Threshold Settings
   const handleSaveThresholds = async (e) => {
@@ -284,8 +307,368 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
         </div>
       </div>
 
-      {/* SECTION 2: Top KPI Highlights Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* TOP NAVIGATION TABS: Live Work Status vs Compliance Scorecard */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('live-work')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeTab === 'live-work'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <UserCheck className="w-4 h-4" />
+          <span>Live Employee Work Status & Fast Finisher</span>
+          {liveStatusData?.summary?.inProgress > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400 text-slate-950 animate-pulse">
+              {liveStatusData.summary.inProgress} BUSY
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('scorecard')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+            activeTab === 'scorecard'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          <span>Department Compliance Scorecard</span>
+        </button>
+      </div>
+
+      {/* TAB 1: LIVE EMPLOYEE WORK STATUS & FAST FINISHER TRACKING */}
+      {activeTab === 'live-work' && (
+        <div className="space-y-5 animate-fade-in">
+          {/* Summary KPI Badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Total Department Staff
+              </span>
+              <div className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-600" />
+                <span>{liveStatusData?.summary?.totalEmployees ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Active department workers</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block mb-1">
+                Available Workers
+              </span>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span>{liveStatusData?.summary?.available ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Ready for task assignment</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block mb-1">
+                Currently Working
+              </span>
+              <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-500 animate-ping" />
+                <span>{liveStatusData?.summary?.inProgress ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">Status: In Progress / Busy</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-cyan-400 block mb-1">
+                Tasks Finished
+              </span>
+              <div className="text-2xl font-black text-indigo-600 dark:text-cyan-400 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-indigo-600 dark:text-cyan-400" />
+                <span>{liveStatusData?.summary?.completed ?? 0}</span>
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">With verified photo proof</span>
+            </div>
+          </div>
+
+          {/* First Finisher 🏆 Banner (Identifies who completes a task first) */}
+          {liveStatusData?.firstFinisher && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-700/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-2xl shadow-md shadow-amber-500/30 shrink-0">
+                  🏆
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">
+                      First Finisher
+                    </span>
+                    <span className="text-xs font-mono text-amber-800 dark:text-amber-300 font-bold">
+                      Completed 1st in Department
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white mt-0.5">
+                    {liveStatusData.firstFinisher.name} ({liveStatusData.firstFinisher.employeeId})
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                    Dept: <span className="font-bold">{liveStatusData.firstFinisher.department}</span> • Task: <span className="font-semibold">{liveStatusData.firstFinisher.assignedTask?.title || 'Inspection Work'}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end sm:self-center">
+                <div className="text-right">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 block uppercase">
+                    Completion Timestamp
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {liveStatusData.firstFinisher.completionTime
+                      ? new Date(liveStatusData.firstFinisher.completionTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                      : '—'}
+                  </span>
+                </div>
+                {liveStatusData.firstFinisher.proofPhoto && (
+                  <button
+                    onClick={() => setViewProofItem(liveStatusData.firstFinisher)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-xs cursor-pointer transition-all active:scale-95"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View Proof</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Department Filter & Control Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            {/* Department Dropdown Filter */}
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Department:
+              </span>
+              <select
+                value={liveDeptFilter}
+                onChange={(e) => setLiveDeptFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+              >
+                <option value="ALL">All Departments (Entire Plant)</option>
+                {['Production', 'Quality', 'Maintenance', 'Store', 'EHS', 'EDP', 'HR', 'Central Quality Audit'].map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-400">
+                {liveStatusData?.employees?.length || 0} employees found
+              </span>
+              <button
+                onClick={() => loadData(false)}
+                disabled={isRefreshing}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>Refresh Live Status</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Employee Live Status Table */}
+          <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-50/90 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[10px] sm:text-[11px] border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="py-3.5 px-4 font-bold">Employee Name & ID</th>
+                  <th className="py-3.5 px-4 font-bold">Department</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Live Status</th>
+                  <th className="py-3.5 px-4 font-bold">Assigned Task</th>
+                  <th className="py-3.5 px-3 font-bold">Start Time</th>
+                  <th className="py-3.5 px-3 font-bold">Completion Time</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Proof Status</th>
+                  <th className="py-3.5 px-4 font-bold text-right">Finish Rank</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                {(!liveStatusData?.employees || liveStatusData.employees.length === 0) ? (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-slate-400 text-xs font-mono">
+                      No employees listed for this department.
+                    </td>
+                  </tr>
+                ) : (
+                  liveStatusData.employees.map((emp) => {
+                    const isBusy = emp.status === 'In Progress / Busy';
+                    const isDone = emp.status === 'Completed';
+                    const isAvailable = emp.status === 'Available';
+
+                    return (
+                      <tr
+                        key={emp.employeeId || emp.userId}
+                        className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors ${
+                          isBusy ? 'bg-amber-500/5' : ''
+                        }`}
+                      >
+                        {/* 1. Name & ID */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs ${
+                                isBusy
+                                  ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40'
+                                  : isDone
+                                  ? 'bg-indigo-500/20 text-indigo-700 dark:text-cyan-300 border border-indigo-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                              }`}
+                            >
+                              {emp.name ? emp.name[0] : 'U'}
+                            </div>
+                            <div>
+                              <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>{emp.name}</span>
+                                {emp.completionRank === 1 && (
+                                  <span title="First Finisher in Department">🏆</span>
+                                )}
+                              </div>
+                              <span className="text-[11px] font-mono text-slate-400">
+                                {emp.employeeId} • {emp.designation || 'Staff'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Department */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {emp.department}
+                          </span>
+                        </td>
+
+                        {/* 3. Live Status Badge */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {isBusy ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 animate-pulse">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span>In Progress / Busy</span>
+                            </span>
+                          ) : isDone ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-500/15 text-indigo-700 dark:text-cyan-300 border border-indigo-500/30">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Completed</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                              <span>Available</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 4. Assigned Task */}
+                        <td className="py-3.5 px-4 max-w-xs truncate">
+                          {emp.assignedTask ? (
+                            <div>
+                              <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">
+                                {emp.assignedTask.title}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                Priority: {emp.assignedTask.priority}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-xs italic">
+                              No active task assigned
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 5. Start Time */}
+                        <td className="py-3.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                          {emp.startTime ? (
+                            <div>
+                              <div>{new Date(emp.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                              <span className="text-[9px] text-slate-400">
+                                {new Date(emp.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+
+                        {/* 6. Completion Time */}
+                        <td className="py-3.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                          {emp.completionTime ? (
+                            <div>
+                              <div className="font-bold text-indigo-600 dark:text-cyan-400">
+                                {new Date(emp.completionTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                              <span className="text-[9px] text-slate-400">
+                                {new Date(emp.completionTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+
+                        {/* 7. Proof Status */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {emp.proofPhoto ? (
+                            <button
+                              onClick={() => setViewProofItem(emp)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-xs font-bold hover:bg-emerald-100 cursor-pointer shadow-2xs"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Photo Proof</span>
+                            </button>
+                          ) : isBusy ? (
+                            <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold">
+                              Pending Upload
+                            </span>
+                          ) : isDone ? (
+                            <span className="text-[11px] font-mono text-slate-500">
+                              Submitted
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* 8. Finish Rank */}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap font-mono">
+                          {emp.completionRank ? (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black ${
+                                emp.completionRank === 1
+                                  ? 'bg-amber-400 text-slate-950 shadow-xs'
+                                  : emp.completionRank === 2
+                                  ? 'bg-slate-200 text-slate-800'
+                                  : 'bg-orange-100 text-orange-800'
+                              }`}
+                            >
+                              {emp.completionRank === 1 ? '1st 🏆' : `#${emp.completionRank}`}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: DEPARTMENT COMPLIANCE SCORECARD */}
+      {activeTab === 'scorecard' && (
+        <div className="space-y-5 animate-fade-in">
+          {/* SECTION 2: Top KPI Highlights Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Card 1: Factory Overall Compliance Score */}
         <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
@@ -688,6 +1071,65 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
               </div>
             );
           })}
+        </div>
+      )}
+        </div>
+      )}
+
+      {/* MODAL: View Employee Completion Proof Modal */}
+      {viewProofItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl space-y-3.5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  Employee Completion Proof
+                </h3>
+              </div>
+              <button
+                onClick={() => setViewProofItem(null)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                {viewProofItem.name} ({viewProofItem.employeeId})
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Department: {viewProofItem.department} • Task: {viewProofItem.assignedTask?.title || 'Inspection Work'}
+              </p>
+            </div>
+
+            {viewProofItem.proofPhoto && (
+              <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-black flex items-center justify-center">
+                <img
+                  src={viewProofItem.proofPhoto}
+                  alt="Proof preview"
+                  className="w-full max-h-72 object-contain"
+                />
+              </div>
+            )}
+
+            {viewProofItem.proofNotes && (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs">
+                <span className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Corrective / Inspection Notes
+                </span>
+                <p className="text-slate-800 dark:text-slate-200 leading-relaxed">
+                  {viewProofItem.proofNotes}
+                </p>
+              </div>
+            )}
+
+            <div className="text-[10px] font-mono text-slate-400 pt-1 flex justify-between">
+              <span>Finished: {viewProofItem.completionTime ? new Date(viewProofItem.completionTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+              <span>Status: Verified & Done</span>
+            </div>
+          </div>
         </div>
       )}
 

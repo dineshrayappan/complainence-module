@@ -1,7 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { getTasks, createTask, updateTask, completeTask, deleteTask } = require('../controllers/taskController');
+const {
+  getTasks,
+  createTask,
+  updateTask,
+  startTask,
+  completeTask,
+  deleteTask,
+  getEmployeeWorkStatus,
+} = require('../controllers/taskController');
 const { verifyToken, requireRole } = require('../middleware/auth');
+
+// Live status of department employees (Admin / Auditor / Supervisor live oversight)
+router.get('/live-status', verifyToken, getEmployeeWorkStatus);
 
 // List: every authenticated user sees their own tasks; ADMIN/AUDITOR see all.
 // Filtering (state, department) is done server-side in the controller.
@@ -10,8 +21,10 @@ router.get('/', verifyToken, getTasks);
 // Scheduling new recurring work is an audit/admin responsibility.
 router.post('/', verifyToken, requireRole(['ADMIN', 'AUDITOR']), createTask);
 
-// Update / complete: controller additionally checks the task is assigned to
-// the caller, so a supervisor can act on their own work without being an admin.
+// Start work: employee clicks start when ready to begin
+router.post('/:id/start', verifyToken, startTask);
+
+// Update / complete: controller checks authorization and mandates proof of completion
 router.put('/:id', verifyToken, updateTask);
 router.post('/:id/complete', verifyToken, completeTask);
 

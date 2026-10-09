@@ -263,8 +263,10 @@ export const taskService = {
   getTasks: (params) => api.get('/tasks', { params }),
   createTask: (data) => api.post('/tasks', data),
   updateTask: (id, data) => api.put(`/tasks/${id}`, data),
-  completeTask: (id) => api.post(`/tasks/${id}/complete`),
+  startTask: (id) => api.post(`/tasks/${id}/start`),
+  completeTask: (id, proofData = {}) => api.post(`/tasks/${id}/complete`, proofData),
   deleteTask: (id) => api.delete(`/tasks/${id}`),
+  getLiveStatus: (params) => api.get('/tasks/live-status', { params }),
 };
 
 export default api;
