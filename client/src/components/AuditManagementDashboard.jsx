@@ -22,8 +22,11 @@ import {
   Sparkles,
   RefreshCw,
   FileCheck2,
+  Camera,
+  Trophy,
+  Play,
 } from 'lucide-react';
-import { complaintService } from '../services/api';
+import { complaintService, taskService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter }) => {
@@ -32,6 +35,10 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [audits, setAudits] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [activeAuditTab, setActiveAuditTab] = useState('rounds'); // 'rounds' | 'department-tasks'
+  const [taskDeptFilter, setTaskDeptFilter] = useState('ALL');
+  const [viewProofTask, setViewProofTask] = useState(null);
   const [stats, setStats] = useState({
     completedAudits: 0,
     openAudits: 0,
@@ -58,15 +65,23 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
       if (showSpinner) setLoading(true);
       else setIsRefreshing(true);
 
-      const res = await complaintService.getAudits();
-      if (res.data?.success) {
-        setAudits(res.data.audits || []);
-        if (res.data.stats) {
-          setStats(res.data.stats);
+      const [auditRes, taskRes] = await Promise.allSettled([
+        complaintService.getAudits(),
+        taskService.getTasks(),
+      ]);
+
+      if (auditRes.status === 'fulfilled' && auditRes.value.data?.success) {
+        setAudits(auditRes.value.data.audits || []);
+        if (auditRes.value.data.stats) {
+          setStats(auditRes.value.data.stats);
         }
       }
+
+      if (taskRes.status === 'fulfilled' && taskRes.value.data?.success) {
+        setTasks(taskRes.value.data.tasks || []);
+      }
     } catch (err) {
-      console.warn('Failed to fetch audits from server, using initial dataset:', err);
+      console.warn('Failed to fetch audits/tasks from server:', err);
     } finally {
       if (showSpinner) setLoading(false);
       setIsRefreshing(false);
@@ -388,8 +403,39 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
       {/* ============================================================ */}
 
       {!selectedAudit ? (
-        /* UPCOMING AUDITS TABLE / CARD VIEW */
-        <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
+        <div className="space-y-4">
+          {/* View Mode Toggle: Audit Rounds vs Department Tasks & Verified Proofs */}
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+            <button
+              type="button"
+              onClick={() => setActiveAuditTab('rounds')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                activeAuditTab === 'rounds'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Audit Inspection Rounds ({audits.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAuditTab('department-tasks')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                activeAuditTab === 'department-tasks'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Department Tasks & Verified Proofs ({tasks.length})</span>
+            </button>
+          </div>
+
+          {activeAuditTab === 'rounds' ? (
+            /* UPCOMING AUDITS TABLE / CARD VIEW */
+            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h2 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -474,6 +520,219 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
               );
             })}
           </div>
+        </div>
+      ) : (
+        /* 2. DEPARTMENT COMPLIANCE TASKS & VERIFIED PROOFS OVERSIGHT */
+        <div className="space-y-4">
+          {/* Department Filter & Summary Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-indigo-600" />
+              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                Filter Department:
+              </span>
+              <select
+                value={taskDeptFilter}
+                onChange={(e) => setTaskDeptFilter(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+              >
+                <option value="ALL">All Departments (Entire Plant)</option>
+                {['Production', 'Quality', 'Maintenance', 'Store', 'EHS', 'EDP', 'HR', 'Central Quality Audit'].map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-slate-400">
+                {tasks.filter((t) => taskDeptFilter === 'ALL' || t.department === taskDeptFilter).length} Tasks
+              </span>
+              <button
+                type="button"
+                onClick={() => loadAudits(false)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <span>Refresh Tasks</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Tasks Table */}
+          <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-50/90 dark:bg-slate-950/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono text-[10px] sm:text-[11px] border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="py-3.5 px-4 font-bold">Task Title & Details</th>
+                  <th className="py-3.5 px-4 font-bold">Department</th>
+                  <th className="py-3.5 px-4 font-bold text-center">Work Status</th>
+                  <th className="py-3.5 px-4 font-bold">Task Owner / 1st Completer</th>
+                  <th className="py-3.5 px-3 font-bold">Completion Time</th>
+                  <th className="py-3.5 px-4 font-bold text-right">Proof Verification</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                {tasks
+                  .filter((t) => taskDeptFilter === 'ALL' || t.department === taskDeptFilter)
+                  .length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 text-xs font-mono">
+                      No compliance tasks scheduled for this department.
+                    </td>
+                  </tr>
+                ) : (
+                  tasks
+                    .filter((t) => taskDeptFilter === 'ALL' || t.department === taskDeptFilter)
+                    .map((task) => {
+                      const isDone = task.status === 'Completed' || task.workStatus === 'COMPLETED';
+                      const isBusy = task.workStatus === 'IN_PROGRESS' || (task.status === 'In Progress' && !isDone);
+                      const winner = task.completedBy || task.firstCompleter || task.assignedTo;
+
+                      return (
+                        <tr
+                          key={task.id}
+                          className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors ${
+                            isDone ? 'bg-emerald-500/5' : isBusy ? 'bg-amber-500/5' : ''
+                          }`}
+                        >
+                          {/* 1. Title & Details */}
+                          <td className="py-3.5 px-4">
+                            <div className="max-w-md">
+                              <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span>{task.title}</span>
+                                {task.priority && (
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold ${
+                                      task.priority === 'HIGH'
+                                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
+                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                                    }`}
+                                  >
+                                    {task.priority}
+                                  </span>
+                                )}
+                              </div>
+                              {task.description && (
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                  {task.description}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 2. Department */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                              {task.department}
+                            </span>
+                          </td>
+
+                          {/* 3. Work Status Badge */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {isDone ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Completed</span>
+                              </span>
+                            ) : isBusy ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40 animate-pulse">
+                                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                  <span>In Progress / Busy</span>
+                                </span>
+                                {Array.isArray(task.activeWorkers) && task.activeWorkers.length > 0 && (
+                                  <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400 mt-1">
+                                    {task.activeWorkers.length} Active {task.activeWorkers.length === 1 ? 'Worker' : 'Workers'}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                <span>Pending</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 4. Task Owner / 1st Completer */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {isDone ? (
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 rounded-lg text-xs font-black bg-amber-400 text-slate-950 border border-amber-500 shadow-2xs">
+                                  🏆 1st Completer
+                                </span>
+                                <div>
+                                  <div className="font-extrabold text-slate-900 dark:text-white">
+                                    {winner?.name || 'Department Worker'}
+                                  </div>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    {winner?.employeeId}
+                                  </span>
+                                </div>
+                              </div>
+                            ) : task.assignedTo?.employeeId === 'DEPT-POOL' ? (
+                              <span className="px-2 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                🌟 Open to Department Pool
+                              </span>
+                            ) : (
+                              <div>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">
+                                  {task.assignedTo?.name || 'Assigned Staff'}
+                                </span>
+                                {task.assignedTo?.employeeId && (
+                                  <span className="text-[10px] font-mono text-slate-400 block">
+                                    {task.assignedTo.employeeId}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* 5. Completion Time */}
+                          <td className="py-3.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {task.completedAt ? (
+                              <div>
+                                <div className="font-bold text-indigo-600 dark:text-cyan-400">
+                                  {new Date(task.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                                <span className="text-[9px] text-slate-400">
+                                  {new Date(task.completedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          {/* 6. Proof Verification Action */}
+                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                            {task.proofPhoto ? (
+                              <button
+                                type="button"
+                                onClick={() => setViewProofTask(task)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition-all active:scale-95 cursor-pointer"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>View Verified Proof</span>
+                              </button>
+                            ) : isBusy ? (
+                              <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-semibold">
+                                Pending Upload
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
         </div>
       ) : (
         /* ============================================================ */
@@ -908,6 +1167,111 @@ export const AuditManagementDashboard = ({ onOpenNewComplaint, onSelectNCFilter 
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 7. MODAL TO VIEW VERIFIED TASK COMPLETION PROOF             */}
+      {/* ============================================================ */}
+      {viewProofTask && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 text-slate-900 dark:text-slate-100 max-h-[90vh] overflow-y-auto space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Verified Task Completion Proof
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs">
+                    {viewProofTask.title} • {viewProofTask.department}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewProofTask(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* First Completer & Verification Badge */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl">🏆</span>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
+                    Recognized 1st Finisher & Task Owner
+                  </span>
+                  <div className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    {viewProofTask.completedBy?.name || viewProofTask.firstCompleter?.name || viewProofTask.assignedTo?.name}
+                    <span className="text-xs font-mono font-normal text-slate-500 dark:text-slate-400 ml-1.5">
+                      ({viewProofTask.completedBy?.employeeId || viewProofTask.firstCompleter?.employeeId || viewProofTask.assignedTo?.employeeId})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {viewProofTask.completedAt && (
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-mono text-slate-400 font-bold block">
+                    Completed At
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {new Date(viewProofTask.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Photo Proof Display */}
+            {viewProofTask.proofPhoto && (
+              <div className="space-y-1.5">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                  Uploaded Floor Photographic Proof:
+                </span>
+                <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-950/80 p-1 flex items-center justify-center">
+                  <img
+                    src={viewProofTask.proofPhoto}
+                    alt="Floor Verification Proof"
+                    className="max-h-72 w-full object-contain rounded-xl"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Verification / Corrective Notes */}
+            {viewProofTask.proofNotes && (
+              <div className="space-y-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block font-mono">
+                  Corrective Details & Floor Notes:
+                </span>
+                <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                  {viewProofTask.proofNotes}
+                </p>
+              </div>
+            )}
+
+            {/* Verification Sign-Off Footer */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Auditor Verified & Logged</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setViewProofTask(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+              >
+                Close Proof
+              </button>
+            </div>
           </div>
         </div>
       )}

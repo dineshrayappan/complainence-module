@@ -285,12 +285,17 @@ export const MyTasksPanel = ({ compact = false }) => {
       setProofModalTask(null);
       load();
 
-      if (res.data?.nextTask) {
+      if (res.data?.message) {
         // eslint-disable-next-line no-alert
         alert(res.data.message);
       }
     } catch (err) {
-      setProofError(err.response?.data?.message || 'Failed to submit completion proof.');
+      if (err.response?.status === 409) {
+        setProofError(`⚠️ ${err.response.data?.message || 'Another employee submitted completion proof first! You cannot claim this task.'}`);
+        load();
+      } else {
+        setProofError(err.response?.data?.message || 'Failed to submit completion proof.');
+      }
     } finally {
       setSubmittingProof(false);
     }
@@ -303,15 +308,6 @@ export const MyTasksPanel = ({ compact = false }) => {
         ? user.department
         : 'Production';
 
-    const matchingWorkers = usersList.filter(
-      (u) => (u.department || '').trim().toLowerCase() === initialDept.trim().toLowerCase()
-    );
-
-    const defaultUserId =
-      matchingWorkers.length > 0
-        ? matchingWorkers[0].id || matchingWorkers[0]._id || matchingWorkers[0].employeeId
-        : user?.id || user?._id || user?.employeeId || '';
-
     setForm({
       title: '',
       department: initialDept,
@@ -319,7 +315,7 @@ export const MyTasksPanel = ({ compact = false }) => {
       dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
       recurrence: 'NONE',
       priority: 'MEDIUM',
-      assignedToUserId: defaultUserId,
+      assignedToUserId: 'DEPT_POOL',
     });
     setShowForm(true);
   };
@@ -334,11 +330,13 @@ export const MyTasksPanel = ({ compact = false }) => {
         (u._id && u._id === task.assignedTo?.userId)
     );
     const assignedId =
-      matchedUser?.id ||
-      matchedUser?._id ||
-      task.assignedTo?.userId ||
-      task.assignedTo?.employeeId ||
-      '';
+      task.assignedTo?.employeeId === 'DEPT-POOL'
+        ? 'DEPT_POOL'
+        : matchedUser?.id ||
+          matchedUser?._id ||
+          task.assignedTo?.userId ||
+          task.assignedTo?.employeeId ||
+          '';
 
     setForm({
       title: task.title || '',
@@ -352,29 +350,14 @@ export const MyTasksPanel = ({ compact = false }) => {
     setShowForm(true);
   };
 
-  // When Department is changed, dynamically update and pre-select that department's workers
+  // When Department is changed, default to department pool for that department
   const handleDepartmentChange = (e) => {
     const selectedDept = e.target.value;
-    const matchingWorkers = usersList.filter(
-      (u) => (u.department || '').trim().toLowerCase() === selectedDept.trim().toLowerCase()
-    );
-
-    setForm((prev) => {
-      let nextAssigneeId = '';
-      if (matchingWorkers.length > 0) {
-        // Pre-select the first worker of this selected department
-        nextAssigneeId = matchingWorkers[0].id || matchingWorkers[0]._id || matchingWorkers[0].employeeId;
-      } else {
-        // Fallback to self or blank if no dedicated worker
-        nextAssigneeId = user?.id || user?._id || user?.employeeId || '';
-      }
-
-      return {
-        ...prev,
-        department: selectedDept,
-        assignedToUserId: nextAssigneeId,
-      };
-    });
+    setForm((prev) => ({
+      ...prev,
+      department: selectedDept,
+      assignedToUserId: 'DEPT_POOL',
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -604,17 +587,22 @@ export const MyTasksPanel = ({ compact = false }) => {
                 onChange={(e) => setForm({ ...form, assignedToUserId: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-sm transition-colors"
               >
+                {/* Department Pool Option: First to complete claims task */}
+                <optgroup label={`── Department Assignment (${form.department}) ──`}>
+                  <option value="DEPT_POOL">
+                    🌟 Entire Department Pool (Open to All {form.department} Workers - 1st to Complete Claims)
+                  </option>
+                </optgroup>
+
                 {departmentWorkers.length > 0 ? (
-                  <optgroup label={`── Workers in ${form.department} (${departmentWorkers.length}) ──`}>
+                  <optgroup label={`── Dedicated Workers in ${form.department} (${departmentWorkers.length}) ──`}>
                     {departmentWorkers.map((u) => (
                       <option key={u.id || u._id || u.employeeId} value={u.id || u._id || u.employeeId}>
                         {u.name} — {u.designation || u.role} [{u.employeeId}]
                       </option>
                     ))}
                   </optgroup>
-                ) : (
-                  <option value="">No dedicated worker registered in {form.department}</option>
-                )}
+                ) : null}
 
                 {/* Quality Auditors option group */}
                 <optgroup label="── Quality Auditors (Central Audit Team) ──">
@@ -780,9 +768,31 @@ export const MyTasksPanel = ({ compact = false }) => {
                             {task.department}
                           </span>
                         )}
-                        {task.assignedTo?.name && (
+                        {/* 1st Completer Trophy Badge if Completed */}
+                        {isDone ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400 text-slate-950 border border-amber-500 shadow-2xs flex items-center gap-1">
+                            <span>🏆 1st Completer:</span>
+                            <span>{task.completedBy?.name || task.assignedTo?.name}</span>
+                            {task.completedAt && (
+                              <span className="font-mono text-[8.5px] opacity-80">
+                                ({new Date(task.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                              </span>
+                            )}
+                          </span>
+                        ) : task.assignedTo?.employeeId === 'DEPT-POOL' ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+                            🌟 Open to Department Pool (1st to Complete Claims)
+                          </span>
+                        ) : task.assignedTo?.name ? (
                           <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
                             👤 {task.assignedTo.name}
+                          </span>
+                        ) : null}
+
+                        {/* Concurrent Active Workers Badge */}
+                        {!isDone && Array.isArray(task.activeWorkers) && task.activeWorkers.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                            ⚡ Active Workers ({task.activeWorkers.length}): {task.activeWorkers.map((w) => w.name).join(', ')}
                           </span>
                         )}
                       </div>

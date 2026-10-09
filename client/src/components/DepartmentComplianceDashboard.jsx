@@ -144,14 +144,23 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
     setProofError(null);
 
     try {
-      await taskService.completeTask(completeModalTask.id, {
+      const res = await taskService.completeTask(completeModalTask.id, {
         proofPhoto,
         proofNotes: proofNotes.trim(),
       });
       setCompleteModalTask(null);
       loadData(false);
+      if (res.data?.message) {
+        // eslint-disable-next-line no-alert
+        alert(res.data.message);
+      }
     } catch (err) {
-      setProofError(err.response?.data?.message || 'Failed to complete task.');
+      if (err.response?.status === 409) {
+        setProofError(`⚠️ ${err.response.data?.message || 'Another employee submitted completion proof first! You cannot claim this task.'}`);
+        loadData(false);
+      } else {
+        setProofError(err.response?.data?.message || 'Failed to complete task.');
+      }
     } finally {
       setSubmittingProof(false);
     }

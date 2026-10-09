@@ -98,6 +98,8 @@ const enrichTaskWithMeta = (task, now = new Date()) => {
     workStatus,
     startedAt: meta.startedAt || task.startedAt || null,
     startedBy: meta.startedBy || task.startedBy || null,
+    activeWorkers: meta.activeWorkers || task.activeWorkers || [],
+    firstCompleter: meta.firstCompleter || task.firstCompleter || null,
     completedAt: meta.completedAt || task.completedAt || null,
     completedBy: meta.completedBy || task.completedBy || null,
     proofPhoto: meta.proofPhoto || task.proofPhoto || null,
@@ -114,7 +116,7 @@ const formatTask = (task, now = new Date()) => {
 };
 
 /** Shared across every route: ADMIN and AUDITOR see the whole plant, everyone
- *  else sees only what is assigned to them. */
+ *  else sees only what is assigned to them or their department. */
 const isElevated = (user) =>
   user?.role === 'ADMIN' || user?.role === 'AUDITOR' ||
   user?.employeeId === 'ALL-001' || user?.email === 'all@factory.com' ||
@@ -122,12 +124,34 @@ const isElevated = (user) =>
 
 const applyVisibility = (tasks, user) => {
   if (isElevated(user)) return tasks;
-  return tasks.filter(
-    (t) =>
+  const userDept = (user?.department || '').trim().toLowerCase();
+  const uEmp = (user?.employeeId || '').toUpperCase();
+  const uId = String(user?.id || user?._id || '');
+
+  return tasks.filter((t) => {
+    // 1. Directly assigned
+    if (
       t.assignedTo?.employeeId === user?.employeeId ||
       t.assignedTo?.userId === (user?.id || user?._id) ||
       t.assignedTo?.email === user?.email
-  );
+    ) {
+      return true;
+    }
+    // 2. Department task: any employee in the same department is eligible to view & work on it
+    if (userDept && (t.department || '').trim().toLowerCase() === userDept) {
+      return true;
+    }
+    // 3. User is an active worker who started working on this task
+    if (
+      Array.isArray(t.activeWorkers) &&
+      t.activeWorkers.some(
+        (w) => (w.employeeId && w.employeeId.toUpperCase() === uEmp) || (w.userId && String(w.userId) === uId)
+      )
+    ) {
+      return true;
+    }
+    return false;
+  });
 };
 
 const matchesFilter = (task, state, department) => {
@@ -212,30 +236,42 @@ const createTask = async (req, res) => {
       return res.status(400).json({ success: false, message: `Priority must be one of: ${PRIORITIES.join(', ')}` });
     }
 
-    // Resolve the assignee: explicit user, else self.
-    let owner = null;
+    // Resolve the assignee: explicit user, department pool, else self.
+    let assignedTo = null;
     const lookupId = assignedToUserId || req.body.assignedToEmployeeId;
-    if (lookupId && isSupabaseConfigured && supabase) {
-      try {
-        const { data } = await supabase
-          .from('users')
-          .select('*')
-          .or(`id.eq.${lookupId},employeeId.eq.${lookupId},email.eq.${lookupId}`)
-          .limit(1);
-        if (data && data.length) owner = data[0];
-      } catch (e) {
-        console.warn('[TaskController:createTask] assignee lookup notice:', e.message);
-      }
-    }
-    if (!owner) owner = mockStore.findUserById(lookupId) || mockStore.getUsers().find((u) => u.employeeId === lookupId);
-    if (!owner) owner = req.user;
 
-    const assignedTo = {
-      userId: owner.id || owner._id || '',
-      employeeId: owner.employeeId || '',
-      name: owner.name || '',
-      department: owner.department || department || '',
-    };
+    if (lookupId === 'DEPT_POOL' || lookupId === 'ALL_WORKERS') {
+      assignedTo = {
+        userId: '',
+        employeeId: 'DEPT-POOL',
+        name: `${department || 'Department'} (Open to All Department Workers)`,
+        department: department || 'Central Quality Audit',
+        isDepartmentPool: true,
+      };
+    } else {
+      let owner = null;
+      if (lookupId && isSupabaseConfigured && supabase) {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('*')
+            .or(`id.eq.${lookupId},employeeId.eq.${lookupId},email.eq.${lookupId}`)
+            .limit(1);
+          if (data && data.length) owner = data[0];
+        } catch (e) {
+          console.warn('[TaskController:createTask] assignee lookup notice:', e.message);
+        }
+      }
+      if (!owner) owner = mockStore.findUserById(lookupId) || mockStore.getUsers().find((u) => u.employeeId === lookupId);
+      if (!owner) owner = req.user;
+
+      assignedTo = {
+        userId: owner.id || owner._id || '',
+        employeeId: owner.employeeId || '',
+        name: owner.name || '',
+        department: owner.department || department || '',
+      };
+    }
 
     const payload = {
       title: String(title).trim(),
@@ -362,7 +398,7 @@ const updateTask = async (req, res) => {
 
 // @desc    Start work on a task (employee begins working)
 // @route   POST /api/tasks/:id/start
-// @access  Private (Assignee, ADMIN, AUDITOR)
+// @access  Private (Assignee, ADMIN, AUDITOR, or any eligible department employee)
 const startTask = async (req, res) => {
   try {
     const task = await findTask(req.params.id);
@@ -370,26 +406,38 @@ const startTask = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found.' });
     }
     if (!canManage(req.user, task)) {
-      return res.status(403).json({ success: false, message: 'You can only start tasks assigned to you or your department.' });
+      return res.status(403).json({ success: false, message: 'You can only start tasks assigned to your department.' });
     }
 
-    if (task.status === 'Completed' || task.workStatus === 'COMPLETED') {
+    if (task.status === 'Completed' || task.workStatus === 'COMPLETED' || task.completedAt) {
       return res.status(400).json({ success: false, message: 'This task has already been completed.' });
     }
 
     const startedAt = new Date().toISOString();
-    const startedBy = {
+    const currentWorker = {
       userId: req.user?.id || req.user?._id || '',
       employeeId: req.user?.employeeId || '',
       name: req.user?.name || '',
+      department: req.user?.department || task.department || '',
+      startedAt,
     };
 
     const existingMeta = extractTaskMeta(task) || {};
+    const existingWorkers = Array.isArray(existingMeta.activeWorkers) ? existingMeta.activeWorkers : [];
+    
+    // Track all eligible workers currently working on this task
+    const workerEmp = (currentWorker.employeeId || '').toUpperCase();
+    const isAlreadyWorking = existingWorkers.some((w) => (w.employeeId || '').toUpperCase() === workerEmp);
+    const updatedWorkers = isAlreadyWorking
+      ? existingWorkers
+      : [...existingWorkers, currentWorker];
+
     const meta = {
       ...existingMeta,
       workStatus: 'IN_PROGRESS',
       startedAt: task.startedAt || existingMeta.startedAt || startedAt,
-      startedBy,
+      startedBy: task.startedBy || existingMeta.startedBy || currentWorker,
+      activeWorkers: updatedWorkers,
     };
 
     const taskId = String(task.id || task._id);
@@ -431,7 +479,7 @@ const startTask = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Work started on task. Status updated to In Progress / Busy.',
+      message: `Work started on task by ${currentWorker.name}. Status updated to In Progress / Busy.`,
       task: formatTask(finalTask),
     });
   } catch (error) {
@@ -440,9 +488,9 @@ const startTask = async (req, res) => {
   }
 };
 
-// @desc    Mark a task complete. Mandatory proof (photo + notes) required!
+// @desc    Mark a task complete. First eligible employee to submit valid proof is awarded the completed task!
 // @route   POST /api/tasks/:id/complete
-// @access  Private (ADMIN, AUDITOR, or the assignee)
+// @access  Private (Assignee, ADMIN, AUDITOR, or any eligible department employee)
 const completeTask = async (req, res) => {
   try {
     const task = await findTask(req.params.id);
@@ -450,12 +498,11 @@ const completeTask = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found.' });
     }
     if (!canManage(req.user, task)) {
-      return res.status(403).json({ success: false, message: 'You can only complete tasks assigned to you.' });
+      return res.status(403).json({ success: false, message: 'You can only complete tasks assigned to your department.' });
     }
 
+    // 1. Mandatory proof validation
     const { proofPhoto, proofNotes } = req.body || {};
-
-    // Strict validation: The employee should not be able to mark the task as completed without uploading the required proof
     if (!proofPhoto || typeof proofPhoto !== 'string' || !proofPhoto.trim()) {
       return res.status(400).json({
         success: false,
@@ -470,31 +517,64 @@ const completeTask = async (req, res) => {
       });
     }
 
+    const taskId = String(task.id || task._id);
+    const existingMeta = extractTaskMeta(task) || {};
+
+    // 2. Race-condition guard: prevent two employees from simultaneously claiming the same task
+    if (
+      task.status === 'Completed' ||
+      task.workStatus === 'COMPLETED' ||
+      task.completedAt ||
+      existingMeta.workStatus === 'COMPLETED' ||
+      existingMeta.completedAt
+    ) {
+      const winnerName = task.completedBy?.name || existingMeta.completedBy?.name || 'Another employee';
+      const winnerEmp = task.completedBy?.employeeId || existingMeta.completedBy?.employeeId || '';
+      const finishTime = task.completedAt || existingMeta.completedAt;
+      const formattedTime = finishTime ? new Date(finishTime).toLocaleTimeString() : 'moments ago';
+
+      return res.status(409).json({
+        success: false,
+        code: 'ALREADY_COMPLETED',
+        message: `Task has already been completed by ${winnerName} ${winnerEmp ? `(${winnerEmp})` : ''} at ${formattedTime}. Only the first eligible employee to submit valid proof is awarded the completed task.`,
+        firstCompleter: task.completedBy || existingMeta.completedBy,
+        completedAt: finishTime,
+      });
+    }
+
     const completedAt = new Date().toISOString();
-    const completedBy = {
+    const winningEmployee = {
       userId: req.user?.id || req.user?._id || '',
       employeeId: req.user?.employeeId || '',
       name: req.user?.name || '',
+      department: req.user?.department || task.department || '',
     };
 
-    const existingMeta = extractTaskMeta(task) || {};
+    // 3. Automatically assign the task to that employee as the completed task owner & first completer
     const meta = {
       ...existingMeta,
       workStatus: 'COMPLETED',
-      startedAt: task.startedAt || existingMeta.startedAt || null,
-      startedBy: task.startedBy || existingMeta.startedBy || null,
+      startedAt: task.startedAt || existingMeta.startedAt || completedAt,
+      startedBy: task.startedBy || existingMeta.startedBy || winningEmployee,
       completedAt,
-      completedBy,
+      completedBy: winningEmployee,
+      firstCompleter: {
+        ...winningEmployee,
+        completedAt,
+        isFirstCompleter: true,
+      },
       proofPhoto: proofPhoto.trim(),
       proofNotes: proofNotes.trim(),
+      activeWorkers: [], // Clear active workers once task is claimed & completed
     };
 
-    const taskId = String(task.id || task._id);
     taskWorkMetadataStore.set(taskId, meta);
     const enrichedDescription = embedTaskMeta(task.description, meta);
 
+    // Persist winning employee as the assigned owner in database
     const safeUpdates = {
       status: 'Completed',
+      assignedTo: winningEmployee, // AUTO-ASSIGN TO WINNING FIRST COMPLETER!
       description: enrichedDescription,
       updatedAt: completedAt,
     };
@@ -502,13 +582,25 @@ const completeTask = async (req, res) => {
     let completed = null;
     if (isSupabaseConfigured && supabase) {
       try {
+        // Atomic SQL check: only update if status is NOT already Completed
         const { data, error } = await supabase
           .from('compliance_tasks')
           .update(safeUpdates)
           .eq('id', task.id)
+          .neq('status', 'Completed')
           .select()
           .single();
-        if (!error && data) completed = data;
+
+        if (!error && data) {
+          completed = data;
+        } else if (error && (error.code === 'PGRST116' || (error.message && error.message.includes('0 rows')))) {
+          // Zero rows matched because another employee beat this one to the finish line!
+          return res.status(409).json({
+            success: false,
+            code: 'ALREADY_COMPLETED',
+            message: 'Another employee submitted completion proof moments before you! You cannot claim this task.',
+          });
+        }
       } catch (dbErr) {
         console.warn('[TaskController:completeTask] Supabase update notice:', dbErr.message);
       }
@@ -516,6 +608,15 @@ const completeTask = async (req, res) => {
 
     const mockUpdates = { ...safeUpdates, ...meta };
     if (!completed) {
+      // Check mockStore concurrency
+      const currentInMock = mockStore.getTaskById(task.id);
+      if (currentInMock && (currentInMock.status === 'Completed' || currentInMock.completedAt)) {
+        return res.status(409).json({
+          success: false,
+          code: 'ALREADY_COMPLETED',
+          message: `Task was just completed by ${currentInMock.completedBy?.name || 'another employee'}.`,
+        });
+      }
       completed = mockStore.updateTask(task.id, mockUpdates);
       if (!completed) {
         completed = mockStore.createTask({ ...task, ...mockUpdates, id: task.id });
@@ -524,7 +625,7 @@ const completeTask = async (req, res) => {
       mockStore.updateTask(task.id, mockUpdates);
     }
 
-    // Rolling schedule: completing a recurring task books the next occurrence
+    // Rolling schedule: completing a recurring task books the next occurrence for the department pool
     let nextTask = null;
     if (task.recurrence && task.recurrence !== 'NONE') {
       const nextDue = nextDueDate(task.dueDate, task.recurrence);
@@ -533,7 +634,13 @@ const completeTask = async (req, res) => {
           title: task.title,
           department: task.department,
           description: (task.description || '').replace(/\s*<!-- TASK_META:[\s\S]*?-->/g, '').trim(),
-          assignedTo: task.assignedTo,
+          assignedTo: {
+            userId: '',
+            employeeId: 'DEPT-POOL',
+            name: `${task.department} (Open to All Department Workers)`,
+            department: task.department,
+            isDepartmentPool: true,
+          },
           dueDate: nextDue.toISOString(),
           status: 'Pending',
           recurrence: task.recurrence,
@@ -558,10 +665,9 @@ const completeTask = async (req, res) => {
 
     res.json({
       success: true,
-      message: nextTask
-        ? `Task completed with proof verified. Next ${task.recurrence.toLowerCase()} occurrence scheduled.`
-        : 'Task completed successfully with uploaded proof.',
+      message: `🎉 Task successfully completed by ${winningEmployee.name}! Automatically assigned as the completed task owner and first completer.`,
       task: formatTask(finalCompleted),
+      firstCompleter: winningEmployee,
       nextTask: nextTask ? formatTask(nextTask) : null,
     });
   } catch (error) {
@@ -669,34 +775,46 @@ const getEmployeeWorkStatus = async (req, res) => {
       const uId = String(user.id || user._id || '');
       const uEmail = (user.email || '').toLowerCase();
 
-      // Find tasks assigned to or handled by this user
-      const userTasks = allTasks.filter((t) => {
-        const assignedEmp = (t.assignedTo?.employeeId || '').toUpperCase();
-        const assignedId = String(t.assignedTo?.userId || '');
-        const assignedEmail = (t.assignedTo?.email || '').toLowerCase();
+      // 1. Is this employee actively working on any in-progress task?
+      const activeTask = allTasks.find((t) => {
+        if (t.status === 'Completed' || t.workStatus === 'COMPLETED' || t.completedAt) return false;
+        // Check if user is in activeWorkers list
+        const isWorker = Array.isArray(t.activeWorkers) && t.activeWorkers.some(
+          (w) => (w.employeeId && (w.employeeId || '').toUpperCase() === uEmp) || (w.userId && String(w.userId) === uId)
+        );
         const startedEmp = (t.startedBy?.employeeId || '').toUpperCase();
         const startedId = String(t.startedBy?.userId || '');
-        const compEmp = (t.completedBy?.employeeId || '').toUpperCase();
-        const compId = String(t.completedBy?.userId || '');
-
-        return (
-          (uEmp && (assignedEmp === uEmp || startedEmp === uEmp || compEmp === uEmp)) ||
-          (uId && (assignedId === uId || startedId === uId || compId === uId)) ||
-          (uEmail && assignedEmail === uEmail)
-        );
+        return isWorker || (uEmp && startedEmp === uEmp) || (uId && startedId === uId);
       });
 
-      // Check for active In-Progress task
-      const activeTask = userTasks.find(
-        (t) => t.workStatus === 'IN_PROGRESS' || (t.status === 'In Progress' && !t.completedAt)
-      );
-
-      // Check for completed tasks
-      const completedTasks = userTasks
-        .filter((t) => t.status === 'Completed' || t.workStatus === 'COMPLETED' || t.completedAt)
+      // 2. Check for tasks won/completed by this user
+      const userDept = (user.department || '').trim().toLowerCase();
+      const completedTasks = allTasks
+        .filter((t) => {
+          if (t.status !== 'Completed' && t.workStatus !== 'COMPLETED' && !t.completedAt) return false;
+          const compEmp = (t.completedBy?.employeeId || '').toUpperCase();
+          const compId = String(t.completedBy?.userId || '');
+          const assignedEmp = (t.assignedTo?.employeeId || '').toUpperCase();
+          const assignedId = String(t.assignedTo?.userId || '');
+          return (uEmp && (compEmp === uEmp || assignedEmp === uEmp)) || (uId && (compId === uId || assignedId === uId));
+        })
         .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
 
       const latestCompleted = completedTasks[0] || null;
+
+      // 3. Open pending task eligible for this employee to start
+      const openDeptTask = allTasks.find((t) => {
+        if (t.status === 'Completed' || t.workStatus === 'COMPLETED' || t.completedAt) return false;
+        const assignedEmp = (t.assignedTo?.employeeId || '').toUpperCase();
+        const assignedId = String(t.assignedTo?.userId || '');
+        const tDept = (t.department || '').trim().toLowerCase();
+
+        // Directly assigned to this user
+        if ((uEmp && assignedEmp === uEmp) || (uId && assignedId === uId)) return true;
+        // Or department pool task open to all department workers
+        if (userDept && (tDept === userDept || assignedEmp === 'DEPT-POOL')) return true;
+        return false;
+      });
 
       let status = 'Available';
       let currentTask = null;
@@ -705,13 +823,6 @@ const getEmployeeWorkStatus = async (req, res) => {
       let proofStatus = 'None';
       let proofPhoto = null;
       let proofNotes = null;
-
-      if (latestCompleted) {
-        completionTime = latestCompleted.completedAt || null;
-        proofStatus = latestCompleted.proofPhoto ? 'Verified / Uploaded' : 'Submitted';
-        proofPhoto = latestCompleted.proofPhoto || null;
-        proofNotes = latestCompleted.proofNotes || null;
-      }
 
       if (activeTask) {
         status = 'In Progress / Busy';
@@ -722,10 +833,15 @@ const getEmployeeWorkStatus = async (req, res) => {
           dueDate: activeTask.dueDate,
           department: activeTask.department,
         };
-        startTime = activeTask.startedAt || activeTask.updatedAt || null;
-        if (!latestCompleted) {
-          proofStatus = 'Pending Upload';
-        }
+        const workerEntry = Array.isArray(activeTask.activeWorkers)
+          ? activeTask.activeWorkers.find(
+              (w) =>
+                (w.employeeId && (w.employeeId || '').toUpperCase() === uEmp) ||
+                (w.userId && String(w.userId) === uId)
+            )
+          : null;
+        startTime = workerEntry?.startedAt || activeTask.startedAt || activeTask.updatedAt || null;
+        proofStatus = 'Pending Upload';
       } else if (latestCompleted) {
         status = 'Completed';
         currentTask = {
@@ -736,6 +852,20 @@ const getEmployeeWorkStatus = async (req, res) => {
           department: latestCompleted.department,
         };
         startTime = latestCompleted.startedAt || null;
+        completionTime = latestCompleted.completedAt || null;
+        proofStatus = latestCompleted.proofPhoto ? 'Verified / Uploaded' : 'Submitted';
+        proofPhoto = latestCompleted.proofPhoto || null;
+        proofNotes = latestCompleted.proofNotes || null;
+      } else if (openDeptTask) {
+        // Available, with an open task ready to start
+        status = 'Available';
+        currentTask = {
+          id: openDeptTask.id,
+          title: openDeptTask.title,
+          priority: openDeptTask.priority,
+          dueDate: openDeptTask.dueDate,
+          department: openDeptTask.department,
+        };
       }
 
       return {
@@ -747,6 +877,7 @@ const getEmployeeWorkStatus = async (req, res) => {
         role: user.role,
         status, // 'Available' | 'In Progress / Busy' | 'Completed'
         assignedTask: currentTask,
+        openTask: openDeptTask ? { id: openDeptTask.id, title: openDeptTask.title } : null,
         startTime,
         completionTime,
         proofStatus,
@@ -788,10 +919,35 @@ const getEmployeeWorkStatus = async (req, res) => {
   }
 };
 
-const canManage = (user, task) =>
-  isElevated(user) ||
-  task.assignedTo?.employeeId === user?.employeeId ||
-  task.assignedTo?.userId === (user?.id || user?._id);
+const canManage = (user, task) => {
+  if (isElevated(user)) return true;
+  // Directly assigned
+  if (
+    task.assignedTo?.employeeId === user?.employeeId ||
+    task.assignedTo?.userId === (user?.id || user?._id) ||
+    task.assignedTo?.email === user?.email
+  ) {
+    return true;
+  }
+  // Eligible department employee (all workers in the department are eligible to perform the task)
+  const userDept = (user?.department || '').trim().toLowerCase();
+  const taskDept = (task.department || '').trim().toLowerCase();
+  if (userDept && taskDept && userDept === taskDept) {
+    return true;
+  }
+  // User is an active worker on this task
+  if (
+    Array.isArray(task.activeWorkers) &&
+    task.activeWorkers.some(
+      (w) =>
+        (w.employeeId && w.employeeId.toUpperCase() === (user?.employeeId || '').toUpperCase()) ||
+        (w.userId && String(w.userId) === String(user?.id || user?._id))
+    )
+  ) {
+    return true;
+  }
+  return false;
+};
 
 const findTask = async (id) => {
   let task = null;
