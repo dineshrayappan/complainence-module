@@ -66,6 +66,48 @@ app.use('/api', async (req, res, next) => {
   }
 });
 
+// API Overview & Documentation helper (useful for Postman testing & browser verification)
+const apiOverview = (req, res) => {
+  res.status(200).json({
+    success: true,
+    name: 'Textile & Garment QMS Complaints System API',
+    status: 'ONLINE',
+    database: isMongoConnected() ? 'MongoDB (Connected)' : 'Resilient In-Memory Mode',
+    message: 'Welcome to the Garment QMS REST API! Use the endpoints below to test with Postman.',
+    auth: {
+      loginEndpoint: 'POST /api/auth/login',
+      testCredentials: [
+        { role: 'ADMIN', identifier: 'admin@factory.com', password: 'admin123' },
+        { role: 'AUDITOR (Dinesh)', identifier: 'dineshrayappan.r@gmail.com', password: 'auditor123' },
+        { role: 'AUDITOR (Pooja)', identifier: 'auditor@factory.com', password: 'auditor123' },
+        { role: 'SUPERVISOR', identifier: 'supervisor@factory.com', password: 'supervisor123' },
+        { role: 'UNIVERSAL', identifier: 'all@factory.com', password: 'master123' },
+      ],
+      postmanInstructions: '1. Send POST /api/auth/login with {"identifier": "...", "password": "..."}.\n2. Copy the "token" from response.\n3. Add header "Authorization: Bearer <token>" to your Postman requests.'
+    },
+    endpoints: {
+      health: 'GET /api/health',
+      login: 'POST /api/auth/login',
+      register: 'POST /api/auth/register',
+      me: 'GET /api/auth/me',
+      complaints: 'GET /api/complaints',
+      createComplaint: 'POST /api/complaints',
+      complaintDetail: 'GET /api/complaints/:id',
+      kpiStats: 'GET /api/complaints/stats/kpi',
+      adminOversight: 'GET /api/complaints/admin/oversight',
+      departmentCompliance: 'GET /api/complaints/admin/department-compliance',
+      tasks: 'GET /api/tasks',
+      users: 'GET /api/users',
+      departments: 'GET /api/departments',
+    },
+  });
+};
+
+// Root & overview endpoints for Postman / web probes
+app.get('/', apiOverview);
+app.get('/api', apiOverview);
+app.get('/health', (req, res) => res.redirect('/api/health'));
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({
