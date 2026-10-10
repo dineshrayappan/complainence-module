@@ -46,6 +46,7 @@ const seedData = async () => {
       const adminPassword = await bcrypt.hash('admin123', salt);
       const auditorPassword = await bcrypt.hash('auditor123', salt);
       const supervisorPassword = await bcrypt.hash('supervisor123', salt);
+      const masterPassword = await bcrypt.hash('master123', salt);
 
       const standardUsers = [
         {
@@ -71,6 +72,28 @@ const seedData = async () => {
           isActive: true,
         },
         {
+          employeeId: 'AUD-002',
+          name: 'Dinesh Rayappan',
+          email: 'dineshrayappan.r@gmail.com',
+          password: auditorPassword,
+          role: 'AUDITOR',
+          department: 'Quality Assurance',
+          designation: 'Lead Quality Auditor',
+          mobileNumber: '+91 98765 43211',
+          isActive: true,
+        },
+        {
+          employeeId: 'ALL-001',
+          name: 'Master QA Director',
+          email: 'all@factory.com',
+          password: masterPassword,
+          role: 'ADMIN',
+          department: 'Executive Operations',
+          designation: 'Universal Multi-Role Director',
+          mobileNumber: '+91 99999 00000',
+          isActive: true,
+        },
+        {
           employeeId: 'SUP-001',
           name: 'Ramesh Patel',
           email: 'supervisor@factory.com',
@@ -81,13 +104,90 @@ const seedData = async () => {
           mobileNumber: '+91 98111 22334',
           isActive: true,
         },
+        {
+          employeeId: 'SUP-101',
+          name: 'Mohammad Arif',
+          email: 'arif@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'Production',
+          designation: 'Sewing Line 1 In-Charge',
+          mobileNumber: '+91 98111 22335',
+          isActive: true,
+        },
+        {
+          employeeId: 'SUP-102',
+          name: 'Priya Sharma',
+          email: 'priya@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'Production',
+          designation: 'Sewing Line 2 In-Charge',
+          mobileNumber: '+91 98111 22336',
+          isActive: true,
+        },
+        {
+          employeeId: 'SUP-103',
+          name: 'Kamal Hasan',
+          email: 'kamal@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'Stores',
+          designation: 'Cutting Line Supervisor',
+          mobileNumber: '+91 98111 22337',
+          isActive: true,
+        },
+        {
+          employeeId: 'SUP-104',
+          name: 'Sunita Roy',
+          email: 'sunita@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'Maintenance',
+          designation: 'Finishing & Packing Lead',
+          mobileNumber: '+91 98111 22338',
+          isActive: true,
+        },
+        {
+          employeeId: 'SUP-105',
+          name: 'Ramesh Patel',
+          email: 'ramesh@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'Stores',
+          designation: 'Stores & Trims In-Charge',
+          mobileNumber: '+91 98111 22339',
+          isActive: true,
+        },
+        {
+          employeeId: 'SUP-106',
+          name: 'Kavita Deshmukh',
+          email: 'kavita@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'EHS',
+          designation: 'EHS & Plant Safety Lead',
+          mobileNumber: '+91 98111 22340',
+          isActive: true,
+        },
+        {
+          employeeId: 'SUP-999',
+          name: 'Vikram Malhotra',
+          email: 'vikram@factory.com',
+          password: supervisorPassword,
+          role: 'ACTION_PERSON',
+          department: 'Quality',
+          designation: 'End-Line QC Supervisor',
+          mobileNumber: '+91 98111 22341',
+          isActive: true,
+        },
       ];
 
       for (const u of standardUsers) {
         await User.findOneAndUpdate(
           { $or: [{ employeeId: u.employeeId }, { email: u.email }] },
           { $set: u },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         );
       }
       console.log('✅ [Seed] Standard factory users verified in MongoDB.');
