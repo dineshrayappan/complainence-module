@@ -23,6 +23,7 @@ import LoginPage from './components/LoginPage';
 import AdminOversightDashboard from './components/AdminOversightDashboard';
 import AdminUserManagement from './components/AdminUserManagement';
 import DepartmentComplianceDashboard from './components/DepartmentComplianceDashboard';
+import DepartmentWorkOperations from './components/DepartmentWorkOperations';
 import SidebarNavigation from './components/SidebarNavigation';
 import FactoryComplianceHome from './components/FactoryComplianceHome';
 import RequirementsComplianceView from './components/RequirementsComplianceView';
@@ -82,8 +83,9 @@ export const App = () => {
   const [toastMessage, setToastMessage] = useState(null);
 
   // Navigation & Sidebar States
-  const [currentNavSection, setCurrentNavSection] = useState('dashboard'); // 'dashboard', 'tasks', 'audits', 'nc', 'cap', 'departments', 'requirements', 'reports', 'settings'
+  const [currentNavSection, setCurrentNavSection] = useState('dashboard'); // 'dashboard', 'tasks', 'audits', 'nc', 'cap', 'departments', 'work-operations', 'requirements', 'reports', 'settings'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [workOpsDept, setWorkOpsDept] = useState('ALL');
 
   // Filter States
   const [activeTab, setActiveTab] = useState('all');
@@ -569,6 +571,15 @@ export const App = () => {
             <DepartmentComplianceDashboard
               onSelectDepartment={handleDrilldownDepartment}
               onClose={() => setCurrentNavSection('dashboard')}
+              onNavigateWorkOperations={(dept) => {
+                setWorkOpsDept(dept || 'ALL');
+                setCurrentNavSection('work-operations');
+              }}
+            />
+          ) : currentNavSection === 'work-operations' ? (
+            <DepartmentWorkOperations
+              initialDepartment={workOpsDept}
+              onBackToScorecard={() => setCurrentNavSection('departments')}
             />
           ) : currentNavSection === 'requirements' ? (
             <RequirementsComplianceView

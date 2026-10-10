@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Flame,
   X,
+  Activity,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -67,6 +68,13 @@ export const SidebarNavigation = ({
       icon: Building2,
       badge: counts.deptCount !== undefined && counts.deptCount !== null && counts.deptCount > 0 ? String(counts.deptCount) : null,
       badgeColor: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200',
+    },
+    {
+      id: 'work-operations',
+      label: 'Work Operations',
+      icon: Activity,
+      badge: counts.activeTasks !== undefined && counts.activeTasks !== null && counts.activeTasks > 0 ? String(counts.activeTasks) : 'Live',
+      badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-cyan-400 border border-indigo-500/20',
     },
     {
       id: 'requirements',
