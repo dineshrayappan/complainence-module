@@ -11,11 +11,11 @@ export default defineConfig({
     host: true, // Allow external mobile devices on local network to access
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.SERVER_URL || 'http://localhost:5000',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://localhost:5000',
+        target: process.env.SERVER_URL || 'http://localhost:5000',
         changeOrigin: true,
       },
     },
