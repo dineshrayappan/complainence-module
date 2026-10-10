@@ -13,6 +13,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const complaintRoutes = require('./routes/complaintRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const departmentRoutes = require('./routes/departmentRoutes');
 
 const app = express();
 
@@ -84,6 +85,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Central Error Handler
 app.use((err, req, res, next) => {

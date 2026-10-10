@@ -32,6 +32,14 @@ module.exports = {
     }
     return null;
   },
+  deleteUser: (id) => {
+    const idx = mockUsers.findIndex((u) => u._id === id || u.id === id || u.employeeId === id);
+    if (idx !== -1) {
+      const removed = mockUsers.splice(idx, 1)[0];
+      return removed;
+    }
+    return null;
+  },
   getComplaints: (params = {}, user = null) => {
     let result = [...mockComplaints];
 
@@ -273,7 +281,43 @@ module.exports = {
     mockTasks.splice(idx, 1);
     return true;
   },
+
+  // ---- Departments Management ----
+  getDepartments: () => [...mockDepartments],
+  findDepartmentById: (id) => {
+    const s = (id || '').trim().toLowerCase();
+    return mockDepartments.find((d) => d.id?.toLowerCase() === s || d.name?.toLowerCase() === s || d.code?.toLowerCase() === s);
+  },
+  createDepartment: (deptData) => {
+    const newDept = {
+      id: deptData.id || `dept-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      headcount: 20,
+      createdAt: new Date().toISOString(),
+      ...deptData,
+    };
+    mockDepartments.push(newDept);
+    return newDept;
+  },
+  deleteDepartment: (idOrName) => {
+    const s = (idOrName || '').trim().toLowerCase();
+    const idx = mockDepartments.findIndex(
+      (d) => d.id?.toLowerCase() === s || d.name?.toLowerCase() === s
+    );
+    if (idx === -1) return null;
+    const removed = mockDepartments.splice(idx, 1)[0];
+    return removed;
+  },
 };
+
+let mockDepartments = [
+  { id: 'dept-01', name: 'Production', code: 'PROD', manager: 'Rajesh Kumar', headcount: 280 },
+  { id: 'dept-02', name: 'Quality', code: 'QA', manager: 'Kavita Nair', headcount: 35 },
+  { id: 'dept-03', name: 'Maintenance', code: 'MAINT', manager: 'Vikram Singh', headcount: 22 },
+  { id: 'dept-04', name: 'Store', code: 'STORE', manager: 'Ramesh Patel', headcount: 18 },
+  { id: 'dept-05', name: 'EHS', code: 'EHS', manager: 'Sunil Verma', headcount: 12 },
+  { id: 'dept-06', name: 'EDP', code: 'EDP', manager: 'Deepak Joshi', headcount: 8 },
+  { id: 'dept-07', name: 'HR', code: 'HR', manager: 'Meera Swaminathan', headcount: 15 },
+];
 
 let mockTasks = [];
 

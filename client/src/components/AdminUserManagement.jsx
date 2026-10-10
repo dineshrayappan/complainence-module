@@ -24,8 +24,12 @@ import {
   AlertTriangle,
   X,
   ArrowRight,
+  Trash2,
+  AlertOctagon,
+  Layers,
+  Activity,
 } from 'lucide-react';
-import { userService } from '../services/api';
+import { userService, departmentService } from '../services/api';
 
 const FACTORY_DEPARTMENTS = [
   'Production',
@@ -40,8 +44,10 @@ const FACTORY_DEPARTMENTS = [
 export const AdminUserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL', 'AUDITOR', 'SUPERVISOR', 'ADMIN', 'INACTIVE'
+  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL', 'AUDITOR', 'SUPERVISOR', 'DEPARTMENTS', 'ADMIN', 'INACTIVE'
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modal States
@@ -49,6 +55,25 @@ export const AdminUserManagement = () => {
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // Delete Confirmation Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { type: 'USER' | 'DEPARTMENT', item }
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [dependencyData, setDependencyData] = useState(null);
+  const [dependencyLoading, setDependencyLoading] = useState(false);
+
+  // Add Department Modal State
+  const [isCreateDeptModalOpen, setIsCreateDeptModalOpen] = useState(false);
+  const [createDeptForm, setCreateDeptForm] = useState({
+    name: '',
+    code: '',
+    manager: '',
+    headcount: 20,
+  });
+  const [createDeptLoading, setCreateDeptLoading] = useState(false);
+  const [createDeptError, setCreateDeptError] = useState('');
 
   // Create User Form State
   const [createForm, setCreateForm] = useState({
@@ -105,9 +130,117 @@ export const AdminUserManagement = () => {
     }
   };
 
+  const loadDepartments = async () => {
+    try {
+      setDepartmentsLoading(true);
+      const res = await departmentService.getDepartments();
+      if (res.data?.success && Array.isArray(res.data.departments)) {
+        setDepartmentsList(res.data.departments);
+      }
+    } catch (err) {
+      console.warn('Failed to load departments:', err);
+    } finally {
+      setDepartmentsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
+    loadDepartments();
   }, []);
+
+  const availableDepartmentNames = departmentsList.length > 0
+    ? departmentsList.map((d) => d.name)
+    : FACTORY_DEPARTMENTS;
+
+  // Open Delete Confirmation Modal with automated dependency inspection
+  const handleOpenDeleteModal = async (type, item) => {
+    setDeleteTarget({ type, item });
+    setDeleteError('');
+    setDependencyData(null);
+    setIsDeleteModalOpen(true);
+    setDependencyLoading(true);
+
+    try {
+      if (type === 'USER') {
+        const res = await userService.checkUserDependencies(item._id || item.id);
+        if (res.data?.success) {
+          setDependencyData(res.data.dependencies);
+        }
+      } else {
+        const res = await departmentService.checkDepartmentDependencies(item.id || item.name);
+        if (res.data?.success) {
+          setDependencyData(res.data.dependencies);
+        }
+      }
+    } catch (err) {
+      console.warn('Dependency inspection notice:', err);
+      if (err.response?.data?.dependencies) {
+        setDependencyData(err.response.data.dependencies);
+      }
+    } finally {
+      setDependencyLoading(false);
+    }
+  };
+
+  // Submit Deletion
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    setDeleteError('');
+
+    try {
+      if (deleteTarget.type === 'USER') {
+        const u = deleteTarget.item;
+        const res = await userService.deleteUser(u._id || u.id);
+        if (res.data?.success) {
+          showToast(res.data.message || `Account for ${u.name} deleted successfully.`);
+          setIsDeleteModalOpen(false);
+          setDeleteTarget(null);
+          loadUsers();
+          loadDepartments();
+        }
+      } else {
+        const d = deleteTarget.item;
+        const res = await departmentService.deleteDepartment(d.id || d.name);
+        if (res.data?.success) {
+          showToast(res.data.message || `Department '${d.name}' deleted successfully.`);
+          setIsDeleteModalOpen(false);
+          setDeleteTarget(null);
+          loadDepartments();
+          loadUsers();
+        }
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to delete. Please verify all active tasks and NCs are closed.';
+      setDeleteError(msg);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Submit Create Department
+  const handleCreateDeptSubmit = async (e) => {
+    e.preventDefault();
+    setCreateDeptError('');
+    setCreateDeptLoading(true);
+
+    try {
+      const res = await departmentService.createDepartment(createDeptForm);
+      if (res.data?.success) {
+        showToast(res.data.message || `Department '${createDeptForm.name}' created!`);
+        setIsCreateDeptModalOpen(false);
+        setCreateDeptForm({ name: '', code: '', manager: '', headcount: 20 });
+        loadDepartments();
+      }
+    } catch (err) {
+      setCreateDeptError(
+        err.response?.data?.message || 'Failed to create department. Please check code or name uniqueness.'
+      );
+    } finally {
+      setCreateDeptLoading(false);
+    }
+  };
 
   // Compute metrics
   const totalUsers = users.length;
@@ -146,6 +279,17 @@ export const AdminUserManagement = () => {
     }
 
     return true;
+  });
+
+  // Filtered departments list
+  const filteredDepartments = departmentsList.filter((d) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      d.name?.toLowerCase().includes(q) ||
+      d.code?.toLowerCase().includes(q) ||
+      d.manager?.toLowerCase().includes(q)
+    );
   });
 
   // Generate strong random password
@@ -367,11 +511,23 @@ export const AdminUserManagement = () => {
             <Wrench className="w-4 h-4" />
             <span>+ Add Supervisor</span>
           </button>
+
+          <button
+            onClick={() => {
+              setCreateDeptForm({ name: '', code: '', manager: '', headcount: 20 });
+              setCreateDeptError('');
+              setIsCreateDeptModalOpen(true);
+            }}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all hover:scale-102 cursor-pointer whitespace-nowrap"
+          >
+            <Building2 className="w-4 h-4" />
+            <span>+ Add Department</span>
+          </button>
         </div>
       </div>
 
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
         <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold mb-1">
             <span>Total Personnel</span>
@@ -411,7 +567,20 @@ export const AdminUserManagement = () => {
           </span>
         </div>
 
-        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/20 shadow-xs">
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-blue-500/20 shadow-xs">
+          <div className="flex items-center justify-between text-blue-600 dark:text-blue-400 text-xs font-semibold mb-1">
+            <span>Departments</span>
+            <Building2 className="w-4 h-4 text-blue-500" />
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-blue-700 dark:text-blue-300">
+            {departmentsList.length}
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono truncate block">
+            Active plant divisions
+          </span>
+        </div>
+
+        <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/20 shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
           <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 text-xs font-semibold mb-1">
             <span>Admins</span>
             <Crown className="w-4 h-4 text-amber-500" />
@@ -420,7 +589,7 @@ export const AdminUserManagement = () => {
             {adminCount}
           </div>
           <span className="text-[10px] text-slate-400 font-mono truncate block">
-            Operations directors
+            Executive oversight
           </span>
         </div>
       </div>
@@ -449,7 +618,7 @@ export const AdminUserManagement = () => {
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            All ({users.length})
+            All Personnel ({users.length})
           </button>
           <button
             onClick={() => setRoleFilter('AUDITOR')}
@@ -470,6 +639,16 @@ export const AdminUserManagement = () => {
             }`}
           >
             Supervisors ({supervisorCount})
+          </button>
+          <button
+            onClick={() => setRoleFilter('DEPARTMENTS')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              roleFilter === 'DEPARTMENTS'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100'
+            }`}
+          >
+            🏢 Departments ({departmentsList.length})
           </button>
           <button
             onClick={() => setRoleFilter('ADMIN')}
@@ -495,17 +674,121 @@ export const AdminUserManagement = () => {
           )}
 
           <button
-            onClick={loadUsers}
-            title="Refresh Personnel"
+            onClick={() => {
+              loadUsers();
+              loadDepartments();
+            }}
+            title="Refresh Personnel & Departments"
             className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors shrink-0"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading || departmentsLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Users Cards Grid */}
-      {loading && users.length === 0 ? (
+      {/* Cards Grid: Factory Departments View OR Personnel Directory */}
+      {roleFilter === 'DEPARTMENTS' ? (
+        departmentsLoading && departmentsList.length === 0 ? (
+          <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
+            <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-3" />
+            <span>Scanning Factory Departments Directory...</span>
+          </div>
+        ) : filteredDepartments.length === 0 ? (
+          <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 font-mono text-xs">
+            No departments found matching the query.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredDepartments.map((dept) => (
+              <div
+                key={dept.id || dept.name}
+                className="p-5 rounded-2xl border bg-white dark:bg-slate-900 border-blue-500/20 hover:border-blue-500/50 hover:shadow-md transition-all relative flex flex-col justify-between"
+              >
+                <div>
+                  {/* Top Row: Department Info */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center font-black text-sm text-white shadow-xs">
+                        <Building2 className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                          {dept.name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[11px]">
+                          <span className="font-bold text-blue-600 dark:text-blue-400">
+                            CODE: {dept.code}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span className="text-slate-500 dark:text-slate-400 truncate max-w-[140px]">
+                            {dept.manager || 'Unassigned'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
+                      Department
+                    </span>
+                  </div>
+
+                  {/* Details Card */}
+                  <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 mb-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Personnel Assigned:</span>
+                      </span>
+                      <strong className="font-semibold text-slate-800 dark:text-slate-100 font-mono">
+                        {dept.personnelCount || 0} active
+                      </strong>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                        <Activity className="w-3.5 h-3.5" />
+                        <span>Active Tasks:</span>
+                      </span>
+                      <span className={`font-mono font-semibold ${dept.activeTasks > 0 ? 'text-indigo-600 dark:text-cyan-400' : 'text-slate-500'}`}>
+                        {dept.activeTasks || 0} in progress
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>Open NCs:</span>
+                      </span>
+                      <span className={`font-mono font-semibold ${dept.openNCs > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        {dept.openNCs || 0} open
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-slate-400 text-[10px]">Headcount Capacity:</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300">
+                        {dept.headcount || 20} staff
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Actions Bar */}
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    onClick={() => handleOpenDeleteModal('DEPARTMENT', dept)}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-bold text-xs transition-colors cursor-pointer"
+                    title={`Delete department ${dept.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Department</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : loading && users.length === 0 ? (
         <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin mb-3" />
           <span>Scanning Factory Personnel Directory...</span>
@@ -680,6 +963,16 @@ export const AdminUserManagement = () => {
                       title={u.isActive ? 'Deactivate account' : 'Reactivate account'}
                     >
                       {u.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+
+                  {!isAdm && (
+                    <button
+                      onClick={() => handleOpenDeleteModal('USER', u)}
+                      className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                      title={`Delete ${isAud ? 'Auditor' : 'Supervisor'} Account`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
@@ -921,7 +1214,7 @@ export const AdminUserManagement = () => {
                       onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
                     >
-                      {FACTORY_DEPARTMENTS.map((dept) => (
+                      {availableDepartmentNames.map((dept) => (
                         <option key={dept} value={dept}>
                           {dept}
                         </option>
@@ -1195,7 +1488,7 @@ export const AdminUserManagement = () => {
                   onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {FACTORY_DEPARTMENTS.map((dept) => (
+                  {availableDepartmentNames.map((dept) => (
                     <option key={dept} value={dept}>
                       {dept}
                     </option>
@@ -1248,6 +1541,286 @@ export const AdminUserManagement = () => {
                     <Check className="w-3.5 h-3.5" />
                   )}
                   <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 4: DELETE CONFIRMATION DIALOG ================= */}
+      {isDeleteModalOpen && deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto flex flex-col">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-rose-500/10 via-amber-500/5 to-transparent">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Trash2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                    {deleteTarget.type === 'DEPARTMENT'
+                      ? 'Delete Factory Department'
+                      : deleteTarget.item.role === 'AUDITOR'
+                      ? 'Delete Auditor Account'
+                      : 'Delete Personnel Account'}
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Confirm deletion with safe data integrity verification
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 sm:p-5 space-y-4 text-xs">
+              {/* Target Details Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-700 dark:text-slate-200 shrink-0">
+                  {deleteTarget.type === 'DEPARTMENT' ? (
+                    <Building2 className="w-5 h-5 text-blue-500" />
+                  ) : (
+                    deleteTarget.item.name?.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                    {deleteTarget.item.name}
+                  </h3>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2 mt-0.5 font-mono">
+                    {deleteTarget.type === 'DEPARTMENT' ? (
+                      <>
+                        <span className="font-bold text-blue-600 dark:text-blue-400">
+                          CODE: {deleteTarget.item.code}
+                        </span>
+                        <span>•</span>
+                        <span>Lead: {deleteTarget.item.manager || 'Unassigned'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold text-purple-600 dark:text-purple-400">
+                          {deleteTarget.item.employeeId}
+                        </span>
+                        <span>•</span>
+                        <span>{deleteTarget.item.department}</span>
+                        <span>•</span>
+                        <span className="capitalize">{deleteTarget.item.role?.toLowerCase()}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Live Dependency Inspection Box */}
+              {dependencyLoading ? (
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center justify-center py-6 text-slate-500 font-mono text-xs">
+                  <RefreshCw className="w-5 h-5 animate-spin text-amber-500 mb-2" />
+                  <span>Verifying active tasks, NCs, and audit dependencies...</span>
+                </div>
+              ) : dependencyData ? (
+                dependencyData.hasActiveDependencies ? (
+                  <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/80 text-rose-900 dark:text-rose-200 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-xs text-rose-700 dark:text-rose-300">
+                      <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>Deletion Blocked: Active Operational Records Found</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-rose-800/90 dark:text-rose-300/90">
+                      This {deleteTarget.type === 'DEPARTMENT' ? 'department' : 'account'} currently has active work assigned:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 font-mono text-[11px] text-rose-800 dark:text-rose-300 pl-1">
+                      {dependencyData.openNCs > 0 && (
+                        <li><strong>{dependencyData.openNCs}</strong> Open Non-Conformance(s)</li>
+                      )}
+                      {dependencyData.activeTasks > 0 && (
+                        <li><strong>{dependencyData.activeTasks}</strong> Active Compliance Task(s)</li>
+                      )}
+                      {dependencyData.scheduledAudits > 0 && (
+                        <li><strong>{dependencyData.scheduledAudits}</strong> Scheduled Audit(s)</li>
+                      )}
+                      {dependencyData.activePersonnel > 0 && (
+                        <li><strong>{dependencyData.activePersonnel}</strong> Assigned Plant Personnel</li>
+                      )}
+                    </ul>
+                    <div className="text-[10px] bg-rose-100/70 dark:bg-rose-900/50 p-2 rounded-xl text-rose-800 dark:text-rose-200 font-sans mt-2">
+                      ⚠️ To ensure QMS workflow stability and avoid orphaned work orders, please reassign personnel and close open records before deleting.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/70 text-emerald-900 dark:text-emerald-200 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-xs text-emerald-700 dark:text-emerald-400">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Zero Active Dependencies: Safe to Delete</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-emerald-800/90 dark:text-emerald-300/90">
+                      No active open tasks or unresolved non-conformances are assigned to this {deleteTarget.type === 'DEPARTMENT' ? 'department' : 'account'}.
+                    </p>
+                    <div className="text-[10px] bg-emerald-100/60 dark:bg-emerald-900/40 p-2 rounded-xl text-emerald-800 dark:text-emerald-300">
+                      🔒 <strong>Historical Data Integrity:</strong> All historical closed NCs, verified CAPs, and audit trail logs will be permanently retained in the compliance database.
+                    </div>
+                  </div>
+                )
+              ) : null}
+
+              {/* Error message if delete failed */}
+              {deleteError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2 bg-slate-50/50 dark:bg-slate-900/50">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleteLoading || dependencyLoading || dependencyData?.hasActiveDependencies}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-rose-600/20 transition-all cursor-pointer"
+              >
+                {deleteLoading ? (
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  {deleteTarget.type === 'DEPARTMENT'
+                    ? 'Confirm Delete Department'
+                    : deleteTarget.item.role === 'AUDITOR'
+                    ? 'Confirm Delete Auditor'
+                    : 'Confirm Delete Account'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 5: ONBOARD NEW DEPARTMENT ================= */}
+      {isCreateDeptModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto flex flex-col">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-blue-500/10 to-transparent">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white">
+                    Add Factory Department
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Register a new plant division in master registry
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsCreateDeptModalOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateDeptSubmit} className="p-4 sm:p-5 space-y-4">
+              {createDeptError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{createDeptError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Department Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Finishing & Packaging, Dyeing Unit"
+                  value={createDeptForm.name}
+                  onChange={(e) => setCreateDeptForm({ ...createDeptForm, name: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Department Code *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. FIN, DYE"
+                    value={createDeptForm.code}
+                    onChange={(e) => setCreateDeptForm({ ...createDeptForm, code: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 text-xs font-mono uppercase rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Headcount Capacity
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="25"
+                    value={createDeptForm.headcount}
+                    onChange={(e) => setCreateDeptForm({ ...createDeptForm, headcount: e.target.value })}
+                    className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Lead Manager / Supervisor
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Anand Verma"
+                  value={createDeptForm.manager}
+                  onChange={(e) => setCreateDeptForm({ ...createDeptForm, manager: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateDeptModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createDeptLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs disabled:opacity-50 transition-all cursor-pointer shadow-md shadow-blue-600/20"
+                >
+                  {createDeptLoading ? (
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  ) : (
+                    <Building2 className="w-3.5 h-3.5" />
+                  )}
+                  <span>Create Department</span>
                 </button>
               </div>
             </form>

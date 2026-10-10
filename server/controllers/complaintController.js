@@ -2233,7 +2233,15 @@ const getDepartmentComplianceStats = async (req, res) => {
       }
     });
 
-    const combinedDepts = Array.from(new Set([...Array.from(foundDepts), ...standardDepts]));
+    if (!isSupabaseConfigured || !supabase) {
+      mockStore.getDepartments().forEach((d) => {
+        if (d.name && d.name.trim()) foundDepts.add(normalizeDeptName(d.name));
+      });
+    }
+
+    const combinedDepts = foundDepts.size > 0
+      ? Array.from(foundDepts)
+      : Array.from(new Set([...Array.from(foundDepts), ...standardDepts]));
 
     const departmentStats = combinedDepts.map((deptName) => {
       const deptComplaints = allComplaints.filter((c) => {

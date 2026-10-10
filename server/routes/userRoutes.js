@@ -7,6 +7,8 @@ const {
   updateUser,
   resetUserPassword,
   toggleUserStatus,
+  checkUserDependencies,
+  deleteUser,
 } = require('../controllers/userController');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
@@ -21,5 +23,7 @@ router.post('/', verifyToken, requireRole(['ADMIN']), createUser);
 router.put('/:id', verifyToken, requireRole(['ADMIN']), updateUser);
 router.patch('/:id/reset-password', verifyToken, requireRole(['ADMIN']), resetUserPassword);
 router.patch('/:id/toggle-status', verifyToken, requireRole(['ADMIN']), toggleUserStatus);
+router.get('/:id/dependencies', verifyToken, requireRole(['ADMIN']), checkUserDependencies);
+router.delete('/:id', verifyToken, requireRole(['ADMIN']), deleteUser);
 
 module.exports = router;

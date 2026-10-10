@@ -504,6 +504,346 @@ const toggleUserStatus = async (req, res) => {
   }
 };
 
+// @desc    Admin: Check active/historical dependencies for a user before deletion
+// @route   GET /api/users/:id/dependencies
+// @access  Private (Admin Only)
+const checkUserDependencies = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    let targetUser = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('id, employeeId, name, role, department')
+          .eq('id', userId)
+          .maybeSingle();
+        targetUser = userRow;
+      } catch (e) {}
+    }
+
+    if (!targetUser) {
+      targetUser = mockStore.findUserById(userId);
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found.',
+      });
+    }
+
+    let activeTasks = 0;
+    let completedTasks = 0;
+    let openNCs = 0;
+    let historicalNCs = 0;
+    let scheduledAudits = 0;
+
+    const uId = String(targetUser.id || targetUser._id || '');
+    const uEmp = String(targetUser.employeeId || '').toUpperCase();
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        // Compliance Tasks
+        const { data: tasksData } = await supabase
+          .from('compliance_tasks')
+          .select('id, status, assignedTo');
+        if (Array.isArray(tasksData)) {
+          tasksData.forEach((t) => {
+            const a = t.assignedTo || {};
+            const isAssigned = (a.userId && String(a.userId) === uId) ||
+                               (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
+            if (isAssigned) {
+              if (t.status === 'Completed') completedTasks++;
+              else activeTasks++;
+            }
+          });
+        }
+
+        // Complaints / NCs
+        const { data: complaintsData } = await supabase
+          .from('complaints')
+          .select('id, status, createdBy, assignedTo');
+        if (Array.isArray(complaintsData)) {
+          complaintsData.forEach((c) => {
+            const cr = c.createdBy || {};
+            const as = c.assignedTo || {};
+            const isCreator = (cr.userId && String(cr.userId) === uId) ||
+                              (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
+            const isAssignee = (as.userId && String(as.userId) === uId) ||
+                               (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
+            if (isCreator || isAssignee) {
+              if (c.status === 'Closed' || c.status === 'Verified') historicalNCs++;
+              else openNCs++;
+            }
+          });
+        }
+
+        // Audits
+        const { data: auditsData } = await supabase
+          .from('audits')
+          .select('id, status, auditor');
+        if (Array.isArray(auditsData)) {
+          auditsData.forEach((a) => {
+            const aud = a.auditor || {};
+            const isAud = (aud.userId && String(aud.userId) === uId) ||
+                          (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
+            if (isAud && a.status !== 'Completed') {
+              scheduledAudits++;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[checkUserDependencies] Supabase inspection notice:', err.message);
+      }
+    } else {
+      // Mock Store Inspection
+      mockStore.getTasks().forEach((t) => {
+        const a = t.assignedTo || {};
+        const isAssigned = (a.userId && String(a.userId) === uId) ||
+                           (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
+        if (isAssigned) {
+          if (t.status === 'Completed') completedTasks++;
+          else activeTasks++;
+        }
+      });
+
+      mockStore.getComplaints({}).forEach((c) => {
+        const cr = c.createdBy || {};
+        const as = c.assignedTo || {};
+        const isCreator = (cr.userId && String(cr.userId) === uId) ||
+                          (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
+        const isAssignee = (as.userId && String(as.userId) === uId) ||
+                           (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
+        if (isCreator || isAssignee) {
+          if (c.status === 'Closed' || c.status === 'Verified') historicalNCs++;
+          else openNCs++;
+        }
+      });
+
+      mockStore.getAudits().forEach((a) => {
+        const aud = a.auditor || {};
+        const isAud = (aud.userId && String(aud.userId) === uId) ||
+                      (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
+        if (isAud && a.status !== 'Completed') {
+          scheduledAudits++;
+        }
+      });
+    }
+
+    const hasActiveDependencies = activeTasks > 0 || openNCs > 0 || scheduledAudits > 0;
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: targetUser.id || targetUser._id,
+        name: targetUser.name,
+        employeeId: targetUser.employeeId,
+        role: targetUser.role,
+        department: targetUser.department,
+      },
+      dependencies: {
+        activeTasks,
+        completedTasks,
+        openNCs,
+        historicalNCs,
+        scheduledAudits,
+        hasActiveDependencies,
+      },
+    });
+  } catch (error) {
+    console.error('[UserController] checkUserDependencies error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to inspect user dependencies.',
+    });
+  }
+};
+
+// @desc    Admin: Safely delete user account (Auditors, Supervisors)
+// @route   DELETE /api/users/:id
+// @access  Private (Admin Only)
+const deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    if (req.user && (req.user.id === userId || req.user._id === userId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own administrative account.',
+      });
+    }
+
+    let targetUser = null;
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('id, employeeId, name, role, department')
+          .eq('id', userId)
+          .maybeSingle();
+        targetUser = userRow;
+      } catch (e) {}
+    }
+
+    if (!targetUser) {
+      targetUser = mockStore.findUserById(userId);
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found.',
+      });
+    }
+
+    if (targetUser.role === 'ADMIN') {
+      return res.status(400).json({
+        success: false,
+        message: 'Administrator accounts cannot be deleted directly.',
+      });
+    }
+
+    const uId = String(targetUser.id || targetUser._id || '');
+    const uEmp = String(targetUser.employeeId || '').toUpperCase();
+
+    // Check active dependencies
+    let activeTasks = 0;
+    let openNCs = 0;
+    let scheduledAudits = 0;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: tasksData } = await supabase
+          .from('compliance_tasks')
+          .select('id, status, assignedTo');
+        if (Array.isArray(tasksData)) {
+          tasksData.forEach((t) => {
+            const a = t.assignedTo || {};
+            const isAssigned = (a.userId && String(a.userId) === uId) ||
+                               (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
+            if (isAssigned && t.status !== 'Completed') {
+              activeTasks++;
+            }
+          });
+        }
+
+        const { data: complaintsData } = await supabase
+          .from('complaints')
+          .select('id, status, createdBy, assignedTo');
+        if (Array.isArray(complaintsData)) {
+          complaintsData.forEach((c) => {
+            const cr = c.createdBy || {};
+            const as = c.assignedTo || {};
+            const isCreator = (cr.userId && String(cr.userId) === uId) ||
+                              (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
+            const isAssignee = (as.userId && String(as.userId) === uId) ||
+                               (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
+            if ((isCreator || isAssignee) && c.status !== 'Closed' && c.status !== 'Verified') {
+              openNCs++;
+            }
+          });
+        }
+
+        const { data: auditsData } = await supabase
+          .from('audits')
+          .select('id, status, auditor');
+        if (Array.isArray(auditsData)) {
+          auditsData.forEach((a) => {
+            const aud = a.auditor || {};
+            const isAud = (aud.userId && String(aud.userId) === uId) ||
+                          (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
+            if (isAud && a.status !== 'Completed') {
+              scheduledAudits++;
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('[deleteUser] Supabase dependency check notice:', err.message);
+      }
+    } else {
+      mockStore.getTasks().forEach((t) => {
+        const a = t.assignedTo || {};
+        const isAssigned = (a.userId && String(a.userId) === uId) ||
+                           (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
+        if (isAssigned && t.status !== 'Completed') {
+          activeTasks++;
+        }
+      });
+
+      mockStore.getComplaints({}).forEach((c) => {
+        const cr = c.createdBy || {};
+        const as = c.assignedTo || {};
+        const isCreator = (cr.userId && String(cr.userId) === uId) ||
+                          (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
+        const isAssignee = (as.userId && String(as.userId) === uId) ||
+                           (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
+        if ((isCreator || isAssignee) && c.status !== 'Closed' && c.status !== 'Verified') {
+          openNCs++;
+        }
+      });
+
+      mockStore.getAudits().forEach((a) => {
+        const aud = a.auditor || {};
+        const isAud = (aud.userId && String(aud.userId) === uId) ||
+                      (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
+        if (isAud && a.status !== 'Completed') {
+          scheduledAudits++;
+        }
+      });
+    }
+
+    if (activeTasks > 0 || openNCs > 0 || scheduledAudits > 0) {
+      const roleLabel = targetUser.role === 'AUDITOR' ? 'Auditor' : 'Supervisor';
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete ${roleLabel} '${targetUser.name}' (${targetUser.employeeId}): Active work detected (${openNCs} open NC(s), ${activeTasks} active task(s), ${scheduledAudits} active audit(s)). Please reassign or complete active items before deleting.`,
+        dependencies: {
+          activeTasks,
+          openNCs,
+          scheduledAudits,
+          hasActiveDependencies: true,
+        },
+      });
+    }
+
+    // Safe Deletion: Removes user record while preserving all historical audit records in database
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { error: delErr } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', targetUser.id);
+        if (delErr) {
+          throw delErr;
+        }
+      } catch (dbErr) {
+        console.error('[UserController:deleteUser] Supabase error:', dbErr.message);
+        return res.status(500).json({
+          success: false,
+          message: `Failed to remove user from database: ${dbErr.message}`,
+        });
+      }
+    }
+
+    mockStore.deleteUser(targetUser.id || targetUser._id);
+
+    const roleName = targetUser.role === 'AUDITOR' ? 'Auditor' : 'Supervisor';
+    return res.status(200).json({
+      success: true,
+      message: `${roleName} '${targetUser.name}' (${targetUser.employeeId}) has been successfully deleted. Historical audit records remain preserved.`,
+      deletedId: targetUser.id || targetUser._id,
+    });
+  } catch (error) {
+    console.error('[UserController] deleteUser error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error while deleting user account.',
+    });
+  }
+};
+
 module.exports = {
   getLineSupervisors,
   getAllUsers,
@@ -511,4 +851,6 @@ module.exports = {
   updateUser,
   resetUserPassword,
   toggleUserStatus,
+  checkUserDependencies,
+  deleteUser,
 };

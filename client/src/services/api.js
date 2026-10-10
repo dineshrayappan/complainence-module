@@ -220,6 +220,64 @@ export const userService = {
     }
     return api.patch(`/users/${id}/toggle-status`);
   },
+
+  checkUserDependencies: async (id) => {
+    return api.get(`/users/${id}/dependencies`);
+  },
+
+  deleteUser: async (id) => {
+    // Call backend API first for full dependency check and data integrity validation
+    const response = await api.delete(`/users/${id}`);
+    if (supabase) {
+      try {
+        await supabase.from('users').delete().eq('id', id);
+      } catch (e) {
+        console.warn('[userService.deleteUser] Direct Supabase notice:', e.message);
+      }
+    }
+    return response;
+  },
+};
+
+export const departmentService = {
+  getDepartments: async () => {
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('*')
+          .order('name', { ascending: true });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          return api.get('/departments').catch(() => ({
+            data: { success: true, count: data.length, departments: data },
+          }));
+        }
+      } catch (e) {
+        console.warn('[departmentService.getDepartments] Supabase direct notice:', e.message);
+      }
+    }
+    return api.get('/departments');
+  },
+
+  checkDepartmentDependencies: async (id) => {
+    return api.get(`/departments/${id}/dependencies`);
+  },
+
+  createDepartment: async (deptData) => {
+    return api.post('/departments', deptData);
+  },
+
+  deleteDepartment: async (id) => {
+    const response = await api.delete(`/departments/${id}`);
+    if (supabase) {
+      try {
+        await supabase.from('departments').delete().or(`id.eq.${id},name.eq.${id}`);
+      } catch (e) {
+        console.warn('[departmentService.deleteDepartment] Direct Supabase notice:', e.message);
+      }
+    }
+    return response;
+  },
 };
 
 export const complaintService = {
