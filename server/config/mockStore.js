@@ -100,7 +100,7 @@ module.exports = {
       const uName = (u.name || '').toLowerCase();
 
       if (uEmail === term || uEmp === term) return true;
-      if (term === 'admin' && (uEmp === 'adm-001' || uRole === 'admin' || uEmail.startsWith('admin@'))) return true;
+      if (term === 'admin' && (uEmp === 'adm-001' || uEmp === 'admin' || uRole === 'admin' || uEmail.startsWith('admin@'))) return true;
       if (term === 'auditor' && (uEmp === 'aud-001' || uRole === 'auditor' || uEmail.startsWith('auditor@'))) return true;
       if (term === 'dinesh' && (uEmp === 'aud-002' || uEmail.includes('dinesh') || uName.includes('dinesh'))) return true;
       if (term === 'supervisor' && (uEmp === 'sup-001' || uRole === 'action_person' || uEmail.startsWith('supervisor@'))) return true;

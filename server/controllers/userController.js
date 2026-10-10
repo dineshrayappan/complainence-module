@@ -678,10 +678,10 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    if (targetUser.employeeId === 'ADM-001' || targetUser.email === 'admin@factory.com') {
+    if (targetUser.employeeId === 'ADM-001' || targetUser.employeeId === 'ADMIN' || targetUser.email === 'admin@factory.com') {
       return res.status(403).json({
         success: false,
-        message: 'Root administrator account (ADM-001) is protected and cannot be deleted.',
+        message: 'Root administrator account is protected and cannot be deleted.',
       });
     }
 

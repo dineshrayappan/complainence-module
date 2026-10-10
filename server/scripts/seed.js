@@ -184,12 +184,20 @@ const seedData = async () => {
       ];
 
       for (const u of standardUsers) {
+        const query =
+          u.role === 'ADMIN' && u.email === 'admin@factory.com'
+            ? { $or: [{ employeeId: 'ADMIN' }, { employeeId: 'ADM-001' }, { email: u.email }] }
+            : { $or: [{ employeeId: u.employeeId }, { email: u.email }] };
         await User.findOneAndUpdate(
-          { $or: [{ employeeId: u.employeeId }, { email: u.email }] },
+          query,
           { $set: u },
           { upsert: true, returnDocument: 'after' }
         );
       }
+
+      const { ensureDefaultAdminUser } = require('../utils/defaultAdmin');
+      await ensureDefaultAdminUser();
+
       console.log('✅ [Seed] Standard factory users verified in MongoDB.');
     } catch (err) {
       console.warn('⚠️ [Seed] MongoDB seed notice:', err.message);

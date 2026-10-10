@@ -68,7 +68,8 @@ const login = async (req, res) => {
       try {
         const searchTerms = [queryIdentifier];
         const qLower = queryIdentifier.toLowerCase();
-        if (qLower === 'admin') { searchTerms.push('admin@factory.com', 'ADM-001'); }
+        if (qLower === 'admin') { searchTerms.push('admin@factory.com', 'admin@admin.com', 'ADMIN', 'ADM-001'); }
+        else if (qLower === 'adm-001') { searchTerms.push('ADMIN', 'admin@factory.com'); }
         else if (qLower === 'auditor') { searchTerms.push('auditor@factory.com', 'AUD-001'); }
         else if (qLower === 'supervisor') { searchTerms.push('supervisor@factory.com', 'SUP-001'); }
         else if (qLower === 'dinesh') { searchTerms.push('dineshrayappan.r@gmail.com', 'AUD-002'); }

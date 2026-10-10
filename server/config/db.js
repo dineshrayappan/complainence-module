@@ -21,6 +21,15 @@ const connectDB = async () => {
     });
     isConnected = true;
     console.log('✅ [Database] Successfully connected to MongoDB server');
+
+    // Automatically ensure default admin user (admin / admin123) is present upon connection
+    try {
+      const { ensureDefaultAdminUser } = require('../utils/defaultAdmin');
+      await ensureDefaultAdminUser();
+    } catch (adminErr) {
+      console.warn('⚠️ [Database] Default admin user initialization notice:', adminErr.message);
+    }
+
     return true;
   } catch (err) {
     isConnected = false;
