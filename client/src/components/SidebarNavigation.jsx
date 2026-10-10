@@ -41,26 +41,22 @@ export const SidebarNavigation = ({
     //   badgeColor: 'bg-indigo-500 text-white',
     //   hidden: true,
     // },
+    // {
+    //   id: 'audits',
+    //   label: 'Audits',
+    //   icon: ShieldCheck,
+    //   badge: counts.audits !== undefined && counts.audits !== null && counts.audits > 0 ? String(counts.audits) : null,
+    //   badgeColor: 'bg-purple-500 text-white',
+    // },
     {
-      id: 'audits',
-      label: 'Audits',
-      icon: ShieldCheck,
-      badge: counts.audits !== undefined && counts.audits !== null && counts.audits > 0 ? String(counts.audits) : null,
-      badgeColor: 'bg-purple-500 text-white',
-    },
-    {
-      id: 'nc',
-      label: 'NC',
-      icon: AlertTriangle,
-      badge: counts.openNC !== undefined && counts.openNC !== null && counts.openNC > 0 ? String(counts.openNC) : null,
-      badgeColor: 'bg-amber-500 text-white',
-    },
-    {
-      id: 'cap',
-      label: 'CAP',
+      id: 'nc-cap',
+      label: 'NC/CAP',
       icon: FileCheck,
-      badge: counts.cap || null,
-      badgeColor: 'bg-emerald-500 text-white',
+      badge:
+        (counts.openNC || 0) + (counts.cap || 0) > 0
+          ? String((counts.openNC || 0) + (counts.cap || 0))
+          : null,
+      badgeColor: 'bg-amber-500 text-white',
     },
     { isDivider: true },
     {
@@ -77,13 +73,13 @@ export const SidebarNavigation = ({
       badge: counts.activeTasks !== undefined && counts.activeTasks !== null && counts.activeTasks > 0 ? String(counts.activeTasks) : 'Live',
       badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-cyan-400 border border-indigo-500/20',
     },
-    {
-      id: 'requirements',
-      label: 'Requirements',
-      icon: BookOpen,
-      badge: 'ISO / SA',
-      badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20',
-    },
+    //{
+      //id: 'requirements',
+      //label: 'Requirements',
+      //icon: BookOpen,
+      //badge: 'ISO / SA',
+      //badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20',
+    //},
     { isDivider: true },
     {
       id: 'reports',
@@ -143,7 +139,7 @@ export const SidebarNavigation = ({
           {/* Navigation Links */}
           <nav className="space-y-1">
             {navItems
-              .filter((item) => !item.hidden)
+              .filter((item) => !item.hidden && (item.isDivider || (item.id && item.icon)))
               .map((item, index) => {
                 if (item.isDivider) {
                   return (
@@ -155,7 +151,9 @@ export const SidebarNavigation = ({
                 }
 
                 const Icon = item.icon;
-                const isActive = currentSection === item.id;
+                const isActive =
+                  currentSection === item.id ||
+                  (item.id === 'nc-cap' && (currentSection === 'nc' || currentSection === 'cap' || currentSection === 'nc-cap'));
 
                 return (
                   <button
