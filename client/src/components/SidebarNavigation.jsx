@@ -39,6 +39,7 @@ export const SidebarNavigation = ({
       icon: ClipboardList,
       badge: counts.tasks || null,
       badgeColor: 'bg-indigo-500 text-white',
+      hidden: true,
     },
     {
       id: 'audits',
@@ -142,7 +143,9 @@ export const SidebarNavigation = ({
 
           {/* Navigation Links */}
           <nav className="space-y-1">
-            {navItems.map((item, index) => {
+            {navItems
+              .filter((item) => !item.hidden)
+              .map((item, index) => {
               if (item.isDivider) {
                 return (
                   <div
