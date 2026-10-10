@@ -9,7 +9,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
-import { complaintService, taskService } from './services/api';
+import { complaintService } from './services/api';
 import { supabase } from './services/supabase';
 import Header from './components/Header';
 import KpiMetrics from './components/KpiMetrics';
@@ -28,7 +28,6 @@ import FactoryComplianceHome from './components/FactoryComplianceHome';
 import RequirementsComplianceView from './components/RequirementsComplianceView';
 import ReportsView from './components/ReportsView';
 import AuditManagementDashboard from './components/AuditManagementDashboard';
-import MyTasksPanel from './components/MyTasksPanel';
 import { Crown, BarChart3, Users, Building2, Flame, CheckSquare, Search, Filter } from 'lucide-react';
 
 // Safe localStorage caching helper namespaced by user to prevent QuotaExceededError and cross-account data leaks
@@ -78,7 +77,6 @@ export const App = () => {
     return [];
   });
   const [metrics, setMetrics] = useState(null);
-  const [taskCounts, setTaskCounts] = useState({ overdue: 0, dueToday: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -170,23 +168,7 @@ export const App = () => {
     loadData(!initialLoadedRef.current, false);
   }, [loadData]);
 
-  // Sidebar badge for My Tasks. Deliberately separate from loadData so that
-  // changing complaint filters does not re-issue the task request.
-  useEffect(() => {
-    if (!user) return;
-    let active = true;
-    taskService
-      .getTasks()
-      .then((res) => {
-        if (active && res.data?.success && res.data.counts) {
-          setTaskCounts(res.data.counts);
-        }
-      })
-      .catch(() => { });
-    return () => {
-      active = false;
-    };
-  }, [user]);
+
 
   // Handle Start Progress (Line Supervisor)
   const handleStartProgress = async (complaint) => {
@@ -527,7 +509,6 @@ export const App = () => {
             overdueNC: derivedCounts.overdueCount ?? 0,
             audits: metrics?.totalAudits ?? 0,
             tasks: complaints.filter((c) => ['Open', 'Assigned', 'In Progress', 'Rejected / Rework'].includes(c.status)).length,
-            myTasks: (taskCounts.overdue + taskCounts.dueToday) || 0,
             cap: (derivedCounts.capSubmitted || 0) + (derivedCounts.underReview || 0),
             deptCount: (metrics?.departments || []).length || 0,
           }}
@@ -584,8 +565,6 @@ export const App = () => {
               onDrilldownDepartment={handleDrilldownDepartment}
               onOpenNewComplaint={() => setIsNewModalOpen(true)}
             />
-          ) : currentNavSection === 'my-tasks' ? (
-            <MyTasksPanel />
           ) : currentNavSection === 'departments' ? (
             <DepartmentComplianceDashboard
               onSelectDepartment={handleDrilldownDepartment}

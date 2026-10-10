@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   LayoutDashboard,
-  ClipboardCheck,
   ClipboardList,
   ShieldCheck,
   AlertTriangle,
@@ -32,13 +31,6 @@ export const SidebarNavigation = ({
       icon: LayoutDashboard,
       badge: null,
       badgeColor: '',
-    },
-    {
-      id: 'my-tasks',
-      label: 'My Tasks (Start/Stop)',
-      icon: ClipboardCheck,
-      badge: counts.myTasks || null,
-      badgeColor: 'bg-rose-500 text-white',
     },
     {
       id: 'tasks',
