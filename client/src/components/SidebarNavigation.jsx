@@ -33,14 +33,14 @@ export const SidebarNavigation = ({
       badge: null,
       badgeColor: '',
     },
-    {
-      id: 'tasks',
-      label: 'NC Tasks',
-      icon: ClipboardList,
-      badge: counts.tasks || null,
-      badgeColor: 'bg-indigo-500 text-white',
-      hidden: true,
-    },
+    // {
+    //   id: 'tasks',
+    //   label: 'NC Tasks',
+    //   icon: ClipboardList,
+    //   badge: counts.tasks || null,
+    //   badgeColor: 'bg-indigo-500 text-white',
+    //   hidden: true,
+    // },
     {
       id: 'audits',
       label: 'Audits',
@@ -94,15 +94,15 @@ export const SidebarNavigation = ({
     },
     ...(isAdmin
       ? [
-          { isDivider: true },
-          {
-            id: 'settings',
-            label: 'Settings',
-            icon: Settings,
-            badge: 'Admin',
-            badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
-          },
-        ]
+        { isDivider: true },
+        {
+          id: 'settings',
+          label: 'Settings',
+          icon: Settings,
+          badge: 'Admin',
+          badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        },
+      ]
       : []),
   ];
 
@@ -123,9 +123,8 @@ export const SidebarNavigation = ({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:sticky top-0 lg:top-20 left-0 h-screen lg:h-[calc(100vh-5rem)] w-64 bg-white dark:bg-slate-900 border-r border-slate-200/90 dark:border-slate-800/90 z-50 lg:z-10 flex flex-col justify-between py-4 px-3 transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed lg:sticky top-0 lg:top-20 left-0 h-screen lg:h-[calc(100vh-5rem)] w-64 bg-white dark:bg-slate-900 border-r border-slate-200/90 dark:border-slate-800/90 z-50 lg:z-10 flex flex-col justify-between py-4 px-3 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         <div className="flex flex-col h-full overflow-y-auto no-scrollbar">
           {/* Mobile Header in Drawer */}
@@ -146,57 +145,54 @@ export const SidebarNavigation = ({
             {navItems
               .filter((item) => !item.hidden)
               .map((item, index) => {
-              if (item.isDivider) {
-                return (
-                  <div
-                    key={`divider-${index}`}
-                    className="my-2 border-t border-slate-100 dark:border-slate-800/80"
-                  />
-                );
-              }
-
-              const Icon = item.icon;
-              const isActive = currentSection === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleItemClick(item.id)}
-                  type="button"
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all group cursor-pointer ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Icon
-                      className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
-                        isActive
-                          ? 'text-white'
-                          : 'text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-cyan-400'
-                      }`}
+                if (item.isDivider) {
+                  return (
+                    <div
+                      key={`divider-${index}`}
+                      className="my-2 border-t border-slate-100 dark:border-slate-800/80"
                     />
-                    <span className="truncate tracking-tight">{item.label}</span>
-                  </div>
+                  );
+                }
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {item.badge && (
-                      <span
-                        className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
-                          isActive
-                            ? 'bg-white/20 text-white'
-                            : item.badgeColor
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                    {isActive && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
-                  </div>
-                </button>
-              );
-            })}
+                const Icon = item.icon;
+                const isActive = currentSection === item.id;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleItemClick(item.id)}
+                    type="button"
+                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all group cursor-pointer ${isActive
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                      }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${isActive
+                            ? 'text-white'
+                            : 'text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-cyan-400'
+                          }`}
+                      />
+                      <span className="truncate tracking-tight">{item.label}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {item.badge && (
+                        <span
+                          className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${isActive
+                              ? 'bg-white/20 text-white'
+                              : item.badgeColor
+                            }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                      {isActive && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+                    </div>
+                  </button>
+                );
+              })}
           </nav>
         </div>
 
