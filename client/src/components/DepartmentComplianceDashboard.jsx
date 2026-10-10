@@ -323,7 +323,7 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
         title: scheduleForm.title.trim(),
         department: scheduleForm.department || (selectedDept !== 'ALL' ? selectedDept : 'Production'),
         description: scheduleForm.description.trim(),
-        dueDate: scheduleForm.dueDate || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        dueDate: scheduleForm.dueDate || null,
         priority: scheduleForm.priority || 'MEDIUM',
         assignedToUserId: scheduleForm.assignedToUserId === 'DEPT_POOL' ? undefined : scheduleForm.assignedToUserId,
       });
@@ -392,6 +392,12 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
   };
 
   const departmentsList = data?.departments || [];
+  const activeDepartments = useMemo(() => {
+    if (departmentsList && departmentsList.length > 0) {
+      return departmentsList.map((d) => d.department);
+    }
+    return FACTORY_DEPARTMENTS;
+  }, [departmentsList]);
 
   // Filter and sort departments
   const filteredDepartments = useMemo(() => {
@@ -534,13 +540,13 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
           </div>
           <div>
             <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight flex items-center gap-1.5">
-              <span>{topDepartment?.department || 'EHS'}</span>
+              <span>{topDepartment?.department || '—'}</span>
               <span className="text-sm font-mono font-extrabold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.2 rounded border border-emerald-300">
-                {topDepartment?.score ?? 100}%
+                {topDepartment ? `${topDepartment.score}%` : '100%'}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {topDepartment?.openNC ?? 0} Open • {topDepartment?.overdueNC ?? 0} Overdue • {topDepartment?.capPercent ?? 98}% CAP
+              {topDepartment ? `${topDepartment.openNC ?? 0} Open • ${topDepartment.overdueNC ?? 0} Overdue • ${topDepartment.capPercent ?? 100}% CAP` : 'No active division backlogs'}
             </p>
           </div>
         </div>
@@ -571,17 +577,17 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Priority Focus
             </span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className={`w-4 h-4 ${criticalDepartment && criticalDepartment.openNC > 0 ? 'text-amber-500' : 'text-slate-400'}`} />
           </div>
           <div>
-            <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 tracking-tight flex items-center gap-1.5">
-              <span>{criticalDepartment?.department || 'All Compliant'}</span>
-              <span className="text-sm font-mono font-extrabold bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 px-2 py-0.2 rounded border border-rose-300">
-                {criticalDepartment ? `${criticalDepartment.score}%` : '100%'}
+            <div className={`text-xl sm:text-2xl font-black tracking-tight flex items-center gap-1.5 ${criticalDepartment && criticalDepartment.openNC > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              <span>{criticalDepartment && criticalDepartment.openNC > 0 ? criticalDepartment.department : 'All Compliant'}</span>
+              <span className={`text-sm font-mono font-extrabold px-2 py-0.2 rounded border ${criticalDepartment && criticalDepartment.openNC > 0 ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300' : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300'}`}>
+                {criticalDepartment && criticalDepartment.openNC > 0 ? `${criticalDepartment.score}%` : '100%'}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {criticalDepartment?.openNC ?? 0} Open NCs • {criticalDepartment?.overdueNC ?? 0} Overdue
+              {criticalDepartment && criticalDepartment.openNC > 0 ? `${criticalDepartment.openNC} Open NCs • ${criticalDepartment.overdueNC} Overdue` : 'Zero active quality breaches'}
             </p>
           </div>
         </div>
@@ -979,7 +985,7 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
                     title: '',
                     department: selectedDept !== 'ALL' ? selectedDept : 'Production',
                     description: '',
-                    dueDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
+                    dueDate: '',
                     priority: 'MEDIUM',
                     assignedToUserId: 'DEPT_POOL',
                   });
@@ -1006,7 +1012,7 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
           >
             🏢 All Departments
           </button>
-          {FACTORY_DEPARTMENTS.map((dept) => {
+          {activeDepartments.map((dept) => {
             const isCurrent = selectedDept === dept;
             const icon = getDeptIcon(dept);
             const deptTaskCount = tasks.filter((t) => (t.department || '').toLowerCase() === dept.toLowerCase()).length;
@@ -1793,7 +1799,7 @@ export const DepartmentComplianceDashboard = ({ onSelectDepartment, onViewRegist
                     onChange={(e) => setScheduleForm({ ...scheduleForm, department: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
-                    {FACTORY_DEPARTMENTS.map((d) => (
+                    {activeDepartments.map((d) => (
                       <option key={d} value={d}>
                         {d}
                       </option>

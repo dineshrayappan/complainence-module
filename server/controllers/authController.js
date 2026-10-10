@@ -62,21 +62,6 @@ const login = async (req, res) => {
       });
     }
 
-    let mappedIdentifier = queryIdentifier;
-    const lowerId = queryIdentifier.toLowerCase();
-    if (lowerId === 'admin') mappedIdentifier = 'ADM-001';
-    else if (lowerId === 'auditor') mappedIdentifier = 'AUD-001';
-    else if (lowerId === 'dinesh') mappedIdentifier = 'AUD-002';
-    else if (lowerId === 'supervisor') mappedIdentifier = 'SUP-001';
-    else if (
-      lowerId === 'all' ||
-      lowerId === 'master' ||
-      lowerId === 'super' ||
-      lowerId === 'superuser' ||
-      lowerId === 'universal'
-    )
-      mappedIdentifier = 'ALL-001';
-
     // 1. If Supabase is configured, attempt authentication from PostgreSQL
     if (isSupabaseConfigured && supabase) {
       try {
@@ -84,7 +69,7 @@ const login = async (req, res) => {
           .from('users')
           .select('*')
           .or(
-            `email.ilike.${mappedIdentifier},employeeId.ilike.${mappedIdentifier},email.ilike.${queryIdentifier},employeeId.ilike.${queryIdentifier}`
+            `email.ilike.${queryIdentifier},employeeId.ilike.${queryIdentifier}`
           )
           .limit(1);
 
@@ -99,9 +84,6 @@ const login = async (req, res) => {
             } else {
               isMatch = user.password === password;
             }
-          }
-          if (!isMatch && (user.employeeId === 'ALL-001' || user.email === 'all@factory.com')) {
-            isMatch = ['master123', 'admin123', 'password123', 'supervisor123', 'auditor123'].includes(password);
           }
 
           if (!isMatch) {
@@ -166,9 +148,7 @@ const login = async (req, res) => {
     }
 
     // 2. Resilient In-Memory Fallback
-    const fallbackUser =
-      mockStore.findUserByIdentifier(mappedIdentifier) ||
-      mockStore.findUserByIdentifier(queryIdentifier);
+    const fallbackUser = mockStore.findUserByIdentifier(queryIdentifier);
 
     let isFallbackMatch = false;
     if (fallbackUser && fallbackUser.password) {
@@ -177,9 +157,6 @@ const login = async (req, res) => {
       } else {
         isFallbackMatch = fallbackUser.password === password;
       }
-    }
-    if (!isFallbackMatch && fallbackUser && (fallbackUser.employeeId === 'ALL-001' || fallbackUser.email === 'all@factory.com')) {
-      isFallbackMatch = ['master123', 'admin123', 'password123', 'supervisor123', 'auditor123'].includes(password);
     }
 
     if (!fallbackUser || !isFallbackMatch) {

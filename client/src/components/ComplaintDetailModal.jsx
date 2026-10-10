@@ -43,7 +43,7 @@ export const ComplaintDetailModal = ({
   onSubmitAction,
   onDeleteComplaint,
 }) => {
-  const { user, isAuditor, isAdmin, demoUsers } = useAuth();
+  const { user, isAuditor, isAdmin } = useAuth();
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 

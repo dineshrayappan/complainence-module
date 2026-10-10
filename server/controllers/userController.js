@@ -25,17 +25,12 @@ const formatUser = (u) => {
 // @access  Private (Auditor or Authenticated)
 const getLineSupervisors = async (req, res) => {
   try {
-    const mockSupervisors = mockStore
-      .getUsers()
-      .filter((u) => (u.role === 'ACTION_PERSON' || u.employeeId === 'ALL-001' || u.isUniversal) && u.isActive)
-      .map(formatUser);
-
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
           .from('users')
           .select('id, name, employeeId, department, designation, mobileNumber, email, role, isActive')
-          .or('role.eq.ACTION_PERSON,role.eq.SUPERVISOR,employeeId.eq.ALL-001')
+          .or('role.eq.ACTION_PERSON,role.eq.SUPERVISOR')
           .eq('isActive', true)
           .order('department', { ascending: true })
           .order('name', { ascending: true });
@@ -53,20 +48,21 @@ const getLineSupervisors = async (req, res) => {
       }
     }
 
-    res.status(200).json({
-      success: true,
-      count: mockSupervisors.length,
-      supervisors: mockSupervisors,
-    });
-  } catch (error) {
     const supervisors = mockStore
       .getUsers()
-      .filter((u) => (u.role === 'ACTION_PERSON' || u.employeeId === 'ALL-001' || u.isUniversal) && u.isActive)
+      .filter((u) => (u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR') && u.isActive)
       .map(formatUser);
+
     res.status(200).json({
       success: true,
       count: supervisors.length,
       supervisors,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve line supervisors.',
+      error: error.message,
     });
   }
 };

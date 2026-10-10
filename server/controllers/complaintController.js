@@ -401,25 +401,13 @@ const createComplaint = async (req, res) => {
     }
 
     const createdByData = {
-      userId: req.user?.id || req.user?._id || 'usr-aud-001',
-      employeeId: req.user?.employeeId || 'AUD-001',
-      name: req.user?.name || 'Quality Auditor',
+      userId: req.user?.id || req.user?._id || null,
+      employeeId: req.user?.employeeId || null,
+      name: req.user?.name || 'Authorized Auditor',
       role: req.user?.role || 'AUDITOR',
     };
 
-    const supervisorIdMap = {
-      '6ab21322cd50706ee2a84637': 'SUP-101',
-      '6ab21322cd50706ee2a84638': 'SUP-102',
-      '6ab21322cd50706ee2a84639': 'SUP-103',
-      '6ab21322cd50706ee2a84640': 'SUP-104',
-      '6ab21322cd50706ee2a84641': 'SUP-105',
-      '6ab21322cd50706ee2a84642': 'SUP-106',
-      '6ab21322cd50706ee2a84643': 'SUP-107',
-      '6ab21322cd50706ee2a84644': 'SUP-108',
-      '6ab21322cd50706ee2a84645': 'SUP-109',
-      '6ab21322cd50706ee2a84646': 'SUP-110',
-    };
-    const lookupSupervisorId = supervisorIdMap[targetSupervisorId] || targetSupervisorId;
+    const lookupSupervisorId = targetSupervisorId;
 
     // Lookup supervisor from Supabase or mockStore
     let supervisor = null;
@@ -440,17 +428,10 @@ const createComplaint = async (req, res) => {
       }
     }
 
-    if (!supervisor && department) {
-      supervisor = mockStore.getUsers().find(
-        (u) => u.role === 'ACTION_PERSON' && (u.department || '').toLowerCase().includes(department.toLowerCase())
-      );
-    }
-
-    if (!supervisor) {
+    if (!supervisor && lookupSupervisorId) {
       supervisor =
         mockStore.findUserById(lookupSupervisorId) ||
-        mockStore.getUsers().find((u) => u.employeeId === lookupSupervisorId) ||
-        mockStore.getUsers().find((u) => u.role === 'ACTION_PERSON') || null;
+        mockStore.getUsers().find((u) => u.employeeId === lookupSupervisorId) || null;
     }
 
     const assignedToData = {
@@ -1974,19 +1955,7 @@ const reassignComplaint = async (req, res) => {
 
     let supervisor = null;
 
-    const supervisorIdMap = {
-      '6ab21322cd50706ee2a84637': 'SUP-101',
-      '6ab21322cd50706ee2a84638': 'SUP-102',
-      '6ab21322cd50706ee2a84639': 'SUP-103',
-      '6ab21322cd50706ee2a84640': 'SUP-104',
-      '6ab21322cd50706ee2a84641': 'SUP-105',
-      '6ab21322cd50706ee2a84642': 'SUP-106',
-      '6ab21322cd50706ee2a84643': 'SUP-107',
-      '6ab21322cd50706ee2a84644': 'SUP-108',
-      '6ab21322cd50706ee2a84645': 'SUP-109',
-      '6ab21322cd50706ee2a84646': 'SUP-110',
-    };
-    const lookupSupervisorId = supervisorIdMap[assignedToUserId] || assignedToUserId;
+    const lookupSupervisorId = assignedToUserId;
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -2245,15 +2214,26 @@ const getDepartmentComplianceStats = async (req, res) => {
       return (name || '').trim() || 'General';
     };
 
-    // Discover any other departments in complaints
+    // Discover real departments from database table and existing complaints
     const foundDepts = new Set();
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: dbDepts } = await supabase.from('departments').select('name');
+        if (Array.isArray(dbDepts)) {
+          dbDepts.forEach((d) => {
+            if (d.name && d.name.trim()) foundDepts.add(normalizeDeptName(d.name));
+          });
+        }
+      } catch (e) {}
+    }
+
     allComplaints.forEach((c) => {
       if (c.department && c.department.trim()) {
         foundDepts.add(normalizeDeptName(c.department));
       }
     });
 
-    const combinedDepts = Array.from(new Set([...standardDepts, ...Array.from(foundDepts)]));
+    const combinedDepts = Array.from(new Set([...Array.from(foundDepts), ...standardDepts]));
 
     const departmentStats = combinedDepts.map((deptName) => {
       const deptComplaints = allComplaints.filter((c) => {

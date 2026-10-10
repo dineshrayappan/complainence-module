@@ -103,8 +103,14 @@ export const FactoryComplianceHome = ({
     if (complianceData?.monthlyTrend && complianceData.monthlyTrend.length > 0) {
       return complianceData.monthlyTrend;
     }
-    const monthNames = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
-    return monthNames.map((m) => ({ month: m, openNC: 0, closedNC: 0, compliance: 100 }));
+    const allMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const dynamicMonths = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      dynamicMonths.push(allMonths[d.getMonth()]);
+    }
+    return dynamicMonths.map((m) => ({ month: m, openNC: 0, closedNC: 0, compliance: 100 }));
   }, [complianceData]);
 
   // Helper for Department Icon

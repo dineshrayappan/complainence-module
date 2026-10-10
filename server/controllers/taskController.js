@@ -889,15 +889,6 @@ const getEmployeeWorkStatus = async (req, res) => {
     }
     if (!allUsers || allUsers.length === 0) {
       allUsers = mockStore.getUsers();
-    } else {
-      // Merge known factory supervisors/workers from mockStore if missing from remote DB
-      const existingEmpIds = new Set(allUsers.map((u) => (u.employeeId || '').toUpperCase()));
-      for (const mUser of mockStore.getUsers()) {
-        if (mUser.employeeId && !existingEmpIds.has(mUser.employeeId.toUpperCase())) {
-          allUsers.push(mUser);
-          existingEmpIds.add(mUser.employeeId.toUpperCase());
-        }
-      }
     }
 
     // Active workers only

@@ -6,18 +6,13 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('garment_qms_token'));
-  const [demoUsers, setDemoUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const fetchDemoUsers = async () => [];
 
   // Initialize and verify saved session
   useEffect(() => {
     let active = true;
 
     const initAuth = async () => {
-      fetchDemoUsers();
-
       const storedToken = localStorage.getItem('garment_qms_token');
       if (storedToken) {
         try {
@@ -112,7 +107,6 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         token,
-        demoUsers,
         loading,
         login,
         register,
@@ -122,7 +116,6 @@ export const AuthProvider = ({ children }) => {
         isAuditor,
         isActionPerson,
         isSupervisor,
-        fetchDemoUsers,
       }}
     >
       {children}
