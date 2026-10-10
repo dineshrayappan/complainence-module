@@ -55,8 +55,8 @@ An enterprise-grade, closed-loop Quality Management & Defect Rectification Platf
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/dineshrayappan/complaints-module.git
-cd complaints-module
+git clone https://github.com/dineshrayappan/complainence-module.git
+cd complainence-module
 
 # Install dependencies for root, server, and client
 npm run install:all
