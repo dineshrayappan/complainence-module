@@ -59,7 +59,7 @@ const safePersistCache = (items, user) => {
 };
 
 export const App = () => {
-  const { user, isAdmin, isAuditor, isActionPerson } = useAuth();
+  const { user, loading: authLoading, isAdmin, isAuditor, isActionPerson } = useAuth();
 
   // Data State with user-scoped hydration to keep supervisor tasks & photos visible across logins
   const [complaints, setComplaints] = useState(() => {
@@ -461,6 +461,16 @@ export const App = () => {
       return true;
     });
   }, [complaints, activeTab, deadlineFilter, user]);
+
+  // While verifying stored token on page refresh, prevent flashing login screen
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center font-sans">
+        <div className="w-9 h-9 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin mb-3" />
+        <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Restoring verified session...</span>
+      </div>
+    );
+  }
 
   // Render dedicated Login Page when not authenticated
   if (!user) {

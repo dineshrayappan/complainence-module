@@ -4,9 +4,20 @@ import { authService } from '../services/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('garment_qms_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [token, setToken] = useState(() => localStorage.getItem('garment_qms_token'));
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => {
+    const hasToken = !!localStorage.getItem('garment_qms_token');
+    const hasUser = !!localStorage.getItem('garment_qms_user');
+    return hasToken && !hasUser;
+  });
 
   // Initialize and verify saved session
   useEffect(() => {
@@ -19,15 +30,25 @@ export const AuthProvider = ({ children }) => {
           const res = await authService.getMe();
           if (active && res.data?.success && res.data.user) {
             setUser(res.data.user);
+            localStorage.setItem('garment_qms_user', JSON.stringify(res.data.user));
             return;
           }
         } catch (err) {
           console.warn('Session verification notice (clearing stale token):', err?.message);
           localStorage.removeItem('garment_qms_token');
+          localStorage.removeItem('garment_qms_user');
           if (active) {
             setToken(null);
             setUser(null);
           }
+        } finally {
+          if (active) {
+            setLoading(false);
+          }
+        }
+      } else {
+        if (active) {
+          setLoading(false);
         }
       }
     };
@@ -48,6 +69,7 @@ export const AuthProvider = ({ children }) => {
       const res = await authService.login({ identifier, password, expectedRole });
       if (res.data?.success && res.data.user) {
         localStorage.setItem('garment_qms_token', res.data.token);
+        localStorage.setItem('garment_qms_user', JSON.stringify(res.data.user));
         setToken(res.data.token);
         setUser(res.data.user);
         return { success: true, user: res.data.user };
@@ -69,6 +91,7 @@ export const AuthProvider = ({ children }) => {
       const res = await authService.register(userData);
       if (res.data?.success && res.data.user) {
         localStorage.setItem('garment_qms_token', res.data.token);
+        localStorage.setItem('garment_qms_user', JSON.stringify(res.data.user));
         setToken(res.data.token);
         setUser(res.data.user);
         return { success: true, user: res.data.user };
@@ -87,6 +110,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('garment_qms_token');
+    localStorage.removeItem('garment_qms_user');
     localStorage.removeItem('garment_qms_cached_complaints');
     setToken(null);
     setUser(null);

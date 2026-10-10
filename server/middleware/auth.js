@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { isMongoConnected } = require('../config/db');
+const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const mockStore = require('../config/mockStore');
 
@@ -32,6 +32,15 @@ const verifyToken = async (req, res, next) => {
       );
 
       let user = null;
+
+      // Ensure MongoDB connection is active in serverless execution
+      if (!isMongoConnected()) {
+        try {
+          await connectDB();
+        } catch (dbErr) {
+          console.warn('[AuthMiddleware] DB connection retry notice:', dbErr.message);
+        }
+      }
 
       // Try MongoDB lookup if connected
       if (isMongoConnected()) {

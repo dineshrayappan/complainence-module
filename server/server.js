@@ -36,6 +36,7 @@ app.use('/uploads', express.static(uploadsPath));
 
 // DB initialization for serverless and standalone execution
 let connectingPromise = null;
+let isSeeded = false;
 const ensureDBConnected = async () => {
   if (isMongoConnected()) {
     return true;
@@ -48,7 +49,10 @@ const ensureDBConnected = async () => {
       const connected = await connectDB();
       if (connected) {
         console.log('⚡ [Server] MongoDB database operational.');
-        await seedData();
+        if (!isSeeded) {
+          await seedData();
+          isSeeded = true;
+        }
       } else {
         console.log('⚡ [Server] Operating with resilient fallback store.');
       }
