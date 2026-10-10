@@ -22,7 +22,7 @@ Examples:
 
   const [employeeId, name, email, password, role = 'ACTION_PERSON', department = 'Production', designation = 'Supervisor', mobileNumber = ''] = args;
 
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/garment_qms';
+  const uri = process.env.MONGODB_URI || 'mongodb+srv://dineshrayappanr_db_user:cDRacfh8jnr2r8r4@cluster0.dop3n2g.mongodb.net/compliance_module?appName=Cluster0';
   await mongoose.connect(uri);
 
   const salt = await bcrypt.genSalt(10);

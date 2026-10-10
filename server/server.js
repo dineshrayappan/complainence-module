@@ -6,7 +6,7 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
-const { connectDB, isMongoConnected } = require('./config/db');
+const { connectDB, isMongoConnected, getLastConnectionError } = require('./config/db');
 const { seedData } = require('./scripts/seed');
 
 const authRoutes = require('./routes/authRoutes');
@@ -34,25 +34,33 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 const uploadsPath = path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadsPath));
 
-// DB initialization promise for serverless and standalone execution
-let dbPromise = null;
+// DB initialization for serverless and standalone execution
+let connectingPromise = null;
 const ensureDBConnected = async () => {
-  if (!dbPromise) {
-    dbPromise = (async () => {
-      try {
-        const connected = await connectDB();
-        if (connected) {
-          console.log('⚡ [Server] MongoDB database operational.');
-        } else {
-          console.log('⚡ [Server] Operating with resilient fallback store.');
-        }
-        await seedData();
-      } catch (err) {
-        console.warn('⚠️ [Server] Database initialization notice:', err.message);
-      }
-    })();
+  if (isMongoConnected()) {
+    return true;
   }
-  return dbPromise;
+  if (connectingPromise) {
+    return connectingPromise;
+  }
+  connectingPromise = (async () => {
+    try {
+      const connected = await connectDB();
+      if (connected) {
+        console.log('⚡ [Server] MongoDB database operational.');
+        await seedData();
+      } else {
+        console.log('⚡ [Server] Operating with resilient fallback store.');
+      }
+      return connected;
+    } catch (err) {
+      console.warn('⚠️ [Server] Database initialization notice:', err.message);
+      return false;
+    } finally {
+      connectingPromise = null;
+    }
+  })();
+  return connectingPromise;
 };
 
 // Ensure DB is ready on incoming API requests
@@ -112,6 +120,8 @@ app.get('/api/health', (req, res) => {
     status: 'healthy',
     system: 'Textile & Garment QMS Complaints System',
     database: isMongoConnected() ? 'MongoDB' : 'In-Memory Resilient Store',
+    mongoConnected: isMongoConnected(),
+    lastError: typeof getLastConnectionError === 'function' ? getLastConnectionError() : null,
     timestamp: new Date().toISOString(),
   });
 });

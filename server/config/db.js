@@ -4,22 +4,43 @@ const mongoose = require('mongoose');
 mongoose.set('bufferCommands', false);
 
 let isConnected = false;
+let lastConnectionError = null;
+
+const DEFAULT_MONGODB_URI =
+  'mongodb+srv://dineshrayappanr_db_user:cDRacfh8jnr2r8r4@cluster0.dop3n2g.mongodb.net/compliance_module?appName=Cluster0';
 
 const connectDB = async () => {
   if (mongoose.connection.readyState === 1) {
     isConnected = true;
+    lastConnectionError = null;
     return true;
   }
 
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/garment_qms';
+  // If already connecting (readyState === 2), wait for it to settle
+  if (mongoose.connection.readyState === 2) {
+    let waitLoops = 0;
+    while (mongoose.connection.readyState === 2 && waitLoops < 25) {
+      await new Promise((r) => setTimeout(r, 200));
+      waitLoops++;
+    }
+    if (mongoose.connection.readyState === 1) {
+      isConnected = true;
+      lastConnectionError = null;
+      return true;
+    }
+  }
+
+  const uri = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
 
   try {
-    console.log(`[Database] Attempting connection to MongoDB at: ${uri}`);
+    const maskedUri = uri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
+    console.log(`[Database] Attempting connection to MongoDB at: ${maskedUri}`);
     await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 3000,
+      serverSelectionTimeoutMS: 8000,
       autoIndex: true,
     });
     isConnected = true;
+    lastConnectionError = null;
     console.log('✅ [Database] Successfully connected to MongoDB server');
 
     // Automatically ensure default admin user (admin / admin123) is present upon connection
@@ -33,6 +54,7 @@ const connectDB = async () => {
     return true;
   } catch (err) {
     isConnected = false;
+    lastConnectionError = err.message;
     console.warn(`⚡ [Database] Could not connect to MongoDB (${err.message}). Operating in resilient fallback mode.`);
     return false;
   }
@@ -41,6 +63,8 @@ const connectDB = async () => {
 const isMongoConnected = () => {
   return mongoose.connection.readyState === 1;
 };
+
+const getLastConnectionError = () => lastConnectionError;
 
 const disconnectDB = async () => {
   try {
@@ -58,4 +82,5 @@ module.exports = {
   connectDB,
   disconnectDB,
   isMongoConnected,
+  getLastConnectionError,
 };

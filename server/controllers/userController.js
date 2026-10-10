@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { isMongoConnected } = require('../config/db');
+const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const Complaint = require('../models/Complaint');
 const ComplianceTask = require('../models/ComplianceTask');
@@ -29,6 +29,9 @@ const formatUser = (u) => {
 // @access  Private (Auditor or Authenticated)
 const getLineSupervisors = async (req, res) => {
   try {
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected()) {
       try {
         const data = await User.find({
@@ -77,6 +80,9 @@ const getAllUsers = async (req, res) => {
   try {
     const { role, department, search, isActive } = req.query;
 
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected()) {
       try {
         const query = {};
@@ -195,6 +201,9 @@ const createUser = async (req, res) => {
 
     const normalizedRole = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
 
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected()) {
       try {
         const existingEmp = await User.findOne({
@@ -303,6 +312,9 @@ const updateUser = async (req, res) => {
     const userId = req.params.id;
     const { name, email, department, designation, mobileNumber, role } = req.body;
 
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected()) {
       try {
         const updateData = {};

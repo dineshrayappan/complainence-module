@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { isMongoConnected } = require('../config/db');
+const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const mockStore = require('../config/mockStore');
 
@@ -63,7 +63,10 @@ const login = async (req, res) => {
       });
     }
 
-    // 1. If MongoDB is connected, attempt authentication from MongoDB
+    // 1. If MongoDB is connected (or can be connected), attempt authentication from MongoDB
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected()) {
       try {
         const searchTerms = [queryIdentifier];
@@ -185,6 +188,9 @@ const register = async (req, res) => {
       normalizedRole = 'AUDITOR';
     }
 
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected()) {
       try {
         const existing = await User.findOne({
@@ -264,6 +270,9 @@ const getMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
 
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
     if (isMongoConnected() && userId) {
       try {
         const query = {
