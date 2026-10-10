@@ -1,5 +1,86 @@
-// In-Memory state for offline development or testing
-const initialUsers = [];
+// In-Memory state for offline development, serverless cold-starts, or cloud deployment fallback
+const initialUsers = [
+  {
+    _id: '6ab26b3053ceb237bcda4f74',
+    id: '6ab26b3053ceb237bcda4f74',
+    employeeId: 'ADM-001',
+    name: 'Anil Mehta',
+    email: 'admin@factory.com',
+    password: 'admin123',
+    role: 'ADMIN',
+    department: 'Plant Operations & Executive Oversight',
+    designation: 'General Operations Director',
+    mobileNumber: '+91 98000 11223',
+    isActive: true,
+  },
+  {
+    _id: '6ab21322cd50706ee2a84632',
+    id: '6ab21322cd50706ee2a84632',
+    employeeId: 'AUD-001',
+    name: 'Pooja Sharma',
+    email: 'auditor@factory.com',
+    password: 'auditor123',
+    role: 'AUDITOR',
+    department: 'Central Quality Audit',
+    designation: 'Senior QA Auditor',
+    mobileNumber: '+91 98765 43210',
+    isActive: true,
+  },
+  {
+    _id: '6ab270104aa078bdcc354bab',
+    id: '6ab270104aa078bdcc354bab',
+    employeeId: 'AUD-002',
+    name: 'Dinesh Rayappan',
+    email: 'dineshrayappan.r@gmail.com',
+    password: 'auditor123',
+    role: 'AUDITOR',
+    department: 'Quality Assurance',
+    designation: 'Lead Quality Auditor',
+    mobileNumber: '+91 98765 43211',
+    isActive: true,
+  },
+  {
+    _id: '6aca062dc48db203d719a558',
+    id: '6aca062dc48db203d719a558',
+    employeeId: 'ALL-001',
+    name: 'Master QA Director',
+    email: 'all@factory.com',
+    password: 'master123',
+    role: 'ADMIN',
+    department: 'Executive Operations',
+    designation: 'Universal Multi-Role Director',
+    mobileNumber: '+91 99999 00000',
+    isActive: true,
+    isUniversal: true,
+    hasAllRoles: true,
+  },
+  {
+    _id: '6ac9ece4c48db203d719a557',
+    id: '6ac9ece4c48db203d719a557',
+    employeeId: 'SUP-001',
+    name: 'Ramesh Patel',
+    email: 'supervisor@factory.com',
+    password: 'supervisor123',
+    role: 'ACTION_PERSON',
+    department: 'Production',
+    designation: 'Floor Supervisor',
+    mobileNumber: '+91 98111 22334',
+    isActive: true,
+  },
+  {
+    _id: '6ab21322cd50706ee2a84637',
+    id: '6ab21322cd50706ee2a84637',
+    employeeId: 'SUP-101',
+    name: 'Mohammad Arif',
+    email: 'arif@factory.com',
+    password: 'supervisor123',
+    role: 'ACTION_PERSON',
+    department: 'Production',
+    designation: 'Sewing Line 1 In-Charge',
+    mobileNumber: '+91 98111 22335',
+    isActive: true,
+  },
+];
 const initialComplaints = [];
 
 let mockUsers = [...initialUsers];
@@ -9,11 +90,23 @@ let mockComplaints = [...initialComplaints];
 module.exports = {
   getUsers: () => [...mockUsers],
   findUserById: (id) => mockUsers.find((u) => u._id === id || u.id === id || u.employeeId === id),
-  findUserByIdentifier: (identifier) => {
+    findUserByIdentifier: (identifier) => {
     const term = (identifier || '').trim().toLowerCase();
-    return mockUsers.find(
-      (u) => (u.email && u.email.toLowerCase() === term) || (u.employeeId && u.employeeId.toLowerCase() === term)
-    );
+    if (!term) return null;
+    return mockUsers.find((u) => {
+      const uEmail = (u.email || '').toLowerCase();
+      const uEmp = (u.employeeId || '').toLowerCase();
+      const uRole = (u.role || '').toLowerCase();
+      const uName = (u.name || '').toLowerCase();
+
+      if (uEmail === term || uEmp === term) return true;
+      if (term === 'admin' && (uEmp === 'adm-001' || uRole === 'admin' || uEmail.startsWith('admin@'))) return true;
+      if (term === 'auditor' && (uEmp === 'aud-001' || uRole === 'auditor' || uEmail.startsWith('auditor@'))) return true;
+      if (term === 'dinesh' && (uEmp === 'aud-002' || uEmail.includes('dinesh') || uName.includes('dinesh'))) return true;
+      if (term === 'supervisor' && (uEmp === 'sup-001' || uRole === 'action_person' || uEmail.startsWith('supervisor@'))) return true;
+      if ((term === 'master' || term === 'all') && (uEmp === 'all-001' || uEmail.startsWith('all@'))) return true;
+      return false;
+    });
   },
   createUser: (userData) => {
     const newUser = {

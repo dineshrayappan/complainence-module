@@ -120,10 +120,15 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/users', userRoutes);
 app.use('/api/complaints', complaintRoutes);
+app.use('/complaints', complaintRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/tasks', taskRoutes);
 app.use('/api/departments', departmentRoutes);
+app.use('/departments', departmentRoutes);
 
 // Central Error Handler
 app.use((err, req, res, next) => {

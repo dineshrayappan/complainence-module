@@ -66,12 +66,20 @@ const login = async (req, res) => {
     // 1. If MongoDB is connected, attempt authentication from MongoDB
     if (isMongoConnected()) {
       try {
-        const user = await User.findOne({
-          $or: [
-            { email: { $regex: new RegExp(`^${queryIdentifier}$`, 'i') } },
-            { employeeId: { $regex: new RegExp(`^${queryIdentifier}$`, 'i') } },
-          ],
-        });
+        const searchTerms = [queryIdentifier];
+        const qLower = queryIdentifier.toLowerCase();
+        if (qLower === 'admin') { searchTerms.push('admin@factory.com', 'ADM-001'); }
+        else if (qLower === 'auditor') { searchTerms.push('auditor@factory.com', 'AUD-001'); }
+        else if (qLower === 'supervisor') { searchTerms.push('supervisor@factory.com', 'SUP-001'); }
+        else if (qLower === 'dinesh') { searchTerms.push('dineshrayappan.r@gmail.com', 'AUD-002'); }
+        else if (qLower === 'master' || qLower === 'all') { searchTerms.push('all@factory.com', 'ALL-001'); }
+
+        const orFilters = searchTerms.flatMap((term) => [
+          { email: { $regex: new RegExp(`^${term}$`, 'i') } },
+          { employeeId: { $regex: new RegExp(`^${term}$`, 'i') } },
+        ]);
+
+        const user = await User.findOne({ $or: orFilters });
 
         if (user) {
           const isMatch = await user.matchPassword(password);
