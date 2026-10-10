@@ -7,7 +7,7 @@ let isConnected = false;
 let lastConnectionError = null;
 
 const DEFAULT_MONGODB_URI =
-  'mongodb+srv://dineshrayappanr_db_user:cDRacfh8jnr2r8r4@cluster0.dop3n2g.mongodb.net/compliance_module?appName=Cluster0';
+  'mongodb://127.0.0.1:27017/garment_qms';
 
 const connectDB = async () => {
   if (mongoose.connection.readyState === 1) {
