@@ -1,4 +1,7 @@
-const { supabase, isSupabaseConfigured } = require('../config/supabase');
+const { isMongoConnected } = require('../config/db');
+const ComplianceTask = require('../models/ComplianceTask');
+const User = require('../models/User');
+const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 
 /**
@@ -77,7 +80,7 @@ const extractTaskMeta = (task) => {
     }
   }
 
-  // Also read from assignedTo JSONB column (persisted directly in Supabase Postgres)
+  // Also read from assignedTo JSONB column (persisted directly in MongoDB)
   if (task.assignedTo && typeof task.assignedTo === 'object') {
     if (task.assignedTo.firstCompleter && !meta.firstCompleter) meta.firstCompleter = task.assignedTo.firstCompleter;
     if (task.assignedTo.completedAt && !meta.completedAt) meta.completedAt = task.assignedTo.completedAt;
@@ -214,13 +217,12 @@ const getTasks = async (req, res) => {
     const { state, department } = req.query;
 
     let tasks = [];
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase.from('compliance_tasks').select('*');
-        if (error) throw error;
-        tasks = data || [];
+        const data = await ComplianceTask.find().sort({ createdAt: -1 }).lean();
+        tasks = (data || []).map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (dbErr) {
-        console.warn('[TaskController:getTasks] Supabase fallback:', dbErr.message);
+        console.warn('[TaskController:getTasks] MongoDB fallback:', dbErr.message);
         tasks = mockStore.getTasks();
       }
     } else {
@@ -290,14 +292,16 @@ const createTask = async (req, res) => {
       };
     } else {
       let owner = null;
-      if (lookupId && isSupabaseConfigured && supabase) {
+      if (lookupId && isMongoConnected()) {
         try {
-          const { data } = await supabase
-            .from('users')
-            .select('*')
-            .or(`id.eq.${lookupId},employeeId.eq.${lookupId},email.eq.${lookupId}`)
-            .limit(1);
-          if (data && data.length) owner = data[0];
+          const query = {
+            $or: [{ employeeId: lookupId }, { email: lookupId }],
+          };
+          if (lookupId && typeof lookupId === 'string' && lookupId.match(/^[0-9a-fA-F]{24}$/)) {
+            query.$or.unshift({ _id: lookupId });
+          }
+          const found = await User.findOne(query).lean();
+          if (found) owner = { ...found, id: found._id ? found._id.toString() : found.id };
         } catch (e) {
           console.warn('[TaskController:createTask] assignee lookup notice:', e.message);
         }
@@ -326,15 +330,16 @@ const createTask = async (req, res) => {
       updatedAt: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase.from('compliance_tasks').insert([payload]).select().single();
-        if (!error && data) {
-          return res.status(201).json({ success: true, message: 'Compliance task scheduled.', task: formatTask(data) });
+        const created = await ComplianceTask.create(payload);
+        if (created) {
+          const taskObj = { ...created.toObject(), id: created._id.toString() };
+          mockStore.createTask(taskObj);
+          return res.status(201).json({ success: true, message: 'Compliance task scheduled.', task: formatTask(taskObj) });
         }
-        throw error;
       } catch (dbErr) {
-        console.warn('[TaskController:createTask] Supabase insert failed, using in-memory store:', dbErr.message);
+        console.warn('[TaskController:createTask] MongoDB insert failed, using in-memory store:', dbErr.message);
       }
     }
 
@@ -389,14 +394,16 @@ const updateTask = async (req, res) => {
     const lookupId = assignedToUserId || assignedToEmployeeId;
     if (lookupId !== undefined && lookupId !== '') {
       let owner = null;
-      if (isSupabaseConfigured && supabase) {
+      if (isMongoConnected()) {
         try {
-          const { data } = await supabase
-            .from('users')
-            .select('*')
-            .or(`id.eq.${lookupId},employeeId.eq.${lookupId},email.eq.${lookupId}`)
-            .limit(1);
-          if (data && data.length) owner = data[0];
+          const query = {
+            $or: [{ employeeId: lookupId }, { email: lookupId }],
+          };
+          if (lookupId && typeof lookupId === 'string' && lookupId.match(/^[0-9a-fA-F]{24}$/)) {
+            query.$or.unshift({ _id: lookupId });
+          }
+          const found = await User.findOne(query).lean();
+          if (found) owner = { ...found, id: found._id ? found._id.toString() : found.id };
         } catch (e) {
           console.warn('[TaskController:updateTask] assignee lookup notice:', e.message);
         }
@@ -418,20 +425,20 @@ const updateTask = async (req, res) => {
       delete updates.status;
     }
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase
-          .from('compliance_tasks')
-          .update(updates)
-          .eq('id', task.id)
-          .select()
-          .single();
-        if (!error && data) {
-          return res.json({ success: true, message: 'Task updated.', task: formatTask(data) });
+        const query = { $or: [{ id: task.id }] };
+        if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: task.id });
         }
-        throw error;
+        const updated = await ComplianceTask.findOneAndUpdate(query, updates, { new: true }).lean();
+        if (updated) {
+          const taskObj = { ...updated, id: updated._id ? updated._id.toString() : updated.id };
+          mockStore.updateTask(task.id, updates);
+          return res.json({ success: true, message: 'Task updated.', task: formatTask(taskObj) });
+        }
       } catch (dbErr) {
-        console.warn('[TaskController:updateTask] Supabase update failed, using in-memory store:', dbErr.message);
+        console.warn('[TaskController:updateTask] MongoDB update failed, using in-memory store:', dbErr.message);
       }
     }
 
@@ -489,10 +496,10 @@ const startTask = async (req, res) => {
     // 3. Prevent already busy employees from taking on duplicate active tasks:
     // Check if this employee is ALREADY actively working on another incomplete task
     let allTasks = [];
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data } = await supabase.from('compliance_tasks').select('*');
-        if (data) allTasks = data;
+        const data = await ComplianceTask.find().lean();
+        if (data) allTasks = data.map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (e) {}
     }
     if (!allTasks || allTasks.length === 0) allTasks = mockStore.getTasks();
@@ -564,17 +571,16 @@ const startTask = async (req, res) => {
     };
 
     let updated = null;
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase
-          .from('compliance_tasks')
-          .update(safeUpdates)
-          .eq('id', task.id)
-          .select()
-          .single();
-        if (!error && data) updated = data;
+        const query = { $or: [{ id: task.id }] };
+        if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: task.id });
+        }
+        const dbUpdated = await ComplianceTask.findOneAndUpdate(query, safeUpdates, { new: true }).lean();
+        if (dbUpdated) updated = { ...dbUpdated, id: dbUpdated._id ? dbUpdated._id.toString() : dbUpdated.id };
       } catch (dbErr) {
-        console.warn('[TaskController:startTask] Supabase update notice:', dbErr.message);
+        console.warn('[TaskController:startTask] MongoDB update notice:', dbErr.message);
       }
     }
 
@@ -735,21 +741,19 @@ const completeTask = async (req, res) => {
     };
 
     let completed = null;
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        // Atomic SQL check: only update if status is NOT already Completed
-        const { data, error } = await supabase
-          .from('compliance_tasks')
-          .update(safeUpdates)
-          .eq('id', task.id)
-          .neq('status', 'Completed')
-          .select()
-          .single();
-
-        if (!error && data) {
-          completed = data;
-        } else if (error && (error.code === 'PGRST116' || (error.message && error.message.includes('0 rows')))) {
-          // Zero rows matched because another employee beat this one to the finish line!
+        const query = {
+          status: { $ne: 'Completed' },
+          $or: [{ id: task.id }],
+        };
+        if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: task.id });
+        }
+        const dbUpdated = await ComplianceTask.findOneAndUpdate(query, safeUpdates, { new: true }).lean();
+        if (dbUpdated) {
+          completed = { ...dbUpdated, id: dbUpdated._id ? dbUpdated._id.toString() : dbUpdated.id };
+        } else {
           const refreshedTask = await findTask(task.id);
           const winner = refreshedTask?.firstCompleter || refreshedTask?.completedBy;
           return res.status(409).json({
@@ -760,7 +764,7 @@ const completeTask = async (req, res) => {
           });
         }
       } catch (dbErr) {
-        console.warn('[TaskController:completeTask] Supabase update notice:', dbErr.message);
+        console.warn('[TaskController:completeTask] MongoDB update notice:', dbErr.message);
       }
     }
 
@@ -808,10 +812,10 @@ const completeTask = async (req, res) => {
           updatedAt: new Date().toISOString(),
         };
 
-        if (isSupabaseConfigured && supabase) {
+        if (isMongoConnected()) {
           try {
-            const { data, error } = await supabase.from('compliance_tasks').insert([nextPayload]).select().single();
-            if (!error && data) nextTask = data;
+            const nextDb = await ComplianceTask.create(nextPayload);
+            if (nextDb) nextTask = { ...nextDb.toObject(), id: nextDb._id.toString() };
           } catch (dbErr) {
             console.warn('[TaskController:completeTask] Recurrence insert notice:', dbErr.message);
           }
@@ -848,15 +852,17 @@ const deleteTask = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only administrators can delete tasks.' });
     }
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { error } = await supabase.from('compliance_tasks').delete().eq('id', task.id);
-        if (!error) {
-          return res.json({ success: true, message: 'Task deleted.' });
+        const query = { $or: [{ id: task.id }] };
+        if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: task.id });
         }
-        throw error;
+        await ComplianceTask.findOneAndDelete(query);
+        mockStore.deleteTask(task.id);
+        return res.json({ success: true, message: 'Task deleted.' });
       } catch (dbErr) {
-        console.warn('[TaskController:deleteTask] Supabase delete failed, using in-memory store:', dbErr.message);
+        console.warn('[TaskController:deleteTask] MongoDB delete failed, using in-memory store:', dbErr.message);
       }
     }
 
@@ -877,12 +883,10 @@ const getEmployeeWorkStatus = async (req, res) => {
 
     // 1. Fetch all users
     let allUsers = [];
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, name, employeeId, email, role, department, designation, isActive');
-        if (!error && data) allUsers = data;
+        const dbUsers = await User.find({ isActive: true }).select('name employeeId email role department designation isActive').lean();
+        if (dbUsers) allUsers = dbUsers.map((u) => ({ ...u, id: u._id.toString() }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] users fetch fallback:', e.message);
       }
@@ -896,10 +900,10 @@ const getEmployeeWorkStatus = async (req, res) => {
 
     // 2. Fetch all tasks
     let allTasks = [];
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase.from('compliance_tasks').select('*');
-        if (!error && data) allTasks = data;
+        const dbTasks = await ComplianceTask.find().lean();
+        if (dbTasks) allTasks = dbTasks.map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] tasks fetch fallback:', e.message);
       }
@@ -1110,10 +1114,14 @@ const canManage = (user, task) => {
 
 const findTask = async (id) => {
   let task = null;
-  if (isSupabaseConfigured && supabase) {
+  if (isMongoConnected()) {
     try {
-      const { data, error } = await supabase.from('compliance_tasks').select('*').eq('id', id).maybeSingle();
-      if (!error && data) task = data;
+      const query = { $or: [{ id }] };
+      if (id && typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
+        query.$or.unshift({ _id: id });
+      }
+      const data = await ComplianceTask.findOne(query).lean();
+      if (data) task = { ...data, id: data._id ? data._id.toString() : data.id };
     } catch (e) {
       console.warn('[TaskController] findTask fallback:', e.message);
     }

@@ -174,7 +174,7 @@ module.exports = {
     }
     return null;
   },
-  syncWithSupabase: (tickets) => {
+  syncWithDB: (tickets) => {
     if (Array.isArray(tickets)) {
       mockComplaints = tickets.map((t) => ({
         ...t,
@@ -184,15 +184,7 @@ module.exports = {
     }
     return mockComplaints;
   },
-  syncUsersWithSupabase: (users) => {
-    if (Array.isArray(users)) {
-      mockUsers = users.map((u) => ({
-        ...u,
-        _id: u.id || u._id,
-      }));
-    }
-    return mockUsers;
-  },
+  
   getComplianceThresholds: () => ({ ...complianceThresholds }),
   updateComplianceThresholds: (updates = {}) => {
     const high = updates.highThreshold != null ? Number(updates.highThreshold) : complianceThresholds.highThreshold;

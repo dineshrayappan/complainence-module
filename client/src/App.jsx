@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
 import { complaintService } from './services/api';
-import { supabase } from './services/supabase';
 import Header from './components/Header';
 import KpiMetrics from './components/KpiMetrics';
 import ComplaintFilters from './components/ComplaintFilters';

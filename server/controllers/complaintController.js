@@ -1,10 +1,14 @@
 const fs = require('fs');
 const path = require('path');
-const { supabase, isSupabaseConfigured } = require('../config/supabase');
+const { isMongoConnected } = require('../config/db');
+const Complaint = require('../models/Complaint');
+const User = require('../models/User');
+const Department = require('../models/Department');
+const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 const { computeDepartmentNCScore } = require('../utils/scoringEngine');
 
-// Database constraint adapter: Supabase check constraint complaints_status_check
+// Database status adapter: maps workflow statuses to canonical values
 // allows ('Assigned', 'In Progress', 'Closed'). We map workflow statuses to compatible DB values.
 const toDbStatus = (status) => {
   const s = String(status || '').trim();
@@ -409,19 +413,23 @@ const createComplaint = async (req, res) => {
 
     const lookupSupervisorId = targetSupervisorId;
 
-    // Lookup supervisor from Supabase or mockStore
+    // Lookup supervisor from MongoDB or mockStore
     let supervisor = null;
 
-    if (isSupabaseConfigured && supabase && lookupSupervisorId) {
+    if (isMongoConnected() && lookupSupervisorId) {
       try {
-        const { data: sups } = await supabase
-          .from('users')
-          .select('*')
-          .or(`id.eq.${lookupSupervisorId},employeeId.eq.${lookupSupervisorId},email.eq.${lookupSupervisorId}`)
-          .limit(1);
-
-        if (sups && sups.length > 0) {
-          supervisor = sups[0];
+        const supQuery = {
+          $or: [
+            { employeeId: lookupSupervisorId.toUpperCase() },
+            { email: lookupSupervisorId.toLowerCase() },
+          ],
+        };
+        if (lookupSupervisorId.match(/^[0-9a-fA-F]{24}$/)) {
+          supQuery.$or.unshift({ _id: lookupSupervisorId });
+        }
+        const supUser = await User.findOne(supQuery).lean();
+        if (supUser) {
+          supervisor = { ...supUser, id: supUser._id.toString() };
         }
       } catch (e) {
         // fallback
@@ -460,12 +468,12 @@ const createComplaint = async (req, res) => {
       },
     ];
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const basePayload = {
+        const mongoPayload = {
           complaintId,
           category: category || 'Stitching Fault',
-          department: department || supervisor.department || 'Production',
+          department: department || supervisor?.department || 'Production',
           location: location || 'Production Floor',
           priority: effectivePriority,
           description: enrichedDescription,
@@ -478,90 +486,35 @@ const createComplaint = async (req, res) => {
           assignedTo: assignedToData,
           createdBy: createdByData,
           deadlineHours: hours,
-          deadlineTimestamp: deadlineTimestamp.toISOString(),
-          status: toDbStatus(rawWorkflowStatus),
+          deadlineTimestamp,
+          status: rawWorkflowStatus || 'Open',
           actionNotes: '',
           feedbackRemarks: '',
           rejectionReason: '',
+          cap: initialCap,
           timeline: initialTimeline,
-          createdAt: now.toISOString(),
-          updatedAt: now.toISOString(),
-        };
-
-        let inserted = null;
-        let baseData = null;
-        let baseErr = null;
-        const res1 = await supabase.from('complaints').insert([basePayload]).select().single();
-        if (res1.error && res1.error.message && res1.error.message.includes('column')) {
-          console.warn('[ComplaintController:createComplaint] Schema missing extended column, retrying with base columns:', res1.error.message);
-          const fallbackPayload = {
-            complaintId,
-            category: category || 'Stitching Fault',
-            department: department || supervisor.department || 'Production',
-            location: location || 'Production Floor',
-            priority: effectivePriority,
-            description: enrichedDescription,
-            beforePhoto: beforePhotoUrl,
-            afterPhoto: null,
-            assignedTo: assignedToData,
-            createdBy: createdByData,
-            deadlineHours: hours,
-            deadlineTimestamp: deadlineTimestamp.toISOString(),
-            status: toDbStatus(rawWorkflowStatus),
-            actionNotes: '',
-            feedbackRemarks: '',
-            rejectionReason: '',
-            timeline: initialTimeline,
-            createdAt: now.toISOString(),
-            updatedAt: now.toISOString(),
-          };
-          const res2 = await supabase.from('complaints').insert([fallbackPayload]).select().single();
-          baseData = res2.data;
-          baseErr = res2.error;
-        } else {
-          baseData = res1.data;
-          baseErr = res1.error;
-        }
-        if (baseErr) {
-          console.error('[ComplaintController:createComplaint] Supabase insert error:', baseErr.message);
-          throw baseErr;
-        }
-        inserted = {
-          ...baseData,
-          requirement: effectiveRequirement,
-          riskSeverity: effectivePriority,
-          capRequired: isCapRequired,
-          verificationMethod: effectiveVerification,
+          createdAt: now,
+          updatedAt: now,
         };
 
         initialCap.responsiblePerson = assignedToData;
 
-        if (inserted) {
-          mockStore.createComplaint({
-            ...inserted,
-            _id: inserted.id,
-            complaintId: inserted.complaintId,
-            requirement: effectiveRequirement,
-            riskSeverity: effectivePriority,
-            capRequired: isCapRequired,
-            verificationMethod: effectiveVerification,
-            cap: initialCap,
-          });
+        const created = await Complaint.create(mongoPayload);
+        if (created) {
+          const inserted = {
+            ...created.toObject(),
+            id: created._id.toString(),
+            _id: created._id.toString(),
+          };
+          mockStore.createComplaint(inserted);
           return res.status(201).json({
             success: true,
             message: `NC Defect ${inserted.complaintId} created and assigned successfully.`,
-            complaint: formatComplaintOutput({
-              ...inserted,
-              requirement: effectiveRequirement,
-              riskSeverity: effectivePriority,
-              capRequired: isCapRequired,
-              verificationMethod: effectiveVerification,
-              cap: initialCap,
-            }),
+            complaint: formatComplaintOutput(inserted),
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:createComplaint] Supabase exception:', dbErr);
+        console.error('[ComplaintController:createComplaint] MongoDB exception:', dbErr);
         return res.status(500).json({
           success: false,
           message: `Database error: ${dbErr.message}`,
@@ -572,7 +525,7 @@ const createComplaint = async (req, res) => {
 
     initialCap.responsiblePerson = assignedToData;
 
-    // Fallback when Supabase is not configured
+    // Fallback when MongoDB is not connected
     const fallbackTicket = mockStore.createComplaint({
       category: category || 'Stitching Fault',
       department: department || supervisor.department || 'Production',
@@ -615,90 +568,96 @@ const getComplaints = async (req, res) => {
     const { status, category, priority, department, search, tab, deadlineCondition, deadline } = req.query;
     const now = new Date();
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        let query = supabase.from('complaints').select('*');
+        const query = {};
 
         // RBAC filtering for Supervisor / Action Person (Strict Personal Assignment Isolation across ALL tabs)
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
-          const userEmpId = req.user.employeeId;
-          const userId = req.user.id || req.user._id;
+          const userEmpId = (req.user.employeeId || '').toUpperCase();
+          const userId = String(req.user.id || req.user._id || '');
 
-          let orFilters = [];
-          if (userEmpId) orFilters.push(`assignedTo->>employeeId.eq.${userEmpId}`);
-          if (userId) orFilters.push(`assignedTo->>userId.eq.${userId}`);
+          const orConditions = [];
+          if (userEmpId) orConditions.push({ 'assignedTo.employeeId': userEmpId });
+          if (userId) orConditions.push({ 'assignedTo.userId': userId });
 
-          if (orFilters.length > 0) {
-            query = query.or(orFilters.join(','));
+          if (orConditions.length > 0) {
+            query.$or = orConditions;
           } else {
-            query = query.eq('id', 'no-match');
+            query._id = null;
           }
         }
 
         // 1. Workflow Status / Tab filtering
         if (tab === 'draft') {
-          query = query.eq('status', 'Draft');
+          query.status = 'Draft';
         } else if (tab === 'open') {
-          query = query.in('status', ['Open', 'Assigned', 'In Progress']);
+          query.status = { $in: ['Open', 'Assigned', 'In Progress'] };
         } else if (tab === 'cap-submitted') {
-          query = query.in('status', ['CAP Submitted', 'Under Verification']);
+          query.status = { $in: ['CAP Submitted', 'Under Verification'] };
         } else if (tab === 'under-review') {
-          query = query.eq('status', 'Under Review');
+          query.status = 'Under Review';
         } else if (tab === 'rejected-rework') {
-          query = query.in('status', ['Rejected / Rework', 'Rejected / Sent Back']);
+          query.status = { $in: ['Rejected / Rework', 'Rejected / Sent Back'] };
         } else if (tab === 'verified') {
-          query = query.eq('status', 'Verified');
+          query.status = 'Verified';
         } else if (tab === 'closed') {
-          query = query.in('status', ['Closed', 'Verified']);
+          query.status = { $in: ['Closed', 'Verified'] };
         } else if (tab === 'action-pending') {
-          query = query.in('status', ['Open', 'Assigned', 'In Progress', 'Rejected / Rework', 'Rejected / Sent Back']);
+          query.status = { $in: ['Open', 'Assigned', 'In Progress', 'Rejected / Rework', 'Rejected / Sent Back'] };
         } else if (tab === 'under-verification') {
-          query = query.in('status', ['CAP Submitted', 'Under Review', 'Under Verification']);
+          query.status = { $in: ['CAP Submitted', 'Under Review', 'Under Verification'] };
         } else if (tab === 'overdue') {
-          query = query.not('status', 'in', '("Closed","Verified")').lt('deadlineTimestamp', now.toISOString());
+          query.status = { $nin: ['Closed', 'Verified'] };
+          query.deadlineTimestamp = { $lt: now };
         } else if (status && status !== 'all' && status !== 'All Statuses') {
-          query = query.eq('status', status);
+          query.status = status;
         }
 
         // 2. Decoupled Deadline Condition filter: Open | Overdue | Due Soon | Closed
         const dCond = deadlineCondition || deadline;
         if (dCond && dCond !== 'All Deadlines') {
           if (dCond === 'Overdue') {
-            query = query.not('status', 'in', '("Closed","Verified")').lt('deadlineTimestamp', now.toISOString());
+            query.status = { $nin: ['Closed', 'Verified'] };
+            query.deadlineTimestamp = { $lt: now };
           } else if (dCond === 'Due Soon') {
-            const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
-            query = query.not('status', 'in', '("Closed","Verified")').gte('deadlineTimestamp', now.toISOString()).lte('deadlineTimestamp', fourHoursLater);
+            const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+            query.status = { $nin: ['Closed', 'Verified'] };
+            query.deadlineTimestamp = { $gte: now, $lte: fourHoursLater };
           } else if (dCond === 'Open') {
-            const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
-            query = query.not('status', 'in', '("Closed","Verified")').gt('deadlineTimestamp', fourHoursLater);
+            const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+            query.status = { $nin: ['Closed', 'Verified'] };
+            query.deadlineTimestamp = { $gt: fourHoursLater };
           } else if (dCond === 'Closed') {
-            query = query.in('status', ['Closed', 'Verified']);
+            query.status = { $in: ['Closed', 'Verified'] };
           }
         }
 
-        if (category) query = query.eq('category', category);
-        if (priority) query = query.eq('priority', priority);
-        if (department) query = query.eq('department', department);
+        if (category) query.category = category;
+        if (priority) query.priority = priority;
+        if (department) query.department = department;
 
         if (search) {
-          const s = `%${search}%`;
-          query = query.or(`complaintId.ilike.${s},location.ilike.${s},description.ilike.${s},category.ilike.${s},assignedTo->>name.ilike.${s}`);
+          const s = new RegExp(search, 'i');
+          const searchConditions = [
+            { complaintId: s },
+            { location: s },
+            { description: s },
+            { category: s },
+            { 'assignedTo.name': s },
+          ];
+          if (query.$or) {
+            query.$and = [{ $or: query.$or }, { $or: searchConditions }];
+            delete query.$or;
+          } else {
+            query.$or = searchConditions;
+          }
         }
 
-        const { data, error } = await query.order('createdAt', { ascending: false });
-
-        if (error) {
-          console.error('[ComplaintController:getComplaints] Supabase query error:', error.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database query error: ' + error.message,
-            error: error.message,
-          });
-        }
+        const data = await Complaint.find(query).sort({ createdAt: -1 }).lean();
 
         if (data) {
-          // Keep in-memory store strictly synchronized as a warm cache
-          mockStore.syncWithSupabase(data);
+          mockStore.syncWithDB(data);
 
           return res.status(200).json({
             success: true,
@@ -707,7 +666,7 @@ const getComplaints = async (req, res) => {
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:getComplaints] Supabase query exception:', dbErr.message);
+        console.error('[ComplaintController:getComplaints] MongoDB query exception:', dbErr.message);
         return res.status(500).json({
           success: false,
           message: 'Database query exception: ' + dbErr.message,
@@ -741,15 +700,15 @@ const getComplaintById = async (req, res) => {
   try {
     const paramId = req.params.id;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase
-          .from('complaints')
-          .select('*')
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`)
-          .maybeSingle();
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
+        }
+        const data = await Complaint.findOne(query).lean();
 
-        if (!error && data) {
+        if (data) {
           // Strict RBAC Isolation: If requester is a Supervisor or Action Person, verify this specific NC was assigned to them
           if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON')) {
             const userEmpId = (req.user.employeeId || '').toUpperCase();
@@ -771,14 +730,13 @@ const getComplaintById = async (req, res) => {
             }
           }
 
-          mockStore.createComplaint({ ...data, _id: data.id, complaintId: data.complaintId });
           return res.status(200).json({
             success: true,
             complaint: formatComplaintOutput(data),
           });
         }
-      } catch (e) {
-        // fallback
+      } catch (dbErr) {
+        console.error('[ComplaintController:getComplaintById] MongoDB error:', dbErr.message);
       }
     }
 
@@ -829,82 +787,49 @@ const markInProgress = async (req, res) => {
     const paramId = req.params.id;
     const now = new Date();
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: current, error: findErr } = await supabase
-          .from('complaints')
-          .select('*')
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`)
-          .maybeSingle();
-
-        if (findErr) {
-          console.error('[ComplaintController:markInProgress] Supabase find error:', findErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database error looking up complaint: ' + findErr.message,
-            error: findErr.message,
-          });
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
         }
+        const current = await Complaint.findOne(query);
 
-        if (!current) {
-          return res.status(404).json({
-            success: false,
-            message: 'Complaint not found in database.',
+        if (current) {
+          if (current.status === 'Closed') {
+            return res.status(400).json({
+              success: false,
+              message: 'Cannot modify a closed complaint.',
+            });
+          }
+
+          const timeline = parseTimeline(current.timeline);
+          timeline.push({
+            action: 'IN_PROGRESS',
+            performedBy: {
+              name: req.user.name,
+              role: req.user.role,
+              employeeId: req.user.employeeId,
+            },
+            notes: 'Supervisor initiated work and containment on the shop floor.',
+            timestamp: now.toISOString(),
           });
-        }
 
-        if (current.status === 'Closed') {
-          return res.status(400).json({
-            success: false,
-            message: 'Cannot modify a closed complaint.',
-          });
-        }
+          current.status = 'In Progress';
+          current.description = setWorkflowStatusInDescription(current.description, 'In Progress');
+          current.timeline = timeline;
+          current.updatedAt = now;
 
-        const timeline = parseTimeline(current.timeline);
-        timeline.push({
-          action: 'IN_PROGRESS',
-          performedBy: {
-            name: req.user.name,
-            role: req.user.role,
-            employeeId: req.user.employeeId,
-          },
-          notes: 'Supervisor initiated work and containment on the shop floor.',
-          timestamp: now.toISOString(),
-        });
-
-        const updatePayload = {
-          status: toDbStatus('In Progress'),
-          description: setWorkflowStatusInDescription(current.description, 'In Progress'),
-          timeline,
-          updatedAt: now.toISOString(),
-        };
-
-        const { data: updated, error: updateErr } = await supabase
-          .from('complaints')
-          .update(updatePayload)
-          .eq('id', current.id)
-          .select()
-          .single();
-
-        if (updateErr) {
-          console.error('[ComplaintController:markInProgress] Supabase update error:', updateErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to update complaint status in database: ' + updateErr.message,
-            error: updateErr.message,
-          });
-        }
-
-        if (updated) {
-          mockStore.updateComplaint(current.id, updatePayload);
+          const updated = await current.save();
+          mockStore.updateComplaint(current._id.toString(), current.toObject());
           return res.status(200).json({
             success: true,
             message: `Complaint ${updated.complaintId} marked in progress.`,
-            complaint: formatComplaintOutput(updated),
+            complaint: formatComplaintOutput(updated.toObject()),
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:markInProgress] Supabase exception:', dbErr.message);
+        console.error('[ComplaintController:markInProgress] MongoDB exception:', dbErr.message);
       }
     }
 
@@ -1041,101 +966,62 @@ const submitAction = async (req, res) => {
       verifiedEffective: false,
     };
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: current, error: findErr } = await supabase
-          .from('complaints')
-          .select('*')
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`)
-          .maybeSingle();
-
-        if (findErr) {
-          console.error('[ComplaintController:submitAction] Supabase lookup error:', findErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database error looking up complaint: ' + findErr.message,
-            error: findErr.message,
-          });
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
         }
+        const current = await Complaint.findOne(query);
 
-        if (!current) {
-          return res.status(404).json({
-            success: false,
-            message: 'Complaint not found in database.',
+        if (current) {
+          if (current.status === 'Closed') {
+            return res.status(400).json({
+              success: false,
+              message: 'Complaint has already been closed by audit.',
+            });
+          }
+
+          const timeline = parseTimeline(current.timeline);
+          timeline.push({
+            action: 'ACTION_SUBMITTED',
+            performedBy: {
+              name: req.user.name,
+              role: req.user.role,
+              employeeId: req.user.employeeId,
+            },
+            notes: `CAP submitted for audit verification:\n• Immediate Correction: ${finalImmediateCorrection}\n• Root Cause: ${finalRootCause}\n• Corrective Action: ${finalCorrectiveAction}\n• Preventive Action: ${finalPreventiveAction}\n• Responsible: ${respPerson.name} (${respPerson.department})`,
+            timestamp: now.toISOString(),
           });
-        }
 
-        if (current.status === 'Closed') {
-          return res.status(400).json({
-            success: false,
-            message: 'Complaint has already been closed by audit.',
-          });
-        }
+          current.afterPhoto = afterPhotoUrl;
+          current.actionNotes = finalActionNotes;
+          current.feedbackRemarks = finalFeedbackRemarks;
+          current.actualCompletedAt = now;
+          current.status = 'CAP Submitted';
+          current.cap = structuredCap;
+          current.description = setWorkflowStatusInDescription(current.description, 'CAP Submitted');
+          current.timeline = timeline;
+          current.updatedAt = now;
 
-        const timeline = parseTimeline(current.timeline);
-        timeline.push({
-          action: 'ACTION_SUBMITTED',
-          performedBy: {
-            name: req.user.name,
-            role: req.user.role,
-            employeeId: req.user.employeeId,
-          },
-          notes: `CAP submitted for audit verification:\n• Immediate Correction: ${finalImmediateCorrection}\n• Root Cause: ${finalRootCause}\n• Corrective Action: ${finalCorrectiveAction}\n• Preventive Action: ${finalPreventiveAction}\n• Responsible: ${respPerson.name} (${respPerson.department})`,
-          timestamp: now.toISOString(),
-        });
-
-        const updatePayload = {
-          afterPhoto: afterPhotoUrl,
-          actionNotes: finalActionNotes,
-          feedbackRemarks: finalFeedbackRemarks,
-          actualCompletedAt: now.toISOString(),
-          status: toDbStatus('CAP Submitted'),
-          cap: structuredCap,
-          description: setWorkflowStatusInDescription(current.description, 'CAP Submitted'),
-          timeline,
-          updatedAt: now.toISOString(),
-        };
-
-        const { data: updated, error: updateErr } = await supabase
-          .from('complaints')
-          .update(updatePayload)
-          .eq('id', current.id)
-          .select()
-          .single();
-
-        if (updateErr) {
-          console.error('[ComplaintController:submitAction] Supabase update error:', updateErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to record action in database: ' + updateErr.message,
-            error: updateErr.message,
-          });
-        }
-
-        if (updated) {
-          mockStore.updateComplaint(current.id, {
-            ...updatePayload,
+          const updated = await current.save();
+          mockStore.updateComplaint(current._id.toString(), {
+            ...current.toObject(),
             cap: structuredCap,
             immediateCorrection: finalImmediateCorrection,
             rootCause: finalRootCause,
             correctiveAction: finalCorrectiveAction,
             preventiveAction: finalPreventiveAction,
-            capResponsiblePerson: respPerson,
-            capTargetDate: targetDate || now.toISOString(),
           });
+
           return res.status(200).json({
             success: true,
-            message: `Resolution for ${updated.complaintId} submitted for audit verification.`,
-            complaint: formatComplaintOutput({ ...updated, cap: structuredCap }),
+            message: `CAP Resolution for NC ${updated.complaintId} submitted successfully and queued for audit verification.`,
+            complaint: formatComplaintOutput(updated.toObject()),
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:submitAction] Supabase exception:', dbErr.message);
-        return res.status(500).json({
-          success: false,
-          message: 'Database exception: ' + dbErr.message,
-          error: dbErr.message,
-        });
+        console.error('[ComplaintController:submitAction] MongoDB exception:', dbErr.message);
       }
     }
 
@@ -1216,151 +1102,113 @@ const verifyComplaint = async (req, res) => {
       });
     }
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: current, error: findErr } = await supabase
-          .from('complaints')
-          .select('*')
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`)
-          .maybeSingle();
-
-        if (findErr) {
-          console.error('[ComplaintController:verifyComplaint] Supabase find error:', findErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database error looking up complaint: ' + findErr.message,
-            error: findErr.message,
-          });
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
         }
+        const current = await Complaint.findOne(query);
 
-        if (!current) {
-          return res.status(404).json({
-            success: false,
-            message: 'Complaint not found in database.',
-          });
-        }
+        if (current) {
+          const timeline = parseTimeline(current.timeline);
+          let newStatus = current.status;
+          const capUpdate = (current.cap && typeof current.cap === 'object') ? (current.cap.toObject ? current.cap.toObject() : { ...current.cap }) : {};
 
-        const timeline = parseTimeline(current.timeline);
-        let newStatus = current.status;
-        let updatePayload = { updatedAt: now.toISOString() };
-        const capUpdate = (current.cap && typeof current.cap === 'object') ? { ...current.cap } : {};
+          if (decision === 'START_REVIEW') {
+            newStatus = 'Under Review';
+            capUpdate.status = 'UNDER_REVIEW';
+            timeline.push({
+              action: 'UNDER_REVIEW',
+              performedBy: {
+                name: req.user.name,
+                role: req.user.role,
+                employeeId: req.user.employeeId,
+              },
+              notes: notes || 'Auditor initiated review and on-site audit of submitted CAP.',
+              timestamp: now.toISOString(),
+            });
+          } else if (decision === 'VERIFY') {
+            newStatus = 'Verified';
+            capUpdate.status = 'VERIFIED_EFFECTIVE';
+            capUpdate.verifiedEffective = true;
+            capUpdate.verifiedAt = now.toISOString();
+            capUpdate.verifiedBy = req.user.name;
+            capUpdate.verificationNotes = notes || 'Audit verified that CAP actions are effective on the shop floor.';
+            timeline.push({
+              action: 'VERIFIED',
+              performedBy: {
+                name: req.user.name,
+                role: req.user.role,
+                employeeId: req.user.employeeId,
+              },
+              notes: notes || 'Audit verified that CAP actions are effective on the shop floor.',
+              timestamp: now.toISOString(),
+            });
+          } else if (decision === 'APPROVE' || decision === 'CLOSE') {
+            newStatus = 'Closed';
+            current.actualCompletedAt = now;
+            current.rejectionReason = '';
+            capUpdate.status = 'CLOSED';
+            capUpdate.verifiedEffective = true;
+            capUpdate.verifiedAt = now.toISOString();
+            capUpdate.verifiedBy = req.user.name;
+            capUpdate.verificationNotes = notes || 'Audit verified Before/After photos and approved closure of ticket.';
+            timeline.push({
+              action: 'CLOSED',
+              performedBy: {
+                name: req.user.name,
+                role: req.user.role,
+                employeeId: req.user.employeeId,
+              },
+              notes: notes || 'Audit verified Before/After photos and approved closure of ticket.',
+              timestamp: now.toISOString(),
+            });
+          } else {
+            const reason = rejectionReason || notes;
+            newStatus = 'Rejected / Rework';
+            current.rejectionReason = reason;
+            capUpdate.status = 'REJECTED';
+            capUpdate.verifiedEffective = false;
+            capUpdate.rejectionReason = reason;
+            timeline.push({
+              action: 'REJECTED',
+              performedBy: {
+                name: req.user.name,
+                role: req.user.role,
+                employeeId: req.user.employeeId,
+              },
+              notes: `Audit rejected resolution and returned to line for rework. Reason: ${reason}`,
+              timestamp: now.toISOString(),
+            });
+          }
 
-        if (decision === 'START_REVIEW') {
-          newStatus = 'Under Review';
-          updatePayload.status = newStatus;
-          capUpdate.status = 'UNDER_REVIEW';
-          timeline.push({
-            action: 'UNDER_REVIEW',
-            performedBy: {
-              name: req.user.name,
-              role: req.user.role,
-              employeeId: req.user.employeeId,
-            },
-            notes: notes || 'Auditor initiated review and on-site audit of submitted CAP.',
-            timestamp: now.toISOString(),
-          });
-        } else if (decision === 'VERIFY') {
-          newStatus = 'Verified';
-          updatePayload.status = newStatus;
-          capUpdate.status = 'VERIFIED_EFFECTIVE';
-          capUpdate.verifiedEffective = true;
-          capUpdate.verifiedAt = now.toISOString();
-          capUpdate.verifiedBy = req.user.name;
-          capUpdate.verificationNotes = notes || 'Audit verified that CAP actions are effective on the shop floor.';
-          timeline.push({
-            action: 'VERIFIED',
-            performedBy: {
-              name: req.user.name,
-              role: req.user.role,
-              employeeId: req.user.employeeId,
-            },
-            notes: notes || 'Audit verified that CAP actions are effective on the shop floor.',
-            timestamp: now.toISOString(),
-          });
-        } else if (decision === 'APPROVE' || decision === 'CLOSE') {
-          newStatus = 'Closed';
-          updatePayload.status = newStatus;
-          updatePayload.actualCompletedAt = now.toISOString();
-          updatePayload.rejectionReason = '';
-          capUpdate.status = 'CLOSED';
-          capUpdate.verifiedEffective = true;
-          capUpdate.verifiedAt = now.toISOString();
-          capUpdate.verifiedBy = req.user.name;
-          capUpdate.verificationNotes = notes || 'Audit verified Before/After photos and approved closure of ticket.';
-          timeline.push({
-            action: 'CLOSED',
-            performedBy: {
-              name: req.user.name,
-              role: req.user.role,
-              employeeId: req.user.employeeId,
-            },
-            notes: notes || 'Audit verified Before/After photos and approved closure of ticket.',
-            timestamp: now.toISOString(),
-          });
-        } else {
-          const reason = rejectionReason || notes;
-          newStatus = 'Rejected / Rework';
-          updatePayload.status = newStatus;
-          updatePayload.rejectionReason = reason;
-          capUpdate.status = 'REJECTED';
-          capUpdate.verifiedEffective = false;
-          capUpdate.rejectionReason = reason;
-          timeline.push({
-            action: 'REJECTED',
-            performedBy: {
-              name: req.user.name,
-              role: req.user.role,
-              employeeId: req.user.employeeId,
-            },
-            notes: `Audit rejected resolution and returned to line for rework. Reason: ${reason}`,
-            timestamp: now.toISOString(),
-          });
-        }
+          current.status = newStatus;
+          current.cap = capUpdate;
+          current.description = setWorkflowStatusInDescription(current.description, newStatus);
+          current.timeline = timeline;
+          current.updatedAt = now;
 
-        updatePayload.status = toDbStatus(newStatus);
-        updatePayload.cap = capUpdate;
-        updatePayload.description = setWorkflowStatusInDescription(current.description, newStatus);
-        updatePayload.timeline = timeline;
+          const updated = await current.save();
+          mockStore.updateComplaint(current._id.toString(), current.toObject());
 
-        const { data: updated, error: updateErr } = await supabase
-          .from('complaints')
-          .update(updatePayload)
-          .eq('id', current.id)
-          .select()
-          .single();
+          const actionLabel =
+            decision === 'START_REVIEW'
+              ? 'moved to Under Review'
+              : decision === 'VERIFY'
+              ? 'verified as effective'
+              : decision === 'APPROVE' || decision === 'CLOSE'
+              ? 'approved and closed'
+              : 'sent back for rework';
 
-        if (updateErr) {
-          console.error('[ComplaintController:verifyComplaint] Supabase update error:', updateErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to record audit decision in database: ' + updateErr.message,
-            error: updateErr.message,
-          });
-        }
-
-        if (updated) {
-          mockStore.updateComplaint(current.id, { ...updatePayload, cap: capUpdate });
           return res.status(200).json({
             success: true,
-            message: `Complaint ${updated.complaintId} has been ${
-              decision === 'VERIFY'
-                ? 'Verified Effective'
-                : decision === 'APPROVE' || decision === 'CLOSE'
-                ? 'Approved & Closed'
-                : decision === 'START_REVIEW'
-                ? 'placed Under Review'
-                : 'Rejected & Returned to line'
-            }.`,
-            complaint: formatComplaintOutput({ ...updated, cap: capUpdate }),
+            message: `NC Defect ${updated.complaintId} successfully ${actionLabel}.`,
+            complaint: formatComplaintOutput(updated.toObject()),
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:verifyComplaint] Supabase exception:', dbErr.message);
-        return res.status(500).json({
-          success: false,
-          message: 'Database exception: ' + dbErr.message,
-          error: dbErr.message,
-        });
+        console.error('[ComplaintController:verifyComplaint] MongoDB exception:', dbErr.message);
       }
     }
 
@@ -1483,74 +1331,45 @@ const addTimelineComment = async (req, res) => {
       });
     }
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: current, error: findErr } = await supabase
-          .from('complaints')
-          .select('*')
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`)
-          .maybeSingle();
-
-        if (findErr) {
-          console.error('[ComplaintController:addTimelineComment] Supabase find error:', findErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database error looking up complaint: ' + findErr.message,
-            error: findErr.message,
-          });
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
         }
+        const current = await Complaint.findOne(query);
 
-        if (!current) {
-          return res.status(404).json({
-            success: false,
-            message: 'Complaint not found in database.',
+        if (current) {
+          const timeline = parseTimeline(current.timeline);
+          timeline.push({
+            action: 'COMMENT_ADDED',
+            performedBy: {
+              name: req.user.name,
+              role: req.user.role,
+              employeeId: req.user.employeeId,
+            },
+            notes: comment.trim(),
+            timestamp: now.toISOString(),
           });
-        }
 
-        const timeline = parseTimeline(current.timeline);
-        timeline.push({
-          action: 'COMMENT_ADDED',
-          performedBy: {
-            name: req.user.name,
-            role: req.user.role,
-            employeeId: req.user.employeeId,
-          },
-          notes: comment.trim(),
-          timestamp: now.toISOString(),
-        });
+          current.timeline = timeline;
+          current.updatedAt = now;
+          const updated = await current.save();
 
-        const { data: updated, error: updateErr } = await supabase
-          .from('complaints')
-          .update({ timeline, updatedAt: now.toISOString() })
-          .eq('id', current.id)
-          .select()
-          .single();
-
-        if (updateErr) {
-          console.error('[ComplaintController:addTimelineComment] Supabase update error:', updateErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to record remark in database: ' + updateErr.message,
-            error: updateErr.message,
+          mockStore.updateComplaint(current._id.toString(), {
+            timeline,
+            updatedAt: now.toISOString(),
           });
-        }
 
-        if (updated) {
-          mockStore.updateComplaint(current.id, { timeline: updated.timeline, updatedAt: now.toISOString() });
           return res.status(200).json({
             success: true,
-            message: 'Remark recorded in ticket audit trail.',
-            timeline: updated.timeline,
-            complaint: formatComplaintOutput(updated),
+            message: 'Remark posted to timeline successfully.',
+            timeline,
+            complaint: formatComplaintOutput(updated.toObject()),
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:addTimelineComment] Supabase exception:', dbErr.message);
-        return res.status(500).json({
-          success: false,
-          message: 'Database exception: ' + dbErr.message,
-          error: dbErr.message,
-        });
+        console.error('[ComplaintController:addTimelineComment] MongoDB error:', dbErr.message);
       }
     }
 
@@ -1596,28 +1415,28 @@ const getKpiStats = async (req, res) => {
   try {
     const now = new Date();
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        let query = supabase.from('complaints').select('status, deadlineTimestamp, assignedTo, department');
+        const query = {};
 
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
-          const userEmpId = req.user.employeeId;
-          const userId = req.user.id || req.user._id;
+          const userEmpId = (req.user.employeeId || '').toUpperCase();
+          const userId = String(req.user.id || req.user._id || '');
 
-          let orFilters = [];
-          if (userEmpId) orFilters.push(`assignedTo->>employeeId.eq.${userEmpId}`);
-          if (userId) orFilters.push(`assignedTo->>userId.eq.${userId}`);
+          const orConditions = [];
+          if (userEmpId) orConditions.push({ 'assignedTo.employeeId': userEmpId });
+          if (userId) orConditions.push({ 'assignedTo.userId': userId });
 
-          if (orFilters.length > 0) {
-            query = query.or(orFilters.join(','));
+          if (orConditions.length > 0) {
+            query.$or = orConditions;
           } else {
-            query = query.eq('id', 'no-match');
+            query._id = null;
           }
         }
 
-        const { data: allComplaints, error } = await query;
+        const allComplaints = await Complaint.find(query).select('status deadlineTimestamp assignedTo department').lean();
 
-        if (!error && allComplaints) {
+        if (allComplaints) {
           const draftTickets = allComplaints.filter((c) => c.status === 'Draft').length;
           const openTickets = allComplaints.filter((c) => ['Open', 'Assigned', 'In Progress'].includes(c.status)).length;
           const capSubmitted = allComplaints.filter((c) => ['CAP Submitted', 'Under Verification'].includes(c.status)).length;
@@ -1662,7 +1481,7 @@ const getKpiStats = async (req, res) => {
           });
         }
       } catch (dbErr) {
-        console.warn('[ComplaintController:getKpiStats] Supabase notice:', dbErr.message);
+        console.error('[ComplaintController:getKpiStats] MongoDB error:', dbErr.message);
       }
     }
 
@@ -1735,21 +1554,21 @@ const getAdminOversightStats = async (req, res) => {
     let allComplaints = [];
     let allUsers = [];
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const [complaintsRes, usersRes] = await Promise.all([
-          supabase.from('complaints').select('*').order('createdAt', { ascending: false }),
-          supabase.from('users').select('*').eq('isActive', true),
+        const [complaintsDocs, usersDocs] = await Promise.all([
+          Complaint.find().sort({ createdAt: -1 }).lean(),
+          User.find({ isActive: true }).lean(),
         ]);
 
-        if (!complaintsRes.error && complaintsRes.data) {
-          allComplaints = complaintsRes.data.map(formatComplaintOutput);
+        if (complaintsDocs) {
+          allComplaints = complaintsDocs.map(formatComplaintOutput);
         }
-        if (!usersRes.error && usersRes.data) {
-          allUsers = usersRes.data.map((u) => ({ ...u, _id: u.id }));
+        if (usersDocs) {
+          allUsers = usersDocs.map((u) => ({ ...u, _id: u._id.toString(), id: u._id.toString() }));
         }
       } catch (dbErr) {
-        console.warn('[ComplaintController:getAdminOversightStats] Supabase notice:', dbErr.message);
+        console.warn('[ComplaintController:getAdminOversightStats] MongoDB notice:', dbErr.message);
       }
     }
 
@@ -1957,16 +1776,20 @@ const reassignComplaint = async (req, res) => {
 
     const lookupSupervisorId = assignedToUserId;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: sups } = await supabase
-          .from('users')
-          .select('*')
-          .or(`id.eq.${lookupSupervisorId},employeeId.eq.${lookupSupervisorId},email.eq.${lookupSupervisorId}`)
-          .limit(1);
-
-        if (sups && sups.length > 0) {
-          supervisor = sups[0];
+        const supQuery = {
+          $or: [
+            { employeeId: lookupSupervisorId.toUpperCase() },
+            { email: lookupSupervisorId.toLowerCase() },
+          ],
+        };
+        if (lookupSupervisorId.match(/^[0-9a-fA-F]{24}$/)) {
+          supQuery.$or.unshift({ _id: lookupSupervisorId });
+        }
+        const supUser = await User.findOne(supQuery).lean();
+        if (supUser) {
+          supervisor = { ...supUser, id: supUser._id.toString() };
         }
       } catch (e) {
         // fallback
@@ -2000,84 +1823,49 @@ const reassignComplaint = async (req, res) => {
       mobileNumber: supervisor?.mobileNumber || '',
     };
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: current, error: findErr } = await supabase
-          .from('complaints')
-          .select('*')
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`)
-          .maybeSingle();
-
-        if (findErr) {
-          console.error('[ComplaintController:reassignComplaint] Supabase lookup error:', findErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Database error looking up complaint: ' + findErr.message,
-            error: findErr.message,
-          });
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
         }
+        const current = await Complaint.findOne(query);
 
-        if (!current) {
-          return res.status(404).json({
-            success: false,
-            message: 'Complaint not found in database.',
+        if (current) {
+          const timeline = parseTimeline(current.timeline);
+          timeline.push({
+            action: 'REASSIGNED',
+            performedBy: {
+              userId: req.user.id || req.user._id,
+              employeeId: req.user.employeeId,
+              name: req.user.name,
+              role: req.user.role,
+            },
+            notes:
+              notes ||
+              `Task reassigned to Line In-Charge ${supervisor.name} (${supervisor.employeeId} - ${supervisor.department})`,
+            timestamp: now.toISOString(),
           });
-        }
 
-        const timeline = parseTimeline(current.timeline);
-        timeline.push({
-          action: 'REASSIGNED',
-          performedBy: {
-            userId: req.user.id || req.user._id,
-            employeeId: req.user.employeeId,
-            name: req.user.name,
-            role: req.user.role,
-          },
-          notes:
-            notes ||
-            `Task reassigned to Line In-Charge ${supervisor.name} (${supervisor.employeeId} - ${supervisor.department})`,
-          timestamp: now.toISOString(),
-        });
+          current.assignedTo = assignedTo;
+          current.timeline = timeline;
+          current.updatedAt = now;
 
-        const { data: updated, error: updateErr } = await supabase
-          .from('complaints')
-          .update({
+          const updated = await current.save();
+          mockStore.updateComplaint(current._id.toString(), {
             assignedTo,
             timeline,
             updatedAt: now.toISOString(),
-          })
-          .eq('id', current.id)
-          .select()
-          .single();
-
-        if (updateErr) {
-          console.error('[ComplaintController:reassignComplaint] Supabase update error:', updateErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to update assignment in database: ' + updateErr.message,
-            error: updateErr.message,
           });
-        }
 
-        if (updated) {
-          mockStore.updateComplaint(current.id, {
-            assignedTo,
-            timeline: updated.timeline,
-            updatedAt: now.toISOString(),
-          });
           return res.status(200).json({
             success: true,
-            message: `Task successfully assigned to ${supervisor.name} (${supervisor.department}).`,
-            complaint: formatComplaintOutput(updated),
+            message: `NC Defect ${updated.complaintId} reassigned to ${supervisor.name} successfully.`,
+            complaint: formatComplaintOutput(updated.toObject()),
           });
         }
       } catch (dbErr) {
-        console.error('[ComplaintController:reassignComplaint] Supabase exception:', dbErr.message);
-        return res.status(500).json({
-          success: false,
-          message: 'Database exception: ' + dbErr.message,
-          error: dbErr.message,
-        });
+        console.error('[ComplaintController:reassignComplaint] MongoDB error:', dbErr.message);
       }
     }
 
@@ -2127,29 +1915,16 @@ const deleteComplaint = async (req, res) => {
   try {
     const paramId = req.params.id;
 
-    // Delete from Supabase if configured
-    if (isSupabaseConfigured && supabase) {
+    // Delete from MongoDB if configured
+    if (isMongoConnected()) {
       try {
-        const { error: delErr } = await supabase
-          .from('complaints')
-          .delete()
-          .or(`id.eq.${paramId},complaintId.eq.${paramId}`);
-
-        if (delErr) {
-          console.error('[ComplaintController:deleteComplaint] Supabase delete error:', delErr.message);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to delete complaint from database: ' + delErr.message,
-            error: delErr.message,
-          });
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
         }
+        await Complaint.deleteOne(query);
       } catch (err) {
-        console.error('[ComplaintController:deleteComplaint] Supabase exception:', err.message);
-        return res.status(500).json({
-          success: false,
-          message: 'Database exception: ' + err.message,
-          error: err.message,
-        });
+        console.error('[ComplaintController:deleteComplaint] MongoDB exception:', err.message);
       }
     }
 
@@ -2175,21 +1950,15 @@ const getDepartmentComplianceStats = async (req, res) => {
   try {
     let allComplaints = [];
 
-    // Fetch complaints from Supabase if configured
-    if (isSupabaseConfigured && supabase) {
+    // Fetch complaints from MongoDB if connected
+    if (isMongoConnected()) {
       try {
-        const { data: dbTickets, error: dbErr } = await supabase
-          .from('complaints')
-          .select('*')
-          .order('createdAt', { ascending: false });
-
-        if (!dbErr && Array.isArray(dbTickets)) {
+        const dbTickets = await Complaint.find().sort({ createdAt: -1 }).lean();
+        if (Array.isArray(dbTickets)) {
           allComplaints = dbTickets.map(formatComplaintOutput);
-        } else if (dbErr) {
-          console.warn('[ComplaintController:getDepartmentComplianceStats] Supabase error:', dbErr.message);
         }
       } catch (err) {
-        console.warn('[ComplaintController:getDepartmentComplianceStats] Supabase notice:', err.message);
+        console.warn('[ComplaintController:getDepartmentComplianceStats] MongoDB notice:', err.message);
       }
     }
 
@@ -2216,9 +1985,9 @@ const getDepartmentComplianceStats = async (req, res) => {
 
     // Discover real departments from database table and existing complaints
     const foundDepts = new Set();
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: dbDepts } = await supabase.from('departments').select('name');
+        const dbDepts = await Department.find().select('name').lean();
         if (Array.isArray(dbDepts)) {
           dbDepts.forEach((d) => {
             if (d.name && d.name.trim()) foundDepts.add(normalizeDeptName(d.name));
@@ -2233,7 +2002,7 @@ const getDepartmentComplianceStats = async (req, res) => {
       }
     });
 
-    if (!isSupabaseConfigured || !supabase) {
+    if (!isMongoConnected()) {
       mockStore.getDepartments().forEach((d) => {
         if (d.name && d.name.trim()) foundDepts.add(normalizeDeptName(d.name));
       });
@@ -2337,9 +2106,8 @@ const getDepartmentComplianceStats = async (req, res) => {
     // Total audits from real database
     let totalAudits = 0;
     try {
-      if (isSupabaseConfigured && supabase) {
-        const { count } = await supabase.from('audits').select('*', { count: 'exact', head: true });
-        totalAudits = count || 0;
+      if (isMongoConnected()) {
+        totalAudits = await Audit.countDocuments();
       }
     } catch (e) {
       totalAudits = 0;
@@ -2444,20 +2212,20 @@ const getAudits = async (req, res) => {
     let audits = [];
     let complaints = [];
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const [auditsRes, complaintsRes] = await Promise.all([
-          supabase.from('audits').select('*').order('created_at', { ascending: false }),
-          supabase.from('complaints').select('status'),
+        const [auditsDocs, complaintsDocs] = await Promise.all([
+          Audit.find().sort({ createdAt: -1 }).lean(),
+          Complaint.find().select('status').lean(),
         ]);
-        if (!auditsRes.error && auditsRes.data) {
-          audits = auditsRes.data;
+        if (auditsDocs) {
+          audits = auditsDocs.map((a) => ({ ...a, id: a._id.toString(), _id: a._id.toString() }));
         }
-        if (!complaintsRes.error && complaintsRes.data) {
-          complaints = complaintsRes.data;
+        if (complaintsDocs) {
+          complaints = complaintsDocs;
         }
       } catch (e) {
-        console.warn('[ComplaintController:getAudits] Supabase query notice:', e.message);
+        console.warn('[ComplaintController:getAudits] MongoDB query notice:', e.message);
       }
     }
 
@@ -2538,12 +2306,25 @@ const createAuditRound = async (req, res) => {
       });
     }
 
-    const newAudit = mockStore.createAudit({
-      title,
-      date,
-      departments: departments || ['HR', 'Production', 'EHS'],
-      leadAuditor: leadAuditor || req.user?.name || 'Auditor',
-    });
+    let newAudit;
+    if (isMongoConnected()) {
+      const created = await Audit.create({
+        title,
+        date: date || new Date(),
+        departments: departments || ['HR', 'Production', 'EHS'],
+        leadAuditor: leadAuditor || req.user?.name || 'Auditor',
+        status: 'Scheduled',
+      });
+      newAudit = { ...created.toObject(), id: created._id.toString(), _id: created._id.toString() };
+      mockStore.createAudit(newAudit);
+    } else {
+      newAudit = mockStore.createAudit({
+        title,
+        date,
+        departments: departments || ['HR', 'Production', 'EHS'],
+        leadAuditor: leadAuditor || req.user?.name || 'Auditor',
+      });
+    }
 
     return res.status(201).json({
       success: true,

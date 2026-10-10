@@ -30,7 +30,6 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { complaintService, taskService } from '../services/api';
-import { supabase } from '../services/supabase';
 
 export const AdminOversightDashboard = ({ onViewComplaint }) => {
   const [data, setData] = useState(null);

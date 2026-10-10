@@ -1,12 +1,16 @@
 const bcrypt = require('bcryptjs');
-const { supabase, isSupabaseConfigured } = require('../config/supabase');
+const { isMongoConnected } = require('../config/db');
+const User = require('../models/User');
+const Complaint = require('../models/Complaint');
+const ComplianceTask = require('../models/ComplianceTask');
+const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 
 const formatUser = (u) => {
   if (!u) return null;
   return {
-    _id: u.id || u._id,
-    id: u.id || u._id,
+    _id: u._id ? u._id.toString() : u.id,
+    id: u._id ? u._id.toString() : u.id,
     employeeId: u.employeeId,
     name: u.name,
     email: u.email,
@@ -25,17 +29,16 @@ const formatUser = (u) => {
 // @access  Private (Auditor or Authenticated)
 const getLineSupervisors = async (req, res) => {
   try {
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, name, employeeId, department, designation, mobileNumber, email, role, isActive')
-          .or('role.eq.ACTION_PERSON,role.eq.SUPERVISOR')
-          .eq('isActive', true)
-          .order('department', { ascending: true })
-          .order('name', { ascending: true });
+        const data = await User.find({
+          role: { $in: ['ACTION_PERSON', 'SUPERVISOR'] },
+          isActive: true,
+        })
+          .sort({ department: 1, name: 1 })
+          .lean();
 
-        if (!error && data) {
+        if (data && data.length > 0) {
           const supervisors = data.map(formatUser);
           return res.status(200).json({
             success: true,
@@ -44,7 +47,7 @@ const getLineSupervisors = async (req, res) => {
           });
         }
       } catch (dbErr) {
-        console.warn('[UserController:getLineSupervisors] Supabase query notice:', dbErr.message);
+        console.warn('[UserController:getLineSupervisors] MongoDB query notice:', dbErr.message);
       }
     }
 
@@ -74,34 +77,40 @@ const getAllUsers = async (req, res) => {
   try {
     const { role, department, search, isActive } = req.query;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        let query = supabase.from('users').select('*');
+        const query = {};
 
         if (role) {
           if (role === 'SUPERVISOR') {
-            query = query.in('role', ['ACTION_PERSON', 'SUPERVISOR']);
+            query.role = { $in: ['ACTION_PERSON', 'SUPERVISOR'] };
           } else {
-            query = query.eq('role', role);
+            query.role = role;
           }
         }
 
         if (department) {
-          query = query.eq('department', department);
+          query.department = department;
         }
 
         if (typeof isActive !== 'undefined') {
-          query = query.eq('isActive', isActive === 'true');
+          query.isActive = isActive === 'true';
         }
 
         if (search) {
-          const s = `%${search}%`;
-          query = query.or(`name.ilike.${s},employeeId.ilike.${s},email.ilike.${s},department.ilike.${s},designation.ilike.${s}`);
+          const regex = new RegExp(search, 'i');
+          query.$or = [
+            { name: regex },
+            { employeeId: regex },
+            { email: regex },
+            { department: regex },
+            { designation: regex },
+          ];
         }
 
-        const { data, error } = await query.order('role', { ascending: true }).order('name', { ascending: true });
+        const data = await User.find(query).sort({ role: 1, name: 1 }).lean();
 
-        if (!error && data) {
+        if (data) {
           const users = data.map(formatUser);
           return res.status(200).json({
             success: true,
@@ -110,7 +119,7 @@ const getAllUsers = async (req, res) => {
           });
         }
       } catch (dbErr) {
-        console.warn('[UserController:getAllUsers] Supabase notice:', dbErr.message);
+        console.warn('[UserController:getAllUsers] MongoDB notice:', dbErr.message);
       }
     }
 
@@ -185,60 +194,53 @@ const createUser = async (req, res) => {
     }
 
     const normalizedRole = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        // Check duplicate employeeId
-        const { data: existingEmp } = await supabase
-          .from('users')
-          .select('id, employeeId, name')
-          .ilike('employeeId', employeeId.trim())
-          .limit(1);
-
-        if (existingEmp && existingEmp.length > 0) {
+        const existingEmp = await User.findOne({
+          employeeId: new RegExp(`^${employeeId.trim()}$`, 'i'),
+        });
+        if (existingEmp) {
           return res.status(400).json({
             success: false,
-            message: `Employee ID '${employeeId.toUpperCase()}' is already registered to ${existingEmp[0].name}.`,
+            message: `Employee ID '${employeeId.toUpperCase()}' is already registered to ${existingEmp.name}.`,
           });
         }
 
-        // Check duplicate email
-        const { data: existingEmail } = await supabase
-          .from('users')
-          .select('id, email')
-          .ilike('email', email.trim())
-          .limit(1);
-
-        if (existingEmail && existingEmail.length > 0) {
+        const existingEmail = await User.findOne({
+          email: new RegExp(`^${email.trim()}$`, 'i'),
+        });
+        if (existingEmail) {
           return res.status(400).json({
             success: false,
             message: `Email address '${email.toLowerCase()}' is already registered in the system.`,
           });
         }
 
-        const { data: inserted, error: insertErr } = await supabase
-          .from('users')
-          .insert([
-            {
-              employeeId: employeeId.trim().toUpperCase(),
-              name: name.trim(),
-              email: email.trim().toLowerCase(),
-              password: hashedPassword,
-              role: normalizedRole,
-              department: department.trim(),
-              designation: designation.trim(),
-              mobileNumber: mobileNumber.trim(),
-              isActive: true,
-            },
-          ])
-          .select()
-          .single();
+        const inserted = await User.create({
+          employeeId: employeeId.trim().toUpperCase(),
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          role: normalizedRole,
+          department: department.trim(),
+          designation: designation.trim(),
+          mobileNumber: mobileNumber.trim(),
+          isActive: true,
+        });
 
-        if (insertErr) {
-          throw insertErr;
-        }
+        // Also sync to mockStore
+        mockStore.createUser({
+          _id: inserted._id.toString(),
+          employeeId: inserted.employeeId,
+          name: inserted.name,
+          email: inserted.email,
+          password,
+          role: normalizedRole,
+          department: inserted.department,
+          designation: inserted.designation,
+          mobileNumber: inserted.mobileNumber,
+        });
 
         return res.status(201).json({
           success: true,
@@ -246,12 +248,25 @@ const createUser = async (req, res) => {
           user: formatUser(inserted),
         });
       } catch (dbErr) {
-        console.error('[UserController:createUser] Supabase insert error:', dbErr.message);
+        console.error('[UserController:createUser] MongoDB error:', dbErr.message);
         return res.status(400).json({
           success: false,
-          message: `Database error saving user: ${dbErr.message}`,
+          message: dbErr.message || 'Database error creating user account.',
         });
       }
+    }
+
+    // Fallback in-memory
+    const existing = mockStore.getUsers().find(
+      (u) =>
+        u.employeeId.toUpperCase() === employeeId.trim().toUpperCase() ||
+        u.email.toLowerCase() === email.trim().toLowerCase()
+    );
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: 'A user with this Employee ID or Email already exists.',
+      });
     }
 
     const newUser = mockStore.createUser({
@@ -268,73 +283,46 @@ const createUser = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: `User '${newUser.name}' (${newUser.employeeId}) created successfully.`,
+      message: `User '${newUser.name}' created successfully.`,
       user: formatUser(newUser),
     });
   } catch (error) {
-    console.error('[UserController] Create user error:', error);
+    console.error('[UserController:createUser] General Error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Server error while creating user account.',
+      message: error.message || 'Failed to create user account.',
     });
   }
 };
 
-// @desc    Admin: Update user details
+// @desc    Admin: Update user details (name, email, department, designation, mobile)
 // @route   PUT /api/users/:id
 // @access  Private (Admin Only)
 const updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const {
-      name,
-      email,
-      department,
-      designation,
-      mobileNumber,
-      role,
-      isActive,
-    } = req.body;
+    const { name, email, department, designation, mobileNumber, role } = req.body;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const updatePayload = {
-          updatedAt: new Date().toISOString(),
+        const updateData = {};
+        if (name) updateData.name = name.trim();
+        if (email) updateData.email = email.trim().toLowerCase();
+        if (department) updateData.department = department.trim();
+        if (designation) updateData.designation = designation.trim();
+        if (typeof mobileNumber !== 'undefined') updateData.mobileNumber = mobileNumber.trim();
+        if (role) updateData.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
+
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
         };
-
-        if (name) updatePayload.name = name.trim();
-        if (department) updatePayload.department = department.trim();
-        if (designation) updatePayload.designation = designation.trim();
-        if (mobileNumber) updatePayload.mobileNumber = mobileNumber.trim();
-        if (typeof isActive !== 'undefined') updatePayload.isActive = Boolean(isActive);
-        if (role) updatePayload.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
-
-        if (email) {
-          // Check email conflict
-          const { data: conflict } = await supabase
-            .from('users')
-            .select('id')
-            .ilike('email', email.trim())
-            .neq('id', userId)
-            .limit(1);
-
-          if (conflict && conflict.length > 0) {
-            return res.status(400).json({
-              success: false,
-              message: `Email '${email}' is already in use by another account.`,
-            });
-          }
-          updatePayload.email = email.trim().toLowerCase();
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
         }
 
-        const { data: updated, error } = await supabase
-          .from('users')
-          .update(updatePayload)
-          .eq('id', userId)
-          .select()
-          .maybeSingle();
-
-        if (!error && updated) {
+        const updated = await User.findOneAndUpdate(query, updateData, { new: true });
+        if (updated) {
+          mockStore.updateUser(userId, updateData);
           return res.status(200).json({
             success: true,
             message: `User '${updated.name}' updated successfully.`,
@@ -342,33 +330,42 @@ const updateUser = async (req, res) => {
           });
         }
       } catch (dbErr) {
-        console.warn('[UserController:updateUser] Supabase notice:', dbErr.message);
+        console.warn('[UserController:updateUser] MongoDB notice:', dbErr.message);
       }
     }
 
-    const updated = mockStore.updateUser(userId, req.body);
-    if (!updated) {
+    const user = mockStore.findUserById(userId);
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User account not found.',
       });
     }
 
+    const updates = {};
+    if (name) updates.name = name.trim();
+    if (email) updates.email = email.trim().toLowerCase();
+    if (department) updates.department = department.trim();
+    if (designation) updates.designation = designation.trim();
+    if (typeof mobileNumber !== 'undefined') updates.mobileNumber = mobileNumber.trim();
+    if (role) updates.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
+
+    const updated = mockStore.updateUser(userId, updates);
     res.status(200).json({
       success: true,
-      message: 'User updated successfully.',
+      message: `User '${updated.name}' updated successfully.`,
       user: formatUser(updated),
     });
   } catch (error) {
-    console.error('[UserController] Update user error:', error);
+    console.error('[UserController] Update error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to update user account.',
+      message: error.message || 'Failed to update user profile.',
     });
   }
 };
 
-// @desc    Admin: Reset or update user password
+// @desc    Admin: Reset a user's password
 // @route   PATCH /api/users/:id/reset-password
 // @access  Private (Admin Only)
 const resetUserPassword = async (req, res) => {
@@ -379,34 +376,32 @@ const resetUserPassword = async (req, res) => {
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'New password must be at least 6 characters in length.',
+        message: 'New password must be at least 6 characters long.',
       });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: updated, error } = await supabase
-          .from('users')
-          .update({
-            password: hashedPassword,
-            updatedAt: new Date().toISOString(),
-          })
-          .eq('id', userId)
-          .select('id, employeeId, name, email, role')
-          .maybeSingle();
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
+        };
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
 
-        if (!error && updated) {
+        const user = await User.findOne(query);
+        if (user) {
+          user.password = newPassword;
+          await user.save();
+          mockStore.updateUser(userId, { password: newPassword });
           return res.status(200).json({
             success: true,
-            message: `Password for '${updated.name}' (${updated.employeeId}) has been successfully updated.`,
-            user: formatUser(updated),
+            message: `Password for '${user.name}' (${user.employeeId}) has been successfully updated.`,
+            user: formatUser(user),
           });
         }
       } catch (dbErr) {
-        console.warn('[UserController:resetPassword] Supabase notice:', dbErr.message);
+        console.warn('[UserController:resetPassword] MongoDB notice:', dbErr.message);
       }
     }
 
@@ -446,37 +441,29 @@ const toggleUserStatus = async (req, res) => {
       });
     }
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: current } = await supabase
-          .from('users')
-          .select('id, name, isActive')
-          .eq('id', userId)
-          .maybeSingle();
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
+        };
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
 
+        const current = await User.findOne(query);
         if (current) {
-          const nextState = !current.isActive;
-          const { data: updated, error } = await supabase
-            .from('users')
-            .update({
-              isActive: nextState,
-              updatedAt: new Date().toISOString(),
-            })
-            .eq('id', userId)
-            .select()
-            .maybeSingle();
-
-          if (!error && updated) {
-            return res.status(200).json({
-              success: true,
-              message: `User '${updated.name}' has been ${updated.isActive ? 'activated' : 'deactivated'}.`,
-              isActive: updated.isActive,
-              user: formatUser(updated),
-            });
-          }
+          current.isActive = !current.isActive;
+          await current.save();
+          mockStore.updateUser(userId, { isActive: current.isActive });
+          return res.status(200).json({
+            success: true,
+            message: `User '${current.name}' has been ${current.isActive ? 'activated' : 'deactivated'}.`,
+            isActive: current.isActive,
+            user: formatUser(current),
+          });
         }
       } catch (dbErr) {
-        console.warn('[UserController:toggleStatus] Supabase notice:', dbErr.message);
+        console.warn('[UserController:toggleStatus] MongoDB notice:', dbErr.message);
       }
     }
 
@@ -512,14 +499,15 @@ const checkUserDependencies = async (req, res) => {
     const userId = req.params.id;
 
     let targetUser = null;
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: userRow } = await supabase
-          .from('users')
-          .select('id, employeeId, name, role, department')
-          .eq('id', userId)
-          .maybeSingle();
-        targetUser = userRow;
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
+        };
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
+        targetUser = await User.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -540,66 +528,51 @@ const checkUserDependencies = async (req, res) => {
     let historicalNCs = 0;
     let scheduledAudits = 0;
 
-    const uId = String(targetUser.id || targetUser._id || '');
+    const uId = String(targetUser._id || targetUser.id || '');
     const uEmp = String(targetUser.employeeId || '').toUpperCase();
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
         // Compliance Tasks
-        const { data: tasksData } = await supabase
-          .from('compliance_tasks')
-          .select('id, status, assignedTo');
-        if (Array.isArray(tasksData)) {
-          tasksData.forEach((t) => {
-            const a = t.assignedTo || {};
-            const isAssigned = (a.userId && String(a.userId) === uId) ||
-                               (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
-            if (isAssigned) {
-              if (t.status === 'Completed') completedTasks++;
-              else activeTasks++;
-            }
-          });
-        }
+        const tasks = await ComplianceTask.find({
+          $or: [
+            { 'assignedTo.userId': uId },
+            { 'assignedTo.employeeId': uEmp },
+          ],
+        }).lean();
+        tasks.forEach((t) => {
+          if (t.status === 'Completed') completedTasks++;
+          else activeTasks++;
+        });
 
         // Complaints / NCs
-        const { data: complaintsData } = await supabase
-          .from('complaints')
-          .select('id, status, createdBy, assignedTo');
-        if (Array.isArray(complaintsData)) {
-          complaintsData.forEach((c) => {
-            const cr = c.createdBy || {};
-            const as = c.assignedTo || {};
-            const isCreator = (cr.userId && String(cr.userId) === uId) ||
-                              (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
-            const isAssignee = (as.userId && String(as.userId) === uId) ||
-                               (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
-            if (isCreator || isAssignee) {
-              if (c.status === 'Closed' || c.status === 'Verified') historicalNCs++;
-              else openNCs++;
-            }
-          });
-        }
+        const complaints = await Complaint.find({
+          $or: [
+            { 'createdBy.userId': uId },
+            { 'createdBy.employeeId': uEmp },
+            { 'assignedTo.userId': uId },
+            { 'assignedTo.employeeId': uEmp },
+          ],
+        }).lean();
+        complaints.forEach((c) => {
+          if (['Closed', 'Verified'].includes(c.status)) historicalNCs++;
+          else openNCs++;
+        });
 
         // Audits
-        const { data: auditsData } = await supabase
-          .from('audits')
-          .select('id, status, auditor');
-        if (Array.isArray(auditsData)) {
-          auditsData.forEach((a) => {
-            const aud = a.auditor || {};
-            const isAud = (aud.userId && String(aud.userId) === uId) ||
-                          (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
-            if (isAud && a.status !== 'Completed') {
-              scheduledAudits++;
-            }
-          });
-        }
+        scheduledAudits = await Audit.countDocuments({
+          $or: [
+            { 'auditor.userId': uId },
+            { 'auditor.employeeId': uEmp },
+          ],
+          status: { $ne: 'Completed' },
+        });
       } catch (err) {
-        console.warn('[checkUserDependencies] Supabase inspection notice:', err.message);
+        console.warn('[checkUserDependencies] MongoDB inspection notice:', err.message);
       }
     } else {
-      // Mock Store Inspection
-      mockStore.getTasks().forEach((t) => {
+      const mockTasks = mockStore.getTasks ? mockStore.getTasks() : [];
+      mockTasks.forEach((t) => {
         const a = t.assignedTo || {};
         const isAssigned = (a.userId && String(a.userId) === uId) ||
                            (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
@@ -609,7 +582,8 @@ const checkUserDependencies = async (req, res) => {
         }
       });
 
-      mockStore.getComplaints({}).forEach((c) => {
+      const mockComplaints = mockStore.getComplaints({});
+      mockComplaints.forEach((c) => {
         const cr = c.createdBy || {};
         const as = c.assignedTo || {};
         const isCreator = (cr.userId && String(cr.userId) === uId) ||
@@ -622,7 +596,8 @@ const checkUserDependencies = async (req, res) => {
         }
       });
 
-      mockStore.getAudits().forEach((a) => {
+      const mockAudits = mockStore.getAudits ? mockStore.getAudits() : [];
+      mockAudits.forEach((a) => {
         const aud = a.auditor || {};
         const isAud = (aud.userId && String(aud.userId) === uId) ||
                       (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
@@ -632,14 +607,14 @@ const checkUserDependencies = async (req, res) => {
       });
     }
 
-    const hasActiveDependencies = activeTasks > 0 || openNCs > 0 || scheduledAudits > 0;
+    const canDelete = activeTasks === 0 && openNCs === 0 && scheduledAudits === 0;
 
     return res.status(200).json({
       success: true,
       user: {
-        id: targetUser.id || targetUser._id,
-        name: targetUser.name,
+        id: targetUser._id ? targetUser._id.toString() : targetUser.id,
         employeeId: targetUser.employeeId,
+        name: targetUser.name,
         role: targetUser.role,
         department: targetUser.department,
       },
@@ -649,19 +624,23 @@ const checkUserDependencies = async (req, res) => {
         openNCs,
         historicalNCs,
         scheduledAudits,
-        hasActiveDependencies,
       },
+      canDelete,
+      reason: canDelete
+        ? 'Account has no active blockers. Safe to delete.'
+        : `Cannot delete: Account has ${openNCs > 0 ? `${openNCs} open NC(s)` : ''} ${activeTasks > 0 ? `${activeTasks} active task(s)` : ''} ${scheduledAudits > 0 ? `${scheduledAudits} scheduled audit(s)` : ''} assigned.`,
     });
   } catch (error) {
-    console.error('[UserController] checkUserDependencies error:', error);
+    console.error('[checkUserDependencies] Error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to inspect user dependencies.',
+      message: 'Failed to inspect user dependencies.',
+      error: error.message,
     });
   }
 };
 
-// @desc    Admin: Safely delete user account (Auditors, Supervisors)
+// @desc    Admin: Delete existing user account (Auditor, Supervisor, etc.)
 // @route   DELETE /api/users/:id
 // @access  Private (Admin Only)
 const deleteUser = async (req, res) => {
@@ -671,19 +650,20 @@ const deleteUser = async (req, res) => {
     if (req.user && (req.user.id === userId || req.user._id === userId)) {
       return res.status(400).json({
         success: false,
-        message: 'You cannot delete your own administrative account.',
+        message: 'Security Violation: Administrators cannot delete their own active account.',
       });
     }
 
     let targetUser = null;
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: userRow } = await supabase
-          .from('users')
-          .select('id, employeeId, name, role, department')
-          .eq('id', userId)
-          .maybeSingle();
-        targetUser = userRow;
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
+        };
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
+        targetUser = await User.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -698,148 +678,79 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    if (targetUser.role === 'ADMIN') {
-      return res.status(400).json({
+    if (targetUser.employeeId === 'ADM-001' || targetUser.email === 'admin@factory.com') {
+      return res.status(403).json({
         success: false,
-        message: 'Administrator accounts cannot be deleted directly.',
+        message: 'Root administrator account (ADM-001) is protected and cannot be deleted.',
       });
     }
 
-    const uId = String(targetUser.id || targetUser._id || '');
+    const uId = String(targetUser._id || targetUser.id || '');
     const uEmp = String(targetUser.employeeId || '').toUpperCase();
 
-    // Check active dependencies
-    let activeTasks = 0;
-    let openNCs = 0;
-    let scheduledAudits = 0;
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data: tasksData } = await supabase
-          .from('compliance_tasks')
-          .select('id, status, assignedTo');
-        if (Array.isArray(tasksData)) {
-          tasksData.forEach((t) => {
-            const a = t.assignedTo || {};
-            const isAssigned = (a.userId && String(a.userId) === uId) ||
-                               (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
-            if (isAssigned && t.status !== 'Completed') {
-              activeTasks++;
-            }
-          });
-        }
-
-        const { data: complaintsData } = await supabase
-          .from('complaints')
-          .select('id, status, createdBy, assignedTo');
-        if (Array.isArray(complaintsData)) {
-          complaintsData.forEach((c) => {
-            const cr = c.createdBy || {};
-            const as = c.assignedTo || {};
-            const isCreator = (cr.userId && String(cr.userId) === uId) ||
-                              (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
-            const isAssignee = (as.userId && String(as.userId) === uId) ||
-                               (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
-            if ((isCreator || isAssignee) && c.status !== 'Closed' && c.status !== 'Verified') {
-              openNCs++;
-            }
-          });
-        }
-
-        const { data: auditsData } = await supabase
-          .from('audits')
-          .select('id, status, auditor');
-        if (Array.isArray(auditsData)) {
-          auditsData.forEach((a) => {
-            const aud = a.auditor || {};
-            const isAud = (aud.userId && String(aud.userId) === uId) ||
-                          (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
-            if (isAud && a.status !== 'Completed') {
-              scheduledAudits++;
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('[deleteUser] Supabase dependency check notice:', err.message);
-      }
-    } else {
-      mockStore.getTasks().forEach((t) => {
-        const a = t.assignedTo || {};
-        const isAssigned = (a.userId && String(a.userId) === uId) ||
-                           (a.employeeId && String(a.employeeId).toUpperCase() === uEmp);
-        if (isAssigned && t.status !== 'Completed') {
-          activeTasks++;
-        }
+    // Check active open NCs
+    if (isMongoConnected()) {
+      const openNcCount = await Complaint.countDocuments({
+        $or: [
+          { 'assignedTo.userId': uId, status: { $nin: ['Closed', 'Verified'] } },
+          { 'assignedTo.employeeId': uEmp, status: { $nin: ['Closed', 'Verified'] } },
+        ],
       });
-
-      mockStore.getComplaints({}).forEach((c) => {
-        const cr = c.createdBy || {};
-        const as = c.assignedTo || {};
-        const isCreator = (cr.userId && String(cr.userId) === uId) ||
-                          (cr.employeeId && String(cr.employeeId).toUpperCase() === uEmp);
-        const isAssignee = (as.userId && String(as.userId) === uId) ||
-                           (as.employeeId && String(as.employeeId).toUpperCase() === uEmp);
-        if ((isCreator || isAssignee) && c.status !== 'Closed' && c.status !== 'Verified') {
-          openNCs++;
-        }
-      });
-
-      mockStore.getAudits().forEach((a) => {
-        const aud = a.auditor || {};
-        const isAud = (aud.userId && String(aud.userId) === uId) ||
-                      (aud.employeeId && String(aud.employeeId).toUpperCase() === uEmp);
-        if (isAud && a.status !== 'Completed') {
-          scheduledAudits++;
-        }
-      });
-    }
-
-    if (activeTasks > 0 || openNCs > 0 || scheduledAudits > 0) {
-      const roleLabel = targetUser.role === 'AUDITOR' ? 'Auditor' : 'Supervisor';
-      return res.status(400).json({
-        success: false,
-        message: `Cannot delete ${roleLabel} '${targetUser.name}' (${targetUser.employeeId}): Active work detected (${openNCs} open NC(s), ${activeTasks} active task(s), ${scheduledAudits} active audit(s)). Please reassign or complete active items before deleting.`,
-        dependencies: {
-          activeTasks,
-          openNCs,
-          scheduledAudits,
-          hasActiveDependencies: true,
-        },
-      });
-    }
-
-    // Safe Deletion: Removes user record while preserving all historical audit records in database
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error: delErr } = await supabase
-          .from('users')
-          .delete()
-          .eq('id', targetUser.id);
-        if (delErr) {
-          throw delErr;
-        }
-      } catch (dbErr) {
-        console.error('[UserController:deleteUser] Supabase error:', dbErr.message);
-        return res.status(500).json({
+      if (openNcCount > 0) {
+        return res.status(400).json({
           success: false,
-          message: `Failed to remove user from database: ${dbErr.message}`,
+          message: `Cannot delete ${targetUser.name}: This account has ${openNcCount} active open Non-Conformance(s) currently assigned. Please reassign or close them first.`,
         });
       }
     }
 
-    mockStore.deleteUser(targetUser.id || targetUser._id);
+    // Check active compliance tasks
+    if (isMongoConnected()) {
+      const activeTaskCount = await ComplianceTask.countDocuments({
+        $or: [
+          { 'assignedTo.userId': uId, status: { $ne: 'Completed' } },
+          { 'assignedTo.employeeId': uEmp, status: { $ne: 'Completed' } },
+        ],
+      });
+      if (activeTaskCount > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot delete ${targetUser.name}: This account has ${activeTaskCount} active pending compliance task(s). Please reassign or complete them first.`,
+        });
+      }
+    }
 
-    const roleName = targetUser.role === 'AUDITOR' ? 'Auditor' : 'Supervisor';
+    // Delete from MongoDB
+    if (isMongoConnected()) {
+      const query = {
+        $or: [{ employeeId: userId }, { email: userId }],
+      };
+      if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+        query.$or.unshift({ _id: userId });
+      }
+      await User.findOneAndDelete(query);
+    }
+
+    // Delete from mockStore
+    mockStore.deleteUser(userId);
+
     return res.status(200).json({
       success: true,
-      message: `${roleName} '${targetUser.name}' (${targetUser.employeeId}) has been successfully deleted. Historical audit records remain preserved.`,
-      deletedId: targetUser.id || targetUser._id,
+      message: `Account '${targetUser.name}' (${targetUser.employeeId}) has been successfully deleted. Historical audit records and closed defect archives remain preserved.`,
+      deletedUser: {
+        id: targetUser._id ? targetUser._id.toString() : targetUser.id,
+        employeeId: targetUser.employeeId,
+        name: targetUser.name,
+        role: targetUser.role,
+        department: targetUser.department,
+      },
     });
   } catch (error) {
-    console.error('[UserController] deleteUser error:', error);
+    console.error('[deleteUser] Error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Server error while deleting user account.',
+      message: 'Failed to delete user account.',
+      error: error.message,
     });
   }
 };

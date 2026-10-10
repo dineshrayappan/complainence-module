@@ -2,6 +2,7 @@
 
 > Snapshot: 2026-09-30 · branch `main` @ `1fb056d` · working tree has one
 > unstaged change (`server/middleware/upload.js`, trailing-newline only)
+> NOTE: Database layer was migrated to MongoDB with Mongoose per user requirements. All Supabase dependencies and configs have been removed.
 
 ---
 
@@ -11,13 +12,12 @@ Single-repo Quality Management System for a textile/garment factory. Tracks
 Non-Conformance (NC) defects from floor capture through closed-loop CAP
 verification, with executive oversight dashboards.
 
-Not a Mongo app any more — migrated to Supabase Postgres in `ecdb321`. Mongo-era
-scar code is still present (see §4.6).
+Migrated to MongoDB with Mongoose (with resilient in-memory fallback for offline testability).
 
 | Package | Stack | Size |
 |---|---|---|
 | `client/` | React 18, Vite 5, Tailwind 3, Axios, lucide-react | ~9.4k LOC, 20 components |
-| `server/` | Express 4, Supabase JS, JWT, Multer, bcryptjs | ~6.2k LOC, 3 controllers |
+| `server/` | Express 4, MongoDB (Mongoose), JWT, Multer, bcryptjs | ~6.2k LOC, 3 controllers |
 | `api/` | Vercel serverless entrypoint | 4 lines |
 
 Total source: **~17.1k LOC** (excludes `node_modules`, `client/dist`, uploads).

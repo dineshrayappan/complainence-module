@@ -1,4 +1,9 @@
-const { supabase, isSupabaseConfigured } = require('../config/supabase');
+const { isMongoConnected } = require('../config/db');
+const Department = require('../models/Department');
+const User = require('../models/User');
+const Complaint = require('../models/Complaint');
+const ComplianceTask = require('../models/ComplianceTask');
+const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 
 // Helper to normalize department name
@@ -11,18 +16,17 @@ const getDepartments = async (req, res) => {
   try {
     let departments = [];
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: dbDepts, error } = await supabase
-          .from('departments')
-          .select('*')
-          .order('name', { ascending: true });
-
-        if (!error && Array.isArray(dbDepts) && dbDepts.length > 0) {
-          departments = dbDepts;
+        const dbDepts = await Department.find().sort({ name: 1 }).lean();
+        if (Array.isArray(dbDepts) && dbDepts.length > 0) {
+          departments = dbDepts.map((d) => ({
+            ...d,
+            id: d._id.toString(),
+          }));
         }
       } catch (err) {
-        console.warn('[getDepartments] Supabase query notice:', err.message);
+        console.warn('[getDepartments] MongoDB query notice:', err.message);
       }
     }
 
@@ -35,16 +39,16 @@ const getDepartments = async (req, res) => {
     let complaintsList = [];
     let tasksList = [];
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
         const [uRes, cRes, tRes] = await Promise.all([
-          supabase.from('users').select('id, department, isActive'),
-          supabase.from('complaints').select('id, department, status'),
-          supabase.from('compliance_tasks').select('id, department, status'),
+          User.find({ isActive: true }).select('department').lean(),
+          Complaint.find({ status: { $nin: ['Closed', 'Verified'] } }).select('department status').lean(),
+          ComplianceTask.find({ status: { $ne: 'Completed' } }).select('department status').lean(),
         ]);
-        if (Array.isArray(uRes.data)) usersList = uRes.data;
-        if (Array.isArray(cRes.data)) complaintsList = cRes.data;
-        if (Array.isArray(tRes.data)) tasksList = tRes.data;
+        usersList = uRes || [];
+        complaintsList = cRes || [];
+        tasksList = tRes || [];
       } catch (e) {}
     } else {
       usersList = mockStore.getUsers();
@@ -56,7 +60,7 @@ const getDepartments = async (req, res) => {
       const deptNameLower = (d.name || '').trim().toLowerCase();
 
       const personnelCount = usersList.filter(
-        (u) => (u.department || '').trim().toLowerCase() === deptNameLower && u.isActive !== false
+        (u) => (u.department || '').trim().toLowerCase() === deptNameLower
       ).length;
 
       const openNCs = complaintsList.filter((c) => {
@@ -70,8 +74,8 @@ const getDepartments = async (req, res) => {
       }).length;
 
       return {
-        id: d.id,
-        _id: d.id,
+        id: d.id || d._id,
+        _id: d.id || d._id,
         name: d.name,
         code: d.code,
         manager: d.manager || 'Unassigned',
@@ -105,14 +109,15 @@ const checkDepartmentDependencies = async (req, res) => {
     const deptId = req.params.id;
     let targetDept = null;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: dbDept } = await supabase
-          .from('departments')
-          .select('*')
-          .or(`id.eq.${deptId},name.ilike.${deptId}`)
-          .maybeSingle();
-        targetDept = dbDept;
+        const query = {
+          $or: [{ code: deptId.toUpperCase() }, { name: new RegExp(`^${deptId}$`, 'i') }],
+        };
+        if (deptId && typeof deptId === 'string' && deptId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: deptId });
+        }
+        targetDept = await Department.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -136,48 +141,35 @@ const checkDepartmentDependencies = async (req, res) => {
     let completedTasks = 0;
     let scheduledAudits = 0;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const [uRes, cRes, tRes, aRes] = await Promise.all([
-          supabase.from('users').select('id, name, employeeId, department, isActive'),
-          supabase.from('complaints').select('id, department, status'),
-          supabase.from('compliance_tasks').select('id, department, status'),
-          supabase.from('audits').select('id, department, status'),
-        ]);
+        activePersonnel = await User.countDocuments({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          isActive: true,
+        });
 
-        if (Array.isArray(uRes.data)) {
-          activePersonnel = uRes.data.filter(
-            (u) => (u.department || '').trim().toLowerCase() === deptNameLower && u.isActive !== false
-          ).length;
-        }
+        const complaints = await Complaint.find({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+        }).lean();
+        complaints.forEach((c) => {
+          if (c.status === 'Closed' || c.status === 'Verified') historicalNCs++;
+          else openNCs++;
+        });
 
-        if (Array.isArray(cRes.data)) {
-          cRes.data.forEach((c) => {
-            if ((c.department || '').trim().toLowerCase() === deptNameLower) {
-              if (c.status === 'Closed' || c.status === 'Verified') historicalNCs++;
-              else openNCs++;
-            }
-          });
-        }
+        const tasks = await ComplianceTask.find({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+        }).lean();
+        tasks.forEach((t) => {
+          if (t.status === 'Completed') completedTasks++;
+          else activeTasks++;
+        });
 
-        if (Array.isArray(tRes.data)) {
-          tRes.data.forEach((t) => {
-            if ((t.department || '').trim().toLowerCase() === deptNameLower) {
-              if (t.status === 'Completed') completedTasks++;
-              else activeTasks++;
-            }
-          });
-        }
-
-        if (Array.isArray(aRes.data)) {
-          aRes.data.forEach((a) => {
-            if ((a.department || '').trim().toLowerCase() === deptNameLower && a.status !== 'Completed') {
-              scheduledAudits++;
-            }
-          });
-        }
+        scheduledAudits = await Audit.countDocuments({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          status: { $ne: 'Completed' },
+        });
       } catch (err) {
-        console.warn('[checkDepartmentDependencies] Supabase inspection notice:', err.message);
+        console.warn('[checkDepartmentDependencies] MongoDB inspection notice:', err.message);
       }
     } else {
       activePersonnel = mockStore.getUsers().filter(
@@ -246,40 +238,37 @@ const createDepartment = async (req, res) => {
     const cleanName = name.trim();
     const cleanCode = code.trim().toUpperCase();
 
-    // Check duplicate in Supabase
-    if (isSupabaseConfigured && supabase) {
+    // Check duplicate in MongoDB
+    if (isMongoConnected()) {
       try {
-        const { data: existing } = await supabase
-          .from('departments')
-          .select('id, name, code')
-          .or(`name.ilike.${cleanName},code.ilike.${cleanCode}`)
-          .limit(1);
+        const existing = await Department.findOne({
+          $or: [
+            { name: new RegExp(`^${cleanName}$`, 'i') },
+            { code: cleanCode },
+          ],
+        });
 
-        if (existing && existing.length > 0) {
+        if (existing) {
           return res.status(400).json({
             success: false,
             message: `Department '${cleanName}' or Code '${cleanCode}' already exists in the system.`,
           });
         }
 
-        const newId = `dept-${Date.now().toString(36)}`;
-        const { data: inserted, error: insertErr } = await supabase
-          .from('departments')
-          .insert([
-            {
-              id: newId,
-              name: cleanName,
-              code: cleanCode,
-              manager: manager ? manager.trim() : 'Unassigned',
-              headcount: Number(headcount) || 20,
-            },
-          ])
-          .select()
-          .single();
+        const inserted = await Department.create({
+          name: cleanName,
+          code: cleanCode,
+          manager: manager ? manager.trim() : 'Unassigned',
+          headcount: Number(headcount) || 20,
+        });
 
-        if (insertErr) throw insertErr;
-
-        mockStore.createDepartment(inserted);
+        mockStore.createDepartment({
+          id: inserted._id.toString(),
+          name: inserted.name,
+          code: inserted.code,
+          manager: inserted.manager,
+          headcount: inserted.headcount,
+        });
 
         return res.status(201).json({
           success: true,
@@ -287,7 +276,7 @@ const createDepartment = async (req, res) => {
           department: inserted,
         });
       } catch (dbErr) {
-        console.error('[createDepartment] Supabase insert error:', dbErr.message);
+        console.error('[createDepartment] MongoDB insert error:', dbErr.message);
         return res.status(400).json({
           success: false,
           message: `Database error creating department: ${dbErr.message}`,
@@ -335,14 +324,15 @@ const deleteDepartment = async (req, res) => {
     const deptId = req.params.id;
     let targetDept = null;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const { data: dbDept } = await supabase
-          .from('departments')
-          .select('*')
-          .or(`id.eq.${deptId},name.ilike.${deptId}`)
-          .maybeSingle();
-        targetDept = dbDept;
+        const query = {
+          $or: [{ code: deptId.toUpperCase() }, { name: new RegExp(`^${deptId}$`, 'i') }],
+        };
+        if (deptId && typeof deptId === 'string' && deptId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: deptId });
+        }
+        targetDept = await Department.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -365,40 +355,29 @@ const deleteDepartment = async (req, res) => {
     let activeTasks = 0;
     let scheduledAudits = 0;
 
-    if (isSupabaseConfigured && supabase) {
+    if (isMongoConnected()) {
       try {
-        const [uRes, cRes, tRes, aRes] = await Promise.all([
-          supabase.from('users').select('id, department, isActive'),
-          supabase.from('complaints').select('id, department, status'),
-          supabase.from('compliance_tasks').select('id, department, status'),
-          supabase.from('audits').select('id, department, status'),
-        ]);
+        activePersonnel = await User.countDocuments({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          isActive: true,
+        });
 
-        if (Array.isArray(uRes.data)) {
-          activePersonnel = uRes.data.filter(
-            (u) => (u.department || '').trim().toLowerCase() === deptNameLower && u.isActive !== false
-          ).length;
-        }
+        openNCs = await Complaint.countDocuments({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          status: { $nin: ['Closed', 'Verified'] },
+        });
 
-        if (Array.isArray(cRes.data)) {
-          openNCs = cRes.data.filter(
-            (c) => (c.department || '').trim().toLowerCase() === deptNameLower && c.status !== 'Closed' && c.status !== 'Verified'
-          ).length;
-        }
+        activeTasks = await ComplianceTask.countDocuments({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          status: { $ne: 'Completed' },
+        });
 
-        if (Array.isArray(tRes.data)) {
-          activeTasks = tRes.data.filter(
-            (t) => (t.department || '').trim().toLowerCase() === deptNameLower && t.status !== 'Completed'
-          ).length;
-        }
-
-        if (Array.isArray(aRes.data)) {
-          scheduledAudits = aRes.data.filter(
-            (a) => (a.department || '').trim().toLowerCase() === deptNameLower && a.status !== 'Completed'
-          ).length;
-        }
+        scheduledAudits = await Audit.countDocuments({
+          department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          status: { $ne: 'Completed' },
+        });
       } catch (err) {
-        console.warn('[deleteDepartment] Supabase dependency check notice:', err.message);
+        console.warn('[deleteDepartment] Dependency inspection notice:', err.message);
       }
     } else {
       activePersonnel = mockStore.getUsers().filter(
@@ -418,53 +397,59 @@ const deleteDepartment = async (req, res) => {
       ).length;
     }
 
-    if (activePersonnel > 0 || openNCs > 0 || activeTasks > 0 || scheduledAudits > 0) {
+    // Safety guardrails
+    if (activePersonnel > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete department '${targetDept.name}': Active assignments detected (${activePersonnel} active personnel, ${openNCs} open NC(s), ${activeTasks} active task(s), ${scheduledAudits} scheduled audit(s)). Please reassign personnel and resolve open records before deleting.`,
-        dependencies: {
-          activePersonnel,
-          openNCs,
-          activeTasks,
-          scheduledAudits,
-          hasActiveDependencies: true,
-        },
+        message: `Cannot delete department '${targetDept.name}': There are currently ${activePersonnel} active employees assigned to this department. Please reassign or update them first.`,
       });
     }
 
-    // Safe Deletion: Removes department record from master table while keeping all historical audit records in database
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error: delErr } = await supabase
-          .from('departments')
-          .delete()
-          .eq('id', targetDept.id);
-
-        if (delErr) {
-          throw delErr;
-        }
-      } catch (dbErr) {
-        console.error('[DepartmentController:deleteDepartment] Supabase error:', dbErr.message);
-        return res.status(500).json({
-          success: false,
-          message: `Failed to remove department from database: ${dbErr.message}`,
-        });
-      }
+    if (openNCs > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete department '${targetDept.name}': There are ${openNCs} active open Non-Conformance tickets in this department that require rectification.`,
+      });
     }
 
-    mockStore.deleteDepartment(targetDept.id || targetDept.name);
+    if (activeTasks > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete department '${targetDept.name}': There are ${activeTasks} active compliance tasks scheduled.`,
+      });
+    }
+
+    if (scheduledAudits > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete department '${targetDept.name}': There are ${scheduledAudits} pending quality audits scheduled.`,
+      });
+    }
+
+    // Perform deletion
+    if (isMongoConnected()) {
+      const query = {
+        $or: [{ code: targetDept.code }, { name: targetDept.name }],
+      };
+      if (targetDept._id) {
+        query.$or.unshift({ _id: targetDept._id });
+      }
+      await Department.findOneAndDelete(query);
+    }
+
+    // Delete in mockStore
+    mockStore.deleteDepartment(targetDept.id || targetDept._id || targetDept.name);
 
     return res.status(200).json({
       success: true,
-      message: `Department '${targetDept.name}' (${targetDept.code}) has been deleted successfully. Historical compliance audit records remain preserved.`,
-      deletedId: targetDept.id,
-      deletedName: targetDept.name,
+      message: `Department '${targetDept.name}' (${targetDept.code}) has been deleted successfully. Historical audit records remain preserved.`,
+      deletedDepartment: targetDept,
     });
   } catch (error) {
     console.error('[DepartmentController] deleteDepartment error:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Server error while deleting department.',
+      message: error.message || 'Failed to delete department.',
     });
   }
 };

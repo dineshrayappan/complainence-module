@@ -6,7 +6,7 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
-const { supabase, isSupabaseConfigured, testConnection } = require('./config/supabase');
+const { connectDB, isMongoConnected } = require('./config/db');
 const { seedData } = require('./scripts/seed');
 
 const authRoutes = require('./routes/authRoutes');
@@ -40,15 +40,11 @@ const ensureDBConnected = async () => {
   if (!dbPromise) {
     dbPromise = (async () => {
       try {
-        if (isSupabaseConfigured && supabase) {
-          const connected = await testConnection();
-          if (connected) {
-            console.log('⚡ [Server] Supabase PostgreSQL operational.');
-          } else {
-            console.log('⚡ [Server] Supabase ping returned non-fatal notice. Operating with resilient fallback.');
-          }
+        const connected = await connectDB();
+        if (connected) {
+          console.log('⚡ [Server] MongoDB database operational.');
         } else {
-          console.log('⚡ [Server] Supabase not yet configured in .env. Resilient in-memory store active.');
+          console.log('⚡ [Server] Operating with resilient fallback store.');
         }
         await seedData();
       } catch (err) {
@@ -59,16 +55,6 @@ const ensureDBConnected = async () => {
   return dbPromise;
 };
 
-// Health check endpoint (always accessible without DB dependency)
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    system: 'Textile & Garment QMS Complaints System',
-    database: isSupabaseConfigured ? 'Supabase (PostgreSQL)' : 'In-Memory Resilient Store',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Ensure DB is ready on incoming API requests
 app.use('/api', async (req, res, next) => {
   try {
@@ -78,6 +64,16 @@ app.use('/api', async (req, res, next) => {
     console.error('[DB Initialization Error]:', err);
     next(err);
   }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    system: 'Textile & Garment QMS Complaints System',
+    database: isMongoConnected() ? 'MongoDB' : 'In-Memory Resilient Store',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // API Routes
@@ -107,7 +103,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Start standalone server only when executed directly (not when required as module or in serverless)
+// Start standalone server only when executed directly
 if (require.main === module) {
   ensureDBConnected()
     .then(() => {
@@ -116,7 +112,7 @@ if (require.main === module) {
         console.log(`🧵 GARMENT QMS SERVER ONLINE ON PORT ${PORT}`);
         console.log(`📍 REST API: http://localhost:${PORT}/api`);
         console.log(`📸 Proof Uploads: http://localhost:${PORT}/uploads`);
-        console.log(`🗄️ Database: ${isSupabaseConfigured ? 'Supabase PostgreSQL' : 'Resilient In-Memory Mode'}`);
+        console.log(`🗄️ Database: ${isMongoConnected() ? 'MongoDB' : 'Resilient In-Memory Mode'}`);
         console.log(`=======================================================`);
       });
     })

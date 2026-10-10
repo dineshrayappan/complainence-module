@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { supabase, isSupabaseConfigured } = require('../config/supabase');
+const { isMongoConnected } = require('../config/db');
+const User = require('../models/User');
 const mockStore = require('../config/mockStore');
 
 const verifyToken = async (req, res, next) => {
@@ -32,22 +33,25 @@ const verifyToken = async (req, res, next) => {
 
       let user = null;
 
-      // Try Supabase lookup if configured
-      if (isSupabaseConfigured && supabase) {
+      // Try MongoDB lookup if connected
+      if (isMongoConnected()) {
         try {
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .or(`id.eq.${decoded.id},employeeId.eq.${decoded.id},email.eq.${decoded.id}`)
-            .limit(1)
-            .maybeSingle();
+          const query = {
+            $or: [
+              { employeeId: decoded.id },
+              { email: decoded.id },
+            ],
+          };
+          if (decoded.id && decoded.id.match(/^[0-9a-fA-F]{24}$/)) {
+            query.$or.unshift({ _id: decoded.id });
+          }
 
-          if (!error && data) {
-            user = { ...data, _id: data.id };
-            delete user.password;
+          const found = await User.findOne(query).select('-password').lean();
+          if (found) {
+            user = { ...found, id: found._id.toString() };
           }
         } catch (dbErr) {
-          console.warn('[AuthMiddleware] Supabase query notice:', dbErr.message);
+          console.warn('[AuthMiddleware] MongoDB query notice:', dbErr.message);
         }
       }
 
@@ -56,7 +60,11 @@ const verifyToken = async (req, res, next) => {
         user =
           mockStore.findUserById(decoded.id) ||
           mockStore.getUsers().find(
-            (u) => u.employeeId === decoded.id || u._id === decoded.id || u.id === decoded.id || u.email === decoded.id
+            (u) =>
+              u.employeeId === decoded.id ||
+              u._id === decoded.id ||
+              u.id === decoded.id ||
+              u.email === decoded.id
           );
       }
 
