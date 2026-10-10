@@ -172,18 +172,13 @@ unauthenticated KPI call correctly 401s.
 
 Node v24.21.0, npm 11.19.0.
 
-### Demo credentials
+### Credentials
 
 | Role | Login | Password |
 |---|---|---|
 | Executive Admin | `admin` / `admin@factory.com` | `admin123` |
-| Auditor | `auditor` / `auditor@factory.com` | `auditor123` |
-| Auditor 2 | `dinesh` / `dinesh@factory.com` | `auditor123` |
-| Supervisor | `supervisor` / `supervisor@factory.com` | `supervisor123` |
-| Universal | `all` / `master` | `master123` |
 
-Short usernames (`admin`, `auditor`, …) are mapped to employee IDs in
-`authController.js:65-78`.
+Short username `admin` is mapped to employee ID `ADMIN`.
 
 ---
 

@@ -28,13 +28,9 @@ An enterprise-grade, closed-loop Quality Management & Defect Rectification Platf
 
 | Role | Employee ID | Email / Username Shortcut | Password | Scope & Authority |
 | :--- | :--- | :--- | :--- | :--- |
-| 👑 **Executive Admin** | `ADM-001` | `admin@factory.com` or `admin` | `admin123` | Executive oversight, user credential management, factory analytics |
-| 🛡️ **Quality Auditor** | `AUD-001` | `auditor@factory.com` or `auditor` | `auditor123` | Factory-wide defect logging, SLA governance, closure verification |
-| 🛡️ **Internal Auditor** | `AUD-002` | `dinesh@factory.com` or `dinesh` | `auditor123` | Internal Quality Auditor (Dinesh Rayappan) |
-| 🔧 **Line Supervisor** | `SUP-001` | `supervisor@factory.com` or `supervisor` | `supervisor123` | Sewing Line 1 in-charge, live 12–24h SLA clock, after-proof uploads |
-| 🌐 **Universal (All Roles)** | `ALL-001` | `all@factory.com` or `all` / `master` | `master123` | Master user with **Auditor, Admin, and Supervisor** access across all tabs |
+| 👑 **Executive Admin** | `ADMIN` / `ADM-001` | `admin@factory.com` or `admin` | `admin123` | Executive oversight, user credential management, factory analytics |
 
-> Additional Auditor or Line Supervisor accounts can also be created at any time using the **Register New User** button on the sign-in page or through the **Personnel Management** section inside the Executive Admin Portal.
+> Additional Auditor or Line Supervisor accounts can be created at any time through the **Personnel Management** section inside the Executive Admin Portal.
 
 ---
 

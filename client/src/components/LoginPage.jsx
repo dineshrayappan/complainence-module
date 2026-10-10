@@ -196,38 +196,6 @@ export const LoginPage = () => {
               </button>
             </div>
           </form>
-
-          {/* Quick Demo Role Selectors */}
-          <div className="mt-5 pt-3.5 border-t border-slate-100">
-            <div className="text-[11px] font-medium text-slate-400 text-center mb-2">
-              Other quick-fill factory accounts:
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('auditor@factory.com', 'auditor123')}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-medium border transition-all cursor-pointer text-center ${
-                  identifier === 'auditor@factory.com'
-                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                }`}
-              >
-                🔍 Auditor (auditor123)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickFill('supervisor@factory.com', 'supervisor123')}
-                className={`py-1.5 px-2 rounded-xl text-[11px] font-medium border transition-all cursor-pointer text-center ${
-                  identifier === 'supervisor@factory.com'
-                    ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                }`}
-              >
-                👷 Supervisor (supervisor123)
-              </button>
-            </div>
-          </div>
-
         </div>
 
         {/* Professional Tagline Below Login Card */}

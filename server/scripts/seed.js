@@ -41,17 +41,14 @@ const seedData = async () => {
         console.log('✅ [Seed] Standard factory departments seeded into MongoDB.');
       }
 
-      // Seed / Update standard users
+      // Seed / Update standard users - Keep ONLY Administrator
       const salt = await bcrypt.genSalt(10);
       const adminPassword = await bcrypt.hash('admin123', salt);
-      const auditorPassword = await bcrypt.hash('auditor123', salt);
-      const supervisorPassword = await bcrypt.hash('supervisor123', salt);
-      const masterPassword = await bcrypt.hash('master123', salt);
 
       const standardUsers = [
         {
           employeeId: 'ADM-001',
-          name: 'Anil Mehta',
+          name: 'Administrator',
           email: 'admin@factory.com',
           password: adminPassword,
           role: 'ADMIN',
@@ -60,128 +57,16 @@ const seedData = async () => {
           mobileNumber: '+91 98000 11223',
           isActive: true,
         },
-        {
-          employeeId: 'AUD-001',
-          name: 'Pooja Sharma',
-          email: 'auditor@factory.com',
-          password: auditorPassword,
-          role: 'AUDITOR',
-          department: 'Central Quality Audit',
-          designation: 'Senior QA Auditor',
-          mobileNumber: '+91 98765 43210',
-          isActive: true,
-        },
-        {
-          employeeId: 'AUD-002',
-          name: 'Dinesh Rayappan',
-          email: 'dineshrayappan.r@gmail.com',
-          password: auditorPassword,
-          role: 'AUDITOR',
-          department: 'Quality Assurance',
-          designation: 'Lead Quality Auditor',
-          mobileNumber: '+91 98765 43211',
-          isActive: true,
-        },
-        {
-          employeeId: 'ALL-001',
-          name: 'Master QA Director',
-          email: 'all@factory.com',
-          password: masterPassword,
-          role: 'ADMIN',
-          department: 'Executive Operations',
-          designation: 'Universal Multi-Role Director',
-          mobileNumber: '+91 99999 00000',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-001',
-          name: 'Ramesh Patel',
-          email: 'supervisor@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Production',
-          designation: 'Floor Supervisor',
-          mobileNumber: '+91 98111 22334',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-101',
-          name: 'Mohammad Arif',
-          email: 'arif@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Production',
-          designation: 'Sewing Line 1 In-Charge',
-          mobileNumber: '+91 98111 22335',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-102',
-          name: 'Priya Sharma',
-          email: 'priya@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Production',
-          designation: 'Sewing Line 2 In-Charge',
-          mobileNumber: '+91 98111 22336',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-103',
-          name: 'Kamal Hasan',
-          email: 'kamal@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Stores',
-          designation: 'Cutting Line Supervisor',
-          mobileNumber: '+91 98111 22337',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-104',
-          name: 'Sunita Roy',
-          email: 'sunita@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Maintenance',
-          designation: 'Finishing & Packing Lead',
-          mobileNumber: '+91 98111 22338',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-105',
-          name: 'Ramesh Patel',
-          email: 'ramesh@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Stores',
-          designation: 'Stores & Trims In-Charge',
-          mobileNumber: '+91 98111 22339',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-106',
-          name: 'Kavita Deshmukh',
-          email: 'kavita@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'EHS',
-          designation: 'EHS & Plant Safety Lead',
-          mobileNumber: '+91 98111 22340',
-          isActive: true,
-        },
-        {
-          employeeId: 'SUP-999',
-          name: 'Vikram Malhotra',
-          email: 'vikram@factory.com',
-          password: supervisorPassword,
-          role: 'ACTION_PERSON',
-          department: 'Quality',
-          designation: 'End-Line QC Supervisor',
-          mobileNumber: '+91 98111 22341',
-          isActive: true,
-        },
       ];
+
+      // Remove demo non-admin users so only production Admin remains
+      await User.deleteMany({
+        $or: [
+          { role: { $ne: 'ADMIN' } },
+          { email: { $in: ['auditor@factory.com', 'dineshrayappan.r@gmail.com', 'all@factory.com', 'supervisor@factory.com', 'arif@factory.com', 'priya@factory.com', 'kamal@factory.com', 'sunita@factory.com', 'ramesh@factory.com', 'kavita@factory.com', 'vikram@factory.com'] } }
+        ],
+        employeeId: { $nin: ['ADMIN', 'ADM-001'] },
+      });
 
       for (const u of standardUsers) {
         const query =
@@ -198,7 +83,7 @@ const seedData = async () => {
       const { ensureDefaultAdminUser } = require('../utils/defaultAdmin');
       await ensureDefaultAdminUser();
 
-      console.log('✅ [Seed] Standard factory users verified in MongoDB.');
+      console.log('✅ [Seed] Administrator user verified in MongoDB (demo data purged).');
     } catch (err) {
       console.warn('⚠️ [Seed] MongoDB seed notice:', err.message);
     }
