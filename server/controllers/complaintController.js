@@ -784,6 +784,12 @@ const getComplaintById = async (req, res) => {
 
 const markInProgress = async (req, res) => {
   try {
+    if (req.user && req.user.role === 'AUDITOR') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: Auditors cannot start floor containment tasks. Start and Stop work is reserved for Department Supervisors.',
+      });
+    }
     const paramId = req.params.id;
     const now = new Date();
 
@@ -889,6 +895,12 @@ const markInProgress = async (req, res) => {
 // @access  Private (Action Person, Supervisor, Auditor, Admin)
 const pauseProgress = async (req, res) => {
   try {
+    if (req.user && req.user.role === 'AUDITOR') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access Denied: Auditors cannot pause floor containment tasks. Start and Stop work is reserved for Department Supervisors.',
+      });
+    }
     const paramId = req.params.id;
     const { reason } = req.body || {};
     const now = new Date();

@@ -707,14 +707,16 @@ export const DepartmentWorkOperations = ({
                   const winner = task.completedBy || task.firstCompleter || task.assignedTo;
 
                   // Department permission check:
-                  // Elevated users or matching department employee can interact with this task
-                  const isElevatedUser = isAdmin || user?.role === 'AUDITOR' || user?.isUniversal;
+                  // Elevated floor supervisors or matching department employee can interact with this task.
+                  // Auditors monitor and verify, but cannot execute floor containment.
+                  const isAuditorUser = user?.role === 'AUDITOR';
+                  const isElevatedUser = !isAuditorUser && (isAdmin || user?.isUniversal);
                   const userDept = (user?.department || '').trim().toLowerCase();
                   const taskDept = (task.department || '').trim().toLowerCase();
                   const isDirectlyAssigned =
                     (task.assignedTo?.employeeId || '').toUpperCase() === uEmp ||
                     task.assignedTo?.userId === user?.id;
-                  const isEligibleWorker = isElevatedUser || isDirectlyAssigned || (userDept && taskDept && userDept === taskDept);
+                  const isEligibleWorker = !isAuditorUser && (isElevatedUser || isDirectlyAssigned || (userDept && taskDept && userDept === taskDept));
 
                   // Is this user already busy working on another task?
                   const isUserBusyOnOtherTask = Boolean(currentUserActiveTask && currentUserActiveTask.id !== task.id);

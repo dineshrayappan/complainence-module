@@ -75,12 +75,15 @@ export const ComplaintCard = ({
   const compDept = (complaint.department || '').trim().toLowerCase();
   const userDept = (user?.department || '').trim().toLowerCase();
 
-  // Strict assignment check: Only the specifically assigned supervisor (or Auditor/Admin) can act
-  const isAssignedSupervisor = isActionPerson && (
+  // Strict assignment check: Only the specifically assigned supervisor can start/stop floor work.
+  // Auditors audit and verify; they do NOT have Start Work or Stop Work buttons.
+  const isAuditorUser = user?.role === 'AUDITOR';
+  const isAssignedSupervisor = !isAuditorUser && isActionPerson && (
     (userEmpId && assignedEmpId && userEmpId === assignedEmpId) ||
-    (currentUserId && assignedUserId && currentUserId === assignedUserId)
+    (currentUserId && assignedUserId && currentUserId === assignedUserId) ||
+    (compDept && userDept && compDept === userDept)
   );
-  const canActionPersonAct = isAuditor || isAdmin || isAssignedSupervisor;
+  const canActionPersonAct = isAssignedSupervisor;
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-3.5 sm:p-5 transition-all duration-200 shadow-xs hover:shadow-md flex flex-col justify-between group">

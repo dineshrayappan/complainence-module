@@ -77,11 +77,13 @@ export const ComplaintTable = ({
             const currentUserId = user?._id?.toString();
             const assignedEmpId = (c.assignedTo?.employeeId || '').toUpperCase();
             const userEmpId = (user?.employeeId || '').toUpperCase();
-            const isAssignedSupervisor = isActionPerson && (
+            const isAuditorUser = user?.role === 'AUDITOR';
+            const isAssignedSupervisor = !isAuditorUser && isActionPerson && (
               (userEmpId && assignedEmpId && userEmpId === assignedEmpId) ||
-              (currentUserId && assignedUserId && currentUserId === assignedUserId)
+              (currentUserId && assignedUserId && currentUserId === assignedUserId) ||
+              (c.department && user?.department && c.department.toLowerCase() === user.department.toLowerCase())
             );
-            const canAct = isAuditor || isAdmin || isAssignedSupervisor;
+            const canFloorAct = isAssignedSupervisor;
 
             return (
               <tr
@@ -180,7 +182,7 @@ export const ComplaintTable = ({
                 >
                   <div className="flex items-center justify-end gap-2">
                     {/* Action Button for Supervisor: Start when Open/Assigned, Stop when In Progress */}
-                    {canAct &&
+                    {canFloorAct &&
                       ['Open', 'Assigned', 'Draft', 'Rejected / Rework', 'Rejected / Sent Back'].includes(c.status) && (
                         <button
                           onClick={() => (onStartProgress ? onStartProgress(c) : onSubmitAction(c))}
@@ -192,7 +194,7 @@ export const ComplaintTable = ({
                         </button>
                       )}
 
-                    {canAct && c.status === 'In Progress' && (
+                    {canFloorAct && c.status === 'In Progress' && (
                       <button
                         onClick={() => onSubmitAction(c)}
                         className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs animate-pulse transition-all active:scale-95 cursor-pointer"
