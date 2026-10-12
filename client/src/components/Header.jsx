@@ -113,7 +113,7 @@ export const Header = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm sm:text-base lg:text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase font-sans truncate">
-                    GARMENT COMPLIANCE MANAGEMENT
+                    COMPLIANCE MANAGEMENT
                   </span>
                   <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
