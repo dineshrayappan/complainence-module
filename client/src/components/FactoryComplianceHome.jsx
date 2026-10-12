@@ -622,62 +622,6 @@ export const FactoryComplianceHome = ({
         </div>
       </div>
 
-      {/* LOWER COMPLIANCE STANDARDS & AUDIT QUICK GLANCE */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* ISO 9001 Standard */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
-              ISO
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">
-                ISO 9001:2015 QMS
-              </div>
-              <div className="text-[11px] text-slate-500">Quality Management System</div>
-            </div>
-          </div>
-          <span className="text-xs font-mono font-extrabold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10">
-            94%
-          </span>
-        </div>
-
-        {/* SA8000 Social Accountability */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-xs">
-              SA
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">
-                SA8000 Standard
-              </div>
-              <div className="text-[11px] text-slate-500">Social & Safety Compliance</div>
-            </div>
-          </div>
-          <span className="text-xs font-mono font-extrabold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10">
-            92%
-          </span>
-        </div>
-
-        {/* WRAP / OEKO-TEX */}
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-xs">
-              WRAP
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-900 dark:text-white">
-                WRAP & OEKO-TEX
-              </div>
-              <div className="text-[11px] text-slate-500">Apparel Production Certification</div>
-            </div>
-          </div>
-          <span className="text-xs font-mono font-extrabold text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-500/10">
-            96%
-          </span>
-        </div>
-      </div>
     </div>
   );
 };

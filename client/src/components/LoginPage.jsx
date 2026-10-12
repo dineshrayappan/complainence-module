@@ -156,7 +156,7 @@ export const LoginPage = () => {
             Compliance Management & Action Tracking
           </p>
           <p className="text-[11px] text-white/80 mt-1 drop-shadow-2xs">
-            Enterprise QMS • ISO 9001:2015 & Buyer Compliance Platform
+            Enterprise Closed-Loop Garment Audit & Action Tracking Platform
           </p>
         </div>
       </div>

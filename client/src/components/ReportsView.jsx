@@ -175,7 +175,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.text(
-        'Plant Unit #4 • ISO 9001:2015 & Buyer Compliance Register',
+        'Plant Unit #4 • Garment Audit & Action Compliance Register',
         pageWidth - margin,
         28,
         { align: 'right' }
