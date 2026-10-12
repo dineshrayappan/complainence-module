@@ -5,9 +5,17 @@ const Complaint = require('../models/Complaint');
 const ComplianceTask = require('../models/ComplianceTask');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
+const {
+  getDailyAttendanceMap,
+  evaluateUserDailyAttendance,
+  getTodayISTString,
+} = require('../utils/attendanceHelper');
 
-const formatUser = (u) => {
+const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
   if (!u) return null;
+  const att = evaluateUserDailyAttendance(u, attendanceMap, dateString);
+  const isPresent = att.isPresent;
+
   return {
     _id: u._id ? u._id.toString() : u.id,
     id: u._id ? u._id.toString() : u.id,
@@ -19,8 +27,11 @@ const formatUser = (u) => {
     designation: u.designation,
     mobileNumber: u.mobileNumber,
     isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
-    isPresent: typeof u.isPresent !== 'undefined' ? Boolean(u.isPresent) : false,
-    attendance: u.isPresent ? 'Present' : 'Absent',
+    isPresent,
+    attendance: isPresent ? 'Present' : 'Absent',
+    attendanceStatus: isPresent ? 'Present' : 'Absent',
+    attendanceDate: att.date,
+    loginTimestamp: att.loginTimestamp || u.lastLoginAt || null,
     lastLoginAt: u.lastLoginAt || null,
     lastLogoutAt: u.lastLogoutAt || null,
     createdAt: u.createdAt,
@@ -33,6 +44,9 @@ const formatUser = (u) => {
 // @access  Private (Auditor or Authenticated)
 const getLineSupervisors = async (req, res) => {
   try {
+    const todayDate = req.query?.date || getTodayISTString();
+    const attendanceMap = await getDailyAttendanceMap(todayDate);
+
     if (!isMongoConnected()) {
       await connectDB();
     }
@@ -46,7 +60,7 @@ const getLineSupervisors = async (req, res) => {
           .lean();
 
         if (data && data.length > 0) {
-          const supervisors = data.map(formatUser);
+          const supervisors = data.map((u) => formatUser(u, attendanceMap, todayDate));
           return res.status(200).json({
             success: true,
             count: supervisors.length,
@@ -61,7 +75,7 @@ const getLineSupervisors = async (req, res) => {
     const supervisors = mockStore
       .getUsers()
       .filter((u) => (u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR') && u.isActive)
-      .map(formatUser);
+      .map((u) => formatUser(u, attendanceMap, todayDate));
 
     res.status(200).json({
       success: true,
@@ -82,7 +96,9 @@ const getLineSupervisors = async (req, res) => {
 // @access  Private (Admin or Authenticated)
 const getAllUsers = async (req, res) => {
   try {
-    const { role, department, search, isActive } = req.query;
+    const { role, department, search, isActive, date } = req.query;
+    const todayDate = date || getTodayISTString();
+    const attendanceMap = await getDailyAttendanceMap(todayDate);
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -91,7 +107,7 @@ const getAllUsers = async (req, res) => {
       try {
         const query = {};
 
-        if (role) {
+        if (role && role !== 'PRESENT' && role !== 'ABSENT') {
           if (role === 'SUPERVISOR') {
             query.role = { $in: ['ACTION_PERSON', 'SUPERVISOR'] };
           } else {
@@ -121,10 +137,18 @@ const getAllUsers = async (req, res) => {
         const data = await User.find(query).sort({ role: 1, name: 1 }).lean();
 
         if (data) {
-          const users = data.map(formatUser);
+          let users = data.map((u) => formatUser(u, attendanceMap, todayDate));
+
+          if (role === 'PRESENT') {
+            users = users.filter((u) => u.isPresent);
+          } else if (role === 'ABSENT') {
+            users = users.filter((u) => !u.isPresent);
+          }
+
           return res.status(200).json({
             success: true,
             count: users.length,
+            date: todayDate,
             users,
           });
         }
@@ -135,7 +159,7 @@ const getAllUsers = async (req, res) => {
 
     // Fallback store filtering
     let users = mockStore.getUsers();
-    if (role) {
+    if (role && role !== 'PRESENT' && role !== 'ABSENT') {
       if (role === 'SUPERVISOR') {
         users = users.filter((u) => u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR');
       } else {
@@ -158,16 +182,26 @@ const getAllUsers = async (req, res) => {
           u.department?.toLowerCase().includes(q)
       );
     }
+    let formattedUsers = users.map((u) => formatUser(u, attendanceMap, todayDate));
+    if (role === 'PRESENT') {
+      formattedUsers = formattedUsers.filter((u) => u.isPresent);
+    } else if (role === 'ABSENT') {
+      formattedUsers = formattedUsers.filter((u) => !u.isPresent);
+    }
+
     return res.status(200).json({
       success: true,
-      count: users.length,
-      users: users.map(formatUser),
+      count: formattedUsers.length,
+      date: todayDate,
+      users: formattedUsers,
     });
   } catch (error) {
-    const users = mockStore.getUsers().map(formatUser);
+    const todayDate = getTodayISTString();
+    const users = mockStore.getUsers().map((u) => formatUser(u, null, todayDate));
     res.status(200).json({
       success: true,
       count: users.length,
+      date: todayDate,
       users,
     });
   }
@@ -771,9 +805,60 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// @desc    Get daily attendance summary & details across all department users
+// @route   GET /api/users/attendance/today
+// @access  Private (Admin, Auditor & Authenticated)
+const getTodayAttendance = async (req, res) => {
+  try {
+    const todayDate = req.query.date || getTodayISTString();
+    const attendanceMap = await getDailyAttendanceMap(todayDate);
+
+    let users = [];
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
+    if (isMongoConnected()) {
+      try {
+        const dbUsers = await User.find({ isActive: true }).sort({ department: 1, name: 1 }).lean();
+        if (dbUsers) users = dbUsers;
+      } catch (e) {
+        console.warn('[UserController:getTodayAttendance] MongoDB query notice:', e.message);
+      }
+    }
+    if (!users || users.length === 0) {
+      users = mockStore.getUsers().filter((u) => u.isActive !== false);
+    }
+
+    const formattedUsers = users.map((u) => formatUser(u, attendanceMap, todayDate));
+    const presentUsers = formattedUsers.filter((u) => u.isPresent);
+    const absentUsers = formattedUsers.filter((u) => !u.isPresent);
+
+    res.status(200).json({
+      success: true,
+      date: todayDate,
+      timezone: 'Asia/Kolkata',
+      summary: {
+        total: formattedUsers.length,
+        present: presentUsers.length,
+        absent: absentUsers.length,
+      },
+      presentUsers,
+      absentUsers,
+      allUsers: formattedUsers,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve daily attendance.',
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   getLineSupervisors,
   getAllUsers,
+  getTodayAttendance,
   createUser,
   updateUser,
   resetUserPassword,

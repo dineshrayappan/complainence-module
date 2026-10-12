@@ -4,6 +4,11 @@ const Complaint = require('../models/Complaint');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
+const {
+  getDailyAttendanceMap,
+  evaluateUserDailyAttendance,
+  getTodayISTString,
+} = require('../utils/attendanceHelper');
 
 /**
  * Compliance Tasks
@@ -983,7 +988,9 @@ const deleteTask = async (req, res) => {
 // @access  Private (Authenticated users, Admin & Auditor oversight)
 const getEmployeeWorkStatus = async (req, res) => {
   try {
-    const { department } = req.query;
+    const { department, date } = req.query;
+    const todayDate = date || getTodayISTString();
+    const attendanceMap = await getDailyAttendanceMap(todayDate);
 
     // 1. Fetch all users
     let allUsers = [];
@@ -1123,9 +1130,11 @@ const getEmployeeWorkStatus = async (req, res) => {
         return false;
       });
 
-      // A person is Present if they have logged in (user.isPresent = true) or are actively working on the floor;
-      // otherwise they are Absent.
-      const isPresent = Boolean(user.isPresent || activeNC || activeTask);
+      // Daily attendance status is evaluated strictly from the persistent Attendance database for today's date in IST
+      const att = evaluateUserDailyAttendance(user, attendanceMap, todayDate);
+      const isPresent = att.isPresent;
+      const attendanceStatus = att.attendanceStatus; // 'Present' or 'Absent'
+
       let status = isPresent ? 'Available' : 'Absent';
       let currentTask = null;
       let startTime = null;
@@ -1167,7 +1176,7 @@ const getEmployeeWorkStatus = async (req, res) => {
         startTime = workerEntry?.startedAt || activeTask.startedAt || activeTask.updatedAt || null;
         proofStatus = 'Pending Upload';
       } else if (!isPresent) {
-        // Person has not logged in -> Absent
+        // Person has not logged in today -> Absent
         status = 'Absent';
         if (openDeptTask) {
           currentTask = {
@@ -1252,7 +1261,10 @@ const getEmployeeWorkStatus = async (req, res) => {
         designation: user.designation,
         role: user.role,
         isPresent,
-        attendance: isPresent ? 'Present' : 'Absent',
+        attendance: attendanceStatus,
+        attendanceStatus,
+        attendanceDate: att.date,
+        loginTimestamp: att.loginTimestamp || (isPresent ? user.lastLoginAt : null),
         status, // 'Available' | 'In Progress / Busy' | 'Completed' | 'Absent'
         assignedTask: currentTask,
         openTask: openDeptTask ? { id: openDeptTask.id, title: openDeptTask.title } : null,
@@ -1281,6 +1293,8 @@ const getEmployeeWorkStatus = async (req, res) => {
     // Summary counts
     const summary = {
       totalEmployees: employeeStatuses.length,
+      present: employeeStatuses.filter((e) => e.isPresent).length,
+      absent: employeeStatuses.filter((e) => !e.isPresent).length,
       available: employeeStatuses.filter((e) => e.status === 'Available').length,
       inProgress: employeeStatuses.filter((e) => e.status === 'In Progress / Busy').length,
       completed: employeeStatuses.filter((e) => e.status === 'Completed').length,
@@ -1289,6 +1303,7 @@ const getEmployeeWorkStatus = async (req, res) => {
     res.json({
       success: true,
       department: department || 'ALL',
+      date: todayDate,
       summary,
       employees: employeeStatuses,
       firstFinisher: completedEmployees.length > 0 ? completedEmployees[0] : null,

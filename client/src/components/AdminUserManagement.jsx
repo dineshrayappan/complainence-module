@@ -868,7 +868,7 @@ export const AdminUserManagement = () => {
                               ? 'bg-slate-400'
                               : 'bg-rose-500'
                           }`}
-                          title={u.isPresent ? 'Present (Active Session)' : 'Absent (Not Logged In)'}
+                          title={u.isPresent ? 'Present (Daily Attendance: Present)' : 'Absent (Daily Attendance: Absent)'}
                         />
                       </div>
 
@@ -966,14 +966,21 @@ export const AdminUserManagement = () => {
                     </div>
 
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-400 text-[10px]">Duty / Attendance:</span>
+                      <span className="text-slate-400 text-[10px]">Daily Attendance:</span>
                       <span
-                        className={`text-[10px] font-bold inline-flex items-center gap-1.5 ${
-                          u.isPresent ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                        className={`text-[10px] font-bold inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${
+                          u.isPresent
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
                         }`}
                       >
                         <span className={`w-2 h-2 rounded-full ${u.isPresent ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                        <span>{u.isPresent ? 'Present (Logged In)' : 'Absent (Not Logged In)'}</span>
+                        <span>{u.isPresent ? 'Present' : 'Absent'}</span>
+                        {u.loginTimestamp && (
+                          <span className="text-[9px] font-normal opacity-80">
+                            • {new Date(u.loginTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>

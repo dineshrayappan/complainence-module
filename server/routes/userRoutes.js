@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getLineSupervisors,
   getAllUsers,
+  getTodayAttendance,
   createUser,
   updateUser,
   resetUserPassword,
@@ -14,6 +15,9 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 
 // Line In-Charges master contact list (for assignment dropdown)
 router.get('/line-supervisors', verifyToken, getLineSupervisors);
+
+// Daily Attendance status endpoint for Admin & Auditor oversight
+router.get('/attendance/today', verifyToken, getTodayAttendance);
 
 // Users Directory (Admin and internal authenticated users)
 router.get('/', verifyToken, getAllUsers);

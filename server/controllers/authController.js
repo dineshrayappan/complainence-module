@@ -3,6 +3,12 @@ const bcrypt = require('bcryptjs');
 const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const mockStore = require('../config/mockStore');
+const {
+  recordDailyLoginAttendance,
+  getDailyAttendanceMap,
+  evaluateUserDailyAttendance,
+  getTodayISTString,
+} = require('../utils/attendanceHelper');
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -32,6 +38,8 @@ const formatUserResponse = (user, expectedRole) => {
         : expectedRole;
   }
 
+  const isPresent = typeof user.isPresent !== 'undefined' ? Boolean(user.isPresent) : false;
+
   return {
     _id: user._id ? user._id.toString() : user.id,
     id: user._id ? user._id.toString() : user.id,
@@ -43,7 +51,11 @@ const formatUserResponse = (user, expectedRole) => {
     designation: user.designation,
     mobileNumber: user.mobileNumber,
     isActive: typeof user.isActive !== 'undefined' ? user.isActive : true,
-    isPresent: typeof user.isPresent !== 'undefined' ? Boolean(user.isPresent) : false,
+    isPresent,
+    attendance: isPresent ? 'Present' : 'Absent',
+    attendanceStatus: isPresent ? 'Present' : 'Absent',
+    attendanceDate: user.attendanceDate || null,
+    loginTimestamp: user.loginTimestamp || user.lastLoginAt || null,
     lastLoginAt: user.lastLoginAt || null,
     lastLogoutAt: user.lastLogoutAt || null,
     isUniversal: !!isUniversal,
@@ -104,10 +116,16 @@ const login = async (req, res) => {
           const now = new Date();
           user.isPresent = true;
           user.lastLoginAt = now;
+          user.attendanceDate = getTodayISTString(now);
+          user.attendanceStatus = 'Present';
+          user.loginTimestamp = now;
+
+          // Record daily attendance in database
           try {
-            await User.findByIdAndUpdate(user._id, { isPresent: true, lastLoginAt: now });
-          } catch (e) {}
-          mockStore.updateUser(user._id.toString(), { isPresent: true, lastLoginAt: now });
+            await recordDailyLoginAttendance(user, now);
+          } catch (attErr) {
+            console.warn('[AuthController:login] Attendance record notice:', attErr.message);
+          }
 
           const token = generateToken(user._id.toString());
           return res.status(200).json({
@@ -156,7 +174,15 @@ const login = async (req, res) => {
     const now = new Date();
     user.isPresent = true;
     user.lastLoginAt = now;
-    mockStore.updateUser(user._id || user.id, { isPresent: true, lastLoginAt: now });
+    user.attendanceDate = getTodayISTString(now);
+    user.attendanceStatus = 'Present';
+    user.loginTimestamp = now;
+
+    try {
+      await recordDailyLoginAttendance(user, now);
+    } catch (attErr) {
+      console.warn('[AuthController:login:fallback] Attendance record notice:', attErr.message);
+    }
 
     const token = generateToken(user._id || user.id);
     return res.status(200).json({
@@ -285,6 +311,8 @@ const register = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
+    const todayDate = getTodayISTString();
+    const attendanceMap = await getDailyAttendanceMap(todayDate);
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -300,13 +328,12 @@ const getMe = async (req, res) => {
         const data = await User.findOne(query).select('-password').lean();
 
         if (data) {
-          if (!data.isPresent) {
-            try {
-              await User.updateOne({ _id: data._id }, { isPresent: true });
-            } catch (e) {}
-            data.isPresent = true;
-          }
-          mockStore.updateUser(data._id.toString(), { isPresent: true });
+          const att = evaluateUserDailyAttendance(data, attendanceMap, todayDate);
+          data.isPresent = att.isPresent;
+          data.attendanceStatus = att.attendanceStatus;
+          data.loginTimestamp = att.loginTimestamp;
+          data.attendanceDate = att.date;
+
           return res.status(200).json({
             success: true,
             user: formatUserResponse(data),
@@ -319,8 +346,11 @@ const getMe = async (req, res) => {
 
     const fallbackUser = mockStore.findUserById(userId) || req.user;
     if (fallbackUser) {
-      fallbackUser.isPresent = true;
-      mockStore.updateUser(fallbackUser._id || fallbackUser.id, { isPresent: true });
+      const att = evaluateUserDailyAttendance(fallbackUser, attendanceMap, todayDate);
+      fallbackUser.isPresent = att.isPresent;
+      fallbackUser.attendanceStatus = att.attendanceStatus;
+      fallbackUser.loginTimestamp = att.loginTimestamp;
+      fallbackUser.attendanceDate = att.date;
     }
     res.status(200).json({
       success: true,
@@ -335,7 +365,7 @@ const getMe = async (req, res) => {
   }
 };
 
-// @desc    Sign out user & mark as absent
+// @desc    Sign out user (daily attendance status is PRESERVED as Present for the current business day)
 // @route   POST /api/auth/logout
 // @access  Public / Private
 const logout = async (req, res) => {
@@ -349,8 +379,9 @@ const logout = async (req, res) => {
         if (typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: userId });
         }
+        // Record logout timestamp only. DO NOT reset attendance status to Absent;
+        // Daily attendance remains "Present" for the entire day.
         await User.updateMany(query, {
-          isPresent: false,
           lastLogoutAt: now,
         });
       } catch (e) {
@@ -360,14 +391,13 @@ const logout = async (req, res) => {
 
     if (userId) {
       mockStore.updateUser(userId.toString(), {
-        isPresent: false,
         lastLogoutAt: now,
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'User signed out. Status marked as Absent.',
+      message: 'User signed out. Daily attendance status remains Present for today.',
     });
   } catch (error) {
     console.error('[AuthController:logout] Error:', error);

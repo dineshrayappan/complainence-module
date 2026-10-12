@@ -320,6 +320,36 @@ module.exports = {
     const removed = mockDepartments.splice(idx, 1)[0];
     return removed;
   },
+  recordAttendance: (userData, dateString, timestamp = new Date()) => {
+    const empId = (userData.employeeId || '').toUpperCase().trim();
+    const existing = mockAttendance.find(
+      (a) => a.employeeId === empId && a.date === dateString
+    );
+    if (!existing) {
+      const rec = {
+        id: `att-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        userId: userData.userId || userData._id || userData.id,
+        employeeId: empId,
+        name: userData.name || '',
+        department: userData.department || '',
+        role: userData.role || 'ACTION_PERSON',
+        date: dateString,
+        status: 'Present',
+        loginTimestamp: timestamp,
+        lastLoginAt: timestamp,
+      };
+      mockAttendance.push(rec);
+      return rec;
+    } else {
+      existing.status = 'Present';
+      existing.lastLoginAt = timestamp;
+      return existing;
+    }
+  },
+  getAttendanceByDate: (dateString) => {
+    return mockAttendance.filter((a) => a.date === dateString);
+  },
+  getAllAttendance: () => [...mockAttendance],
 };
 
 let mockDepartments = [
@@ -332,10 +362,11 @@ let mockDepartments = [
   { id: 'dept-07', name: 'HR', code: 'HR', manager: 'Meera Swaminathan', headcount: 15 },
 ];
 
+let mockAttendance = [];
+
 let mockTasks = [];
 
 let mockAudits = [];
-
 
 let complianceThresholds = {
   highThreshold: 90,     // >= 90% is Green

@@ -129,6 +129,8 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
       if (employeeStatusFilter === 'AVAILABLE') return emp.status === 'Available';
       if (employeeStatusFilter === 'BUSY') return emp.status === 'In Progress / Busy';
       if (employeeStatusFilter === 'COMPLETED') return emp.status === 'Completed';
+      if (employeeStatusFilter === 'PRESENT') return emp.isPresent || emp.attendance === 'Present';
+      if (employeeStatusFilter === 'ABSENT') return !emp.isPresent && emp.attendance !== 'Present';
       return true;
     })
     .filter((emp) => {
@@ -270,7 +272,9 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                 <Users className="w-5 h-5 text-indigo-600" />
                 <span>{liveStatusData?.summary?.totalEmployees ?? 0}</span>
               </div>
-              <span className="text-[11px] text-slate-500 mt-1 block">Active plant workers</span>
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                Today: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{liveStatusData?.summary?.present ?? 0} Present</strong> • <span className="text-slate-400">{liveStatusData?.summary?.absent ?? 0} Absent</span>
+              </span>
             </div>
 
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
@@ -425,6 +429,8 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                   className="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
                 >
                   <option value="ALL">All Statuses</option>
+                  <option value="PRESENT">🟢 Present ({liveStatusData?.summary?.present ?? 0})</option>
+                  <option value="ABSENT">⚪ Absent ({liveStatusData?.summary?.absent ?? 0})</option>
                   <option value="AVAILABLE">Available (Idle)</option>
                   <option value="BUSY">In Progress / Busy</option>
                   <option value="COMPLETED">Completed</option>
@@ -450,6 +456,7 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                   <tr>
                     <th className="py-3.5 px-4 font-bold">Employee Name & ID</th>
                     <th className="py-3.5 px-4 font-bold">Department</th>
+                    <th className="py-3.5 px-4 font-bold text-center">Daily Attendance</th>
                     <th className="py-3.5 px-4 font-bold text-center">Availability Status</th>
                     <th className="py-3.5 px-4 font-bold">Assigned Task</th>
                     <th className="py-3.5 px-3 font-bold">Start Time</th>
@@ -462,7 +469,7 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
                   {filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-slate-400 text-xs font-mono">
+                      <td colSpan={10} className="py-12 text-center text-slate-400 text-xs font-mono">
                         No employees found matching the current filters.
                       </td>
                     </tr>
@@ -512,6 +519,28 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                             <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               {emp.department}
                             </span>
+                          </td>
+
+                          {/* Daily Attendance */}
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {emp.isPresent || emp.attendance === 'Present' || emp.attendanceStatus === 'Present' ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-400/50" />
+                                  <span>Present</span>
+                                </span>
+                                {emp.loginTimestamp && (
+                                  <span className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                    {new Date(emp.loginTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                                <span>Absent</span>
+                              </span>
+                            )}
                           </td>
 
                           {/* Availability Status */}
