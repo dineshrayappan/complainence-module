@@ -692,34 +692,39 @@ export const App = () => {
               )}
 
               {(effectiveNavSection === 'nc-cap' || effectiveNavSection === 'nc' || effectiveNavSection === 'cap') && (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-indigo-500/10 border border-amber-500/20 dark:border-amber-500/30 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 dark:bg-amber-500/30 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 border border-amber-500/30">
-                      <Building2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20 mb-4 p-4 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xl shadow-indigo-950/20 text-white">
+                  {/* Ambient Decorative Backlight matching Factory Compliance */}
+                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-60 h-60 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
+                  <div className="absolute bottom-0 left-1/3 -mb-16 w-40 h-40 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
+
+                  <div className="relative z-10 flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5 text-indigo-400" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-slate-900 dark:text-white text-sm">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-black text-white text-sm tracking-tight">
                           NC / CAP Integrated Management
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                           Closed-Loop Defect & Rework Tracking
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5">
+                      <p className="text-[11px] text-slate-300 mt-0.5">
                         Non-Conformance (NC) Logging • Root Cause Analysis • Corrective & Preventive Action (CAP) • Floor Verification
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+
+                  <div className="relative z-10 flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                       ✓ 100% Floor Verification Standard
                     </span>
                     {isAuditor && (
                       <button
                         type="button"
                         onClick={() => setIsNewModalOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
                         <span>+ Log Audit NC</span>
