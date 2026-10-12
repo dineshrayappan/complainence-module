@@ -587,25 +587,25 @@ export const AuditProDashboard = ({
       {/* -----------------------------------------------------------------------
           ROW 1: 8 KPI METRIC CARDS (Exact Replica of AuditPro Grid)
           ----------------------------------------------------------------------- */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
         {/* CARD 1: Total Audits */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('audits')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-blue-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-cyan-400">
-                <ClipboardList className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-blue-50 dark:bg-blue-950/80 text-blue-600 dark:text-cyan-400 shrink-0">
+                <ClipboardList className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Total Audits">
                 Total Audits
               </span>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5 truncate">
               {metrics.totalAudits}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +12%</span> vs. last month
             </div>
           </div>
@@ -618,22 +618,22 @@ export const AuditProDashboard = ({
         {/* CARD 2: Completed Audits */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('audits')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Completed Audits">
                 Completed Audits
               </span>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5 truncate">
               {metrics.completedAudits}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +18%</span> vs. last month
+            <div className="text-[10px] text-slate-400 font-medium truncate">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +10%</span> vs. last month
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -645,21 +645,21 @@ export const AuditProDashboard = ({
         {/* CARD 3: Scheduled Audits */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('audits')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-purple-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-purple-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-purple-100 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400">
-                <Calendar className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-purple-50 dark:bg-purple-950/80 text-purple-600 dark:text-purple-400 shrink-0">
+                <Calendar className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Scheduled Audits">
                 Scheduled Audits
               </span>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5 truncate">
               {metrics.scheduledAudits}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +11%</span> vs. last month
             </div>
           </div>
@@ -672,21 +672,21 @@ export const AuditProDashboard = ({
         {/* CARD 4: Overdue Audits */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('audits')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-rose-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-rose-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400">
-                <Clock className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 shrink-0">
+                <Clock className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Overdue Audits">
                 Overdue Audits
               </span>
             </div>
-            <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 font-mono my-0.5 truncate">
               {metrics.overdueAudits}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-rose-600 dark:text-rose-400 font-bold">↑ +50%</span> vs. last month
             </div>
           </div>
@@ -699,21 +699,21 @@ export const AuditProDashboard = ({
         {/* CARD 5: Total NCs */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('nc-cap')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-amber-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-amber-50 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 shrink-0">
+                <AlertTriangle className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Total NCs">
                 Total NCs
               </span>
             </div>
-            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono my-0.5 truncate">
               {metrics.totalNCs}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +7%</span> vs. last month
             </div>
           </div>
@@ -726,21 +726,21 @@ export const AuditProDashboard = ({
         {/* CARD 6: Open NCs */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('nc')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-rose-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-rose-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400">
-                <AlertOctagon className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertOctagon className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Open NCs">
                 Open NCs
               </span>
             </div>
-            <div className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 font-mono my-0.5 truncate">
               {metrics.openNCs}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-rose-600 dark:text-rose-400 font-bold">↑ +23%</span> vs. last month
             </div>
           </div>
@@ -753,21 +753,21 @@ export const AuditProDashboard = ({
         {/* CARD 7: Closed NCs */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('nc-cap')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400">
-                <CheckCheck className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <CheckCheck className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Closed NCs">
                 Closed NCs
               </span>
             </div>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono my-0.5 truncate">
               {metrics.closedNCs}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +25%</span> vs. last month
             </div>
           </div>
@@ -780,21 +780,21 @@ export const AuditProDashboard = ({
         {/* CARD 8: Pending CAPs */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('cap')}
-          className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-sky-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+          className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-sky-400 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between min-w-0"
         >
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="p-1.5 rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-600 dark:text-cyan-400">
-                <Hourglass className="w-4 h-4" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 mb-1.5 min-w-0">
+              <span className="p-1 rounded-lg bg-sky-50 dark:bg-sky-950/80 text-sky-600 dark:text-cyan-400 shrink-0">
+                <Hourglass className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate" title="Pending CAPs">
                 Pending CAPs
               </span>
             </div>
-            <div className="text-2xl font-black text-sky-600 dark:text-cyan-400 font-mono my-0.5">
+            <div className="text-xl sm:text-2xl font-black text-sky-600 dark:text-cyan-400 font-mono my-0.5 truncate">
               {metrics.pendingCAPs}
             </div>
-            <div className="text-[10px] text-slate-400 font-medium">
+            <div className="text-[10px] text-slate-400 font-medium truncate">
               <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +9%</span> vs. last month
             </div>
           </div>
@@ -808,38 +808,38 @@ export const AuditProDashboard = ({
       {/* -----------------------------------------------------------------------
           ROW 2: 3 ANALYTICS VISUALIZATIONS (Audit Performance, NC Severity, CAP Status)
           ----------------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Visual 1: Audit Performance Trend (Combination Bar & Line Chart, 6 cols ~ 50%) */}
-        <div className="lg:col-span-6 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        {/* Visual 1: Audit Performance Trend (Combo Bar & Line Chart, 5 cols ~ 42%) */}
+        <div className="xl:col-span-5 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-cyan-400">
+                <span className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-cyan-400 shrink-0">
                   <TrendingUp className="w-4 h-4" />
                 </span>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
                     Audit Performance Trend
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 truncate">
                     Monthly audit completion rate and score trend
                   </p>
                 </div>
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                <span className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2.5 text-[10px] sm:text-[11px] font-semibold text-slate-600 dark:text-slate-400 shrink-0">
+                <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-xs bg-blue-600" />
-                  <span>Completed Audits</span>
+                  <span>Completed</span>
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-xs bg-sky-300" />
-                  <span>Planned Audits</span>
+                  <span>Planned</span>
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1">
                   <span className="w-2.5 h-1 rounded-full bg-indigo-600" />
-                  <span>Audit Score</span>
+                  <span>Score</span>
                 </span>
               </div>
             </div>
@@ -890,7 +890,6 @@ export const AuditProDashboard = ({
                 {/* Bars for Planned & Completed */}
                 {trendData.map((d, i) => {
                   const groupX = 55 + i * 74;
-                  // Max count is 50 -> scale (count / 50) * 140
                   const plannedHeight = (d.planned / 50) * 140;
                   const completedHeight = (d.completed / 50) * 140;
 
@@ -976,36 +975,36 @@ export const AuditProDashboard = ({
           </div>
         </div>
 
-        {/* Visual 2: NC Severity Breakdown (Donut Chart, 3 cols ~ 25%) */}
-        <div className="lg:col-span-3 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        {/* Visual 2: NC Severity Breakdown (Donut Chart, 3 cols) */}
+        <div className="col-span-1 sm:col-span-6 xl:col-span-3 p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600">
+            <div className="flex items-center justify-between gap-1 mb-3">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="p-1.5 rounded-xl bg-blue-50 dark:bg-blue-950 text-blue-600 shrink-0">
                   <AlertTriangle className="w-4 h-4" />
                 </span>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                   NC Severity Breakdown
                 </h3>
               </div>
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                Total NCs: {severityBreakdown.total}
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0 whitespace-nowrap">
+                Total: {severityBreakdown.total}
               </span>
             </div>
 
-            {/* Donut Chart with Center Text & Legend */}
-            <div className="flex items-center justify-between gap-3 my-2">
-              <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
+            {/* Donut Chart with Center Text & Non-overlapping Legend */}
+            <div className="flex items-center gap-3 sm:gap-4 my-2 min-w-0">
+              <div className="relative w-26 h-26 sm:w-28 sm:h-28 shrink-0 flex items-center justify-center">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   {/* Background Track */}
-                  <circle cx="50" cy="50" r="38" stroke="#f1f5f9" strokeWidth="14" fill="transparent" className="dark:stroke-slate-800" />
+                  <circle cx="50" cy="50" r="38" stroke="#f1f5f9" strokeWidth="13" fill="transparent" className="dark:stroke-slate-800" />
                   {/* High (Rose) */}
                   <circle
                     cx="50"
                     cy="50"
                     r="38"
                     stroke="#f43f5e"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(severityBreakdown.high.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset="0"
@@ -1016,7 +1015,7 @@ export const AuditProDashboard = ({
                     cy="50"
                     r="38"
                     stroke="#f59e0b"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(severityBreakdown.med.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset={`-${(severityBreakdown.high.pct * 238.76) / 100}`}
@@ -1027,7 +1026,7 @@ export const AuditProDashboard = ({
                     cy="50"
                     r="38"
                     stroke="#10b981"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(severityBreakdown.low.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset={`-${((severityBreakdown.high.pct + severityBreakdown.med.pct) * 238.76) / 100}`}
@@ -1035,43 +1034,43 @@ export const AuditProDashboard = ({
                 </svg>
 
                 {/* Donut Center Text */}
-                <div className="absolute text-center">
-                  <div className="text-xl font-black text-slate-900 dark:text-white font-mono leading-tight">
+                <div className="absolute text-center pointer-events-none">
+                  <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono leading-none">
                     {severityBreakdown.total}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-semibold">Total NCs</div>
+                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Total NCs</div>
                 </div>
               </div>
 
               {/* Legend List */}
-              <div className="space-y-2.5 text-xs flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                    <span>High</span>
+              <div className="space-y-1.5 text-xs flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">High</span>
                   </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {severityBreakdown.high.count} ({severityBreakdown.high.pct}%)
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    <span>Medium</span>
-                  </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {severityBreakdown.med.count} ({severityBreakdown.med.pct}%)
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {severityBreakdown.high.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.high.pct}%)</span>
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>Low</span>
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-amber-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">Medium</span>
                   </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {severityBreakdown.low.count} ({severityBreakdown.low.pct}%)
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {severityBreakdown.med.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.med.pct}%)</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">Low</span>
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {severityBreakdown.low.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.low.pct}%)</span>
                   </span>
                 </div>
               </div>
@@ -1079,35 +1078,35 @@ export const AuditProDashboard = ({
           </div>
         </div>
 
-        {/* Visual 3: CAP Status Breakdown (Donut Chart, 3 cols ~ 25%) */}
-        <div className="lg:col-span-3 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+        {/* Visual 3: CAP Status Breakdown (Donut Chart, 4 cols) */}
+        <div className="col-span-1 sm:col-span-6 xl:col-span-4 p-4 sm:p-4.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600">
+            <div className="flex items-center justify-between gap-1 mb-3">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="p-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 shrink-0">
                   <ShieldCheck className="w-4 h-4" />
                 </span>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                   CAP Status
                 </h3>
               </div>
-              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                Total NCs: {capStatusBreakdown.total}
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0 whitespace-nowrap">
+                Total: {capStatusBreakdown.total}
               </span>
             </div>
 
-            {/* Donut Chart with Center Text & Legend */}
-            <div className="flex items-center justify-between gap-3 my-2">
-              <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
+            {/* Donut Chart with Center Text & Non-overlapping Legend */}
+            <div className="flex items-center gap-3 sm:gap-4 my-2 min-w-0">
+              <div className="relative w-26 h-26 sm:w-28 sm:h-28 shrink-0 flex items-center justify-center">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                  <circle cx="50" cy="50" r="38" stroke="#f1f5f9" strokeWidth="14" fill="transparent" className="dark:stroke-slate-800" />
+                  <circle cx="50" cy="50" r="38" stroke="#f1f5f9" strokeWidth="13" fill="transparent" className="dark:stroke-slate-800" />
                   {/* Submitted (Emerald) */}
                   <circle
                     cx="50"
                     cy="50"
                     r="38"
                     stroke="#10b981"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(capStatusBreakdown.submitted.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset="0"
@@ -1118,7 +1117,7 @@ export const AuditProDashboard = ({
                     cy="50"
                     r="38"
                     stroke="#3b82f6"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(capStatusBreakdown.inProgress.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset={`-${(capStatusBreakdown.submitted.pct * 238.76) / 100}`}
@@ -1129,7 +1128,7 @@ export const AuditProDashboard = ({
                     cy="50"
                     r="38"
                     stroke="#f59e0b"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(capStatusBreakdown.pending.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset={`-${((capStatusBreakdown.submitted.pct + capStatusBreakdown.inProgress.pct) * 238.76) / 100}`}
@@ -1140,7 +1139,7 @@ export const AuditProDashboard = ({
                     cy="50"
                     r="38"
                     stroke="#ef4444"
-                    strokeWidth="14"
+                    strokeWidth="13"
                     fill="transparent"
                     strokeDasharray={`${(capStatusBreakdown.notSubmitted.pct * 238.76) / 100} 238.76`}
                     strokeDashoffset={`-${((capStatusBreakdown.submitted.pct + capStatusBreakdown.inProgress.pct + capStatusBreakdown.pending.pct) * 238.76) / 100}`}
@@ -1148,53 +1147,53 @@ export const AuditProDashboard = ({
                 </svg>
 
                 {/* Donut Center Text */}
-                <div className="absolute text-center">
-                  <div className="text-xl font-black text-slate-900 dark:text-white font-mono leading-tight">
+                <div className="absolute text-center pointer-events-none">
+                  <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono leading-none">
                     {capStatusBreakdown.total}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-semibold">Total NCs</div>
+                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Total NCs</div>
                 </div>
               </div>
 
               {/* Legend List */}
-              <div className="space-y-2 text-xs flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span>Submitted</span>
+              <div className="space-y-1.5 text-xs flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">Submitted</span>
                   </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {capStatusBreakdown.submitted.count} ({capStatusBreakdown.submitted.pct}%)
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <span>In Progress</span>
-                  </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {capStatusBreakdown.inProgress.count} ({capStatusBreakdown.inProgress.pct}%)
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {capStatusBreakdown.submitted.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.submitted.pct}%)</span>
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    <span>Pending</span>
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">In Progress</span>
                   </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {capStatusBreakdown.pending.count} ({capStatusBreakdown.pending.pct}%)
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {capStatusBreakdown.inProgress.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.inProgress.pct}%)</span>
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                    <span>Not Submitted</span>
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-amber-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">Pending</span>
                   </span>
-                  <span className="font-mono text-slate-500 font-semibold">
-                    {capStatusBreakdown.notSubmitted.count} ({capStatusBreakdown.notSubmitted.pct}%)
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {capStatusBreakdown.pending.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.pending.pct}%)</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-1 py-0.5">
+                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500" />
+                    <span className="truncate whitespace-nowrap text-[11px]">Not Submitted</span>
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                    {capStatusBreakdown.notSubmitted.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.notSubmitted.pct}%)</span>
                   </span>
                 </div>
               </div>
