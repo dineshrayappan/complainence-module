@@ -989,7 +989,7 @@ const getEmployeeWorkStatus = async (req, res) => {
     let allUsers = [];
     if (isMongoConnected()) {
       try {
-        const dbUsers = await User.find({ isActive: true }).select('name employeeId email role department designation isActive').lean();
+        const dbUsers = await User.find({ isActive: true }).select('name employeeId email role department designation isActive isPresent lastLoginAt lastLogoutAt').lean();
         if (dbUsers) allUsers = dbUsers.map((u) => ({ ...u, id: u._id.toString() }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] users fetch fallback:', e.message);
@@ -1123,7 +1123,10 @@ const getEmployeeWorkStatus = async (req, res) => {
         return false;
       });
 
-      let status = 'Available';
+      // A person is Present if they have logged in (user.isPresent = true) or are actively working on the floor;
+      // otherwise they are Absent.
+      const isPresent = Boolean(user.isPresent || activeNC || activeTask);
+      let status = isPresent ? 'Available' : 'Absent';
       let currentTask = null;
       let startTime = null;
       let completionTime = null;
@@ -1163,6 +1166,18 @@ const getEmployeeWorkStatus = async (req, res) => {
           : null;
         startTime = workerEntry?.startedAt || activeTask.startedAt || activeTask.updatedAt || null;
         proofStatus = 'Pending Upload';
+      } else if (!isPresent) {
+        // Person has not logged in -> Absent
+        status = 'Absent';
+        if (openDeptTask) {
+          currentTask = {
+            id: openDeptTask.id,
+            title: openDeptTask.title,
+            priority: openDeptTask.priority,
+            dueDate: openDeptTask.dueDate,
+            department: openDeptTask.department,
+          };
+        }
       } else {
         // Pick newest completed work between tasks and NCs
         const candidates = [];
@@ -1236,7 +1251,9 @@ const getEmployeeWorkStatus = async (req, res) => {
         department: user.department,
         designation: user.designation,
         role: user.role,
-        status, // 'Available' | 'In Progress / Busy' | 'Completed'
+        isPresent,
+        attendance: isPresent ? 'Present' : 'Absent',
+        status, // 'Available' | 'In Progress / Busy' | 'Completed' | 'Absent'
         assignedTask: currentTask,
         openTask: openDeptTask ? { id: openDeptTask.id, title: openDeptTask.title } : null,
         startTime,
@@ -1244,6 +1261,8 @@ const getEmployeeWorkStatus = async (req, res) => {
         proofStatus,
         proofPhoto,
         proofNotes,
+        lastLoginAt: user.lastLoginAt || null,
+        lastLogoutAt: user.lastLogoutAt || null,
         totalCompletedCount: completedTasks.length + completedNCs.length,
       };
     });

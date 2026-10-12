@@ -108,12 +108,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('garment_qms_token');
-    localStorage.removeItem('garment_qms_user');
-    localStorage.removeItem('garment_qms_cached_complaints');
-    setToken(null);
-    setUser(null);
+  const logout = async () => {
+    try {
+      const storedUser = user || JSON.parse(localStorage.getItem('garment_qms_user') || '{}');
+      const userId = storedUser._id || storedUser.id || storedUser.employeeId;
+      if (userId) {
+        await authService.logout({ userId });
+      }
+    } catch (e) {
+      console.warn('[AuthContext:logout] server notice:', e.message);
+    } finally {
+      localStorage.removeItem('garment_qms_token');
+      localStorage.removeItem('garment_qms_user');
+      localStorage.removeItem('garment_qms_cached_complaints');
+      setToken(null);
+      setUser(null);
+    }
   };
 
   const isUniversal =

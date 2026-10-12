@@ -43,6 +43,9 @@ const formatUserResponse = (user, expectedRole) => {
     designation: user.designation,
     mobileNumber: user.mobileNumber,
     isActive: typeof user.isActive !== 'undefined' ? user.isActive : true,
+    isPresent: typeof user.isPresent !== 'undefined' ? Boolean(user.isPresent) : false,
+    lastLoginAt: user.lastLoginAt || null,
+    lastLogoutAt: user.lastLogoutAt || null,
     isUniversal: !!isUniversal,
     hasAllRoles: !!isUniversal,
   };
@@ -98,6 +101,14 @@ const login = async (req, res) => {
             });
           }
 
+          const now = new Date();
+          user.isPresent = true;
+          user.lastLoginAt = now;
+          try {
+            await User.findByIdAndUpdate(user._id, { isPresent: true, lastLoginAt: now });
+          } catch (e) {}
+          mockStore.updateUser(user._id.toString(), { isPresent: true, lastLoginAt: now });
+
           const token = generateToken(user._id.toString());
           return res.status(200).json({
             success: true,
@@ -141,6 +152,11 @@ const login = async (req, res) => {
         message: 'This account has been deactivated.',
       });
     }
+
+    const now = new Date();
+    user.isPresent = true;
+    user.lastLoginAt = now;
+    mockStore.updateUser(user._id || user.id, { isPresent: true, lastLoginAt: now });
 
     const token = generateToken(user._id || user.id);
     return res.status(200).json({
@@ -284,6 +300,13 @@ const getMe = async (req, res) => {
         const data = await User.findOne(query).select('-password').lean();
 
         if (data) {
+          if (!data.isPresent) {
+            try {
+              await User.updateOne({ _id: data._id }, { isPresent: true });
+            } catch (e) {}
+            data.isPresent = true;
+          }
+          mockStore.updateUser(data._id.toString(), { isPresent: true });
           return res.status(200).json({
             success: true,
             user: formatUserResponse(data),
@@ -295,6 +318,10 @@ const getMe = async (req, res) => {
     }
 
     const fallbackUser = mockStore.findUserById(userId) || req.user;
+    if (fallbackUser) {
+      fallbackUser.isPresent = true;
+      mockStore.updateUser(fallbackUser._id || fallbackUser.id, { isPresent: true });
+    }
     res.status(200).json({
       success: true,
       user: formatUserResponse(fallbackUser),
@@ -308,8 +335,53 @@ const getMe = async (req, res) => {
   }
 };
 
+// @desc    Sign out user & mark as absent
+// @route   POST /api/auth/logout
+// @access  Public / Private
+const logout = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id || req.body?.userId;
+    const now = new Date();
+
+    if (isMongoConnected() && userId) {
+      try {
+        const query = { $or: [{ employeeId: userId }, { email: userId }] };
+        if (typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
+        await User.updateMany(query, {
+          isPresent: false,
+          lastLogoutAt: now,
+        });
+      } catch (e) {
+        console.warn('[AuthController:logout] MongoDB logout update error:', e.message);
+      }
+    }
+
+    if (userId) {
+      mockStore.updateUser(userId.toString(), {
+        isPresent: false,
+        lastLogoutAt: now,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'User signed out. Status marked as Absent.',
+    });
+  } catch (error) {
+    console.error('[AuthController:logout] Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error during logout.',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   login,
   register,
   getMe,
+  logout,
 };

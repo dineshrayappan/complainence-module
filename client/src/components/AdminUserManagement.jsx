@@ -251,6 +251,8 @@ export const AdminUserManagement = () => {
   const adminCount = users.filter((u) => u.role === 'ADMIN').length;
   const activeCount = users.filter((u) => u.isActive).length;
   const inactiveCount = users.filter((u) => !u.isActive).length;
+  const presentCount = users.filter((u) => u.isPresent).length;
+  const absentCount = users.filter((u) => !u.isPresent).length;
 
   // Filtered users list
   const filteredUsers = users.filter((u) => {
@@ -264,6 +266,8 @@ export const AdminUserManagement = () => {
       return false;
     if (roleFilter === 'ADMIN' && u.role !== 'ADMIN') return false;
     if (roleFilter === 'INACTIVE' && u.isActive) return false;
+    if (roleFilter === 'PRESENT' && !u.isPresent) return false;
+    if (roleFilter === 'ABSENT' && u.isPresent) return false;
 
     // Search query
     if (searchQuery.trim()) {
@@ -536,9 +540,14 @@ export const AdminUserManagement = () => {
           <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
             {totalUsers}
           </div>
-          <span className="text-[10px] text-slate-400 font-mono truncate block">
-            {activeCount} active in plant
-          </span>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold font-mono">
+              ● {presentCount} Present
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              ○ {absentCount} Absent
+            </span>
+          </div>
         </div>
 
         <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-purple-500/20 shadow-xs">
@@ -672,6 +681,26 @@ export const AdminUserManagement = () => {
               Inactive ({inactiveCount})
             </button>
           )}
+          <button
+            onClick={() => setRoleFilter('PRESENT')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              roleFilter === 'PRESENT'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+            }`}
+          >
+            🟢 Present ({presentCount})
+          </button>
+          <button
+            onClick={() => setRoleFilter('ABSENT')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+              roleFilter === 'ABSENT'
+                ? 'bg-slate-700 text-white shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+            }`}
+          >
+            ⚪ Absent ({absentCount})
+          </button>
 
           <button
             onClick={() => {
@@ -833,8 +862,13 @@ export const AdminUserManagement = () => {
                         {u.name?.charAt(0).toUpperCase()}
                         <span
                           className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 ${
-                            u.isActive ? 'bg-emerald-500' : 'bg-rose-500'
+                            u.isPresent
+                              ? 'bg-emerald-500 ring-2 ring-emerald-400/50'
+                              : u.isActive
+                              ? 'bg-slate-400'
+                              : 'bg-rose-500'
                           }`}
+                          title={u.isPresent ? 'Present (Active Session)' : 'Absent (Not Logged In)'}
                         />
                       </div>
 
@@ -928,6 +962,18 @@ export const AdminUserManagement = () => {
                         }`}
                       >
                         {u.isActive ? 'Active • Can Sign In' : 'Deactivated • Login Disabled'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400 text-[10px]">Duty / Attendance:</span>
+                      <span
+                        className={`text-[10px] font-bold inline-flex items-center gap-1.5 ${
+                          u.isPresent ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${u.isPresent ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                        <span>{u.isPresent ? 'Present (Logged In)' : 'Absent (Not Logged In)'}</span>
                       </span>
                     </div>
                   </div>

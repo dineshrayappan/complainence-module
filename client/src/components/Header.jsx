@@ -282,7 +282,7 @@ export const Header = ({
               </div>
 
               <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
                     {isAdmin ? 'Admin' : user?.name?.split(' ')[0] || 'User'}
                   </span>
@@ -296,6 +296,13 @@ export const Header = ({
                     }`}
                   >
                     {isAdmin ? 'Admin' : isAuditor ? 'Auditor' : 'Department'}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                    title="Active session • Marked Present in system"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Present</span>
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">

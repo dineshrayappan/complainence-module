@@ -19,6 +19,10 @@ const formatUser = (u) => {
     designation: u.designation,
     mobileNumber: u.mobileNumber,
     isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
+    isPresent: typeof u.isPresent !== 'undefined' ? Boolean(u.isPresent) : false,
+    attendance: u.isPresent ? 'Present' : 'Absent',
+    lastLoginAt: u.lastLoginAt || null,
+    lastLogoutAt: u.lastLogoutAt || null,
     createdAt: u.createdAt,
     updatedAt: u.updatedAt,
   };
