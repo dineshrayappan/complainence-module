@@ -88,12 +88,7 @@ const apiOverview = (req, res) => {
     message: 'Welcome to the Garment QMS REST API! Use the endpoints below to test with Postman.',
     auth: {
       loginEndpoint: 'POST /api/auth/login',
-      adminCredentials: {
-        role: 'ADMIN',
-        identifier: 'admin@factory.com',
-        password: 'admin123',
-      },
-      postmanInstructions: '1. Send POST /api/auth/login with {"identifier": "admin@factory.com", "password": "admin123"}.\n2. Copy the "token" from response.\n3. Add header "Authorization: Bearer <token>" to your Postman requests.'
+      postmanInstructions: '1. Send POST /api/auth/login with {"identifier": "<email_or_employeeId>", "password": "<password>"}.\n2. Copy the "token" from response.\n3. Add header "Authorization: Bearer <token>" to your Postman requests.'
     },
     endpoints: {
       health: 'GET /api/health',

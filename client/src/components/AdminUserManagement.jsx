@@ -603,7 +603,7 @@ export const AdminUserManagement = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search name, ID (e.g. AUD-001, SUP-101), department..."
+            placeholder="Search name, Employee ID, department..."
             className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
         </div>

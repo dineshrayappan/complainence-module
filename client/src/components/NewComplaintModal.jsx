@@ -64,9 +64,6 @@ const isDeptMatch = (userDept, targetDept) => {
   return false;
 };
 
-// Backward compatibility export
-export const DUMMY_SUPERVISORS = [];
-
 // Specific Industrial Factory Departments & Roles
 const AUDIT_DEPARTMENTS = [
   {

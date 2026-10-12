@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, AlertCircle, ShieldCheck, Lock, User, HelpCircle, X, Key } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, ShieldCheck, Lock, User, HelpCircle, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage = () => {
@@ -11,20 +11,14 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleQuickFill = (id, pwd) => {
-    setIdentifier(id);
-    setPassword(pwd);
-    setError(null);
-  };
-
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!identifier.trim()) {
-      setError('Please enter your Username, Employee ID, or Email (e.g. admin).');
+      setError('Please enter your Employee ID or Email.');
       return;
     }
     if (!password) {
-      setError('Please enter your password (e.g. admin123).');
+      setError('Please enter your password.');
       return;
     }
 
@@ -61,51 +55,9 @@ export const LoginPage = () => {
           <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight leading-tight">
             Welcome back!
           </h1>
-          <p className="text-xs sm:text-[13px] text-slate-500 mt-1 mb-5 leading-relaxed">
+          <p className="text-xs sm:text-[13px] text-slate-500 mt-1 mb-6 leading-relaxed">
             Please sign in to access your compliance & audit workspace.
           </p>
-
-          {/* Default Login Details Banner */}
-          <div className="mb-5 p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-blue-50/70 to-purple-50/40 border border-indigo-100 shadow-xs">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span className="text-[11px] font-bold tracking-wide uppercase text-indigo-950">
-                  Default Login Details
-                </span>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                System Admin
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs mb-2.5">
-              <div className="bg-white/90 p-2 rounded-xl border border-indigo-100/70 shadow-2xs">
-                <div className="text-[10px] text-slate-500 font-medium">Username / ID</div>
-                <div className="font-mono font-bold text-slate-900 text-xs sm:text-sm select-all">
-                  admin
-                </div>
-              </div>
-              <div className="bg-white/90 p-2 rounded-xl border border-indigo-100/70 shadow-2xs">
-                <div className="text-[10px] text-slate-500 font-medium">Password</div>
-                <div className="font-mono font-bold text-slate-900 text-xs sm:text-sm select-all">
-                  admin123
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => handleQuickFill('admin', 'admin123')}
-              className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 active:scale-[0.99] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span>⚡ Auto-fill Default Admin (admin / admin123)</span>
-            </button>
-          </div>
 
           {/* Error Alert */}
           {error && (
@@ -131,7 +83,7 @@ export const LoginPage = () => {
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="admin or Employee ID / Email"
+                  placeholder="Enter Employee ID or Email"
                   autoComplete="username"
                   className="w-full h-11 pl-10 pr-3.5 text-sm rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white focus:bg-white text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/20"
                 />
