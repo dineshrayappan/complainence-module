@@ -48,7 +48,7 @@ export const AuditProDashboard = ({
   const [complianceData, setComplianceData] = useState(null);
 
   // Filter & Search states
-  const [dateRangePreset, setDateRangePreset] = useState('SEP_2025'); // 'SEP_2025', 'THIS_MONTH', '30D', '7D', 'ALL'
+  const [dateRangePreset, setDateRangePreset] = useState('ALL'); // 'ALL', 'THIS_MONTH', '30D', '7D'
   const [isDateMenuOpen, setIsDateMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -112,44 +112,101 @@ export const AuditProDashboard = ({
 
   // Date range label
   const dateRangeLabel = useMemo(() => {
-    if (dateRangePreset === 'SEP_2025') return '01 Sep 2025 - 30 Sep 2025';
     if (dateRangePreset === 'THIS_MONTH') return 'Current Month (Live)';
     if (dateRangePreset === '30D') return 'Past 30 Days';
     if (dateRangePreset === '7D') return 'Past 7 Days';
-    return 'All Time History';
+    return 'All Time History (Live)';
   }, [dateRangePreset]);
 
+  // Filtered Complaints based on Date Range and Search Query
+  const filteredComplaints = useMemo(() => {
+    let list = complaints;
+    const now = new Date();
+
+    if (dateRangePreset === 'THIS_MONTH') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      list = list.filter((c) => new Date(c.createdAt || now) >= startOfMonth);
+    } else if (dateRangePreset === '30D') {
+      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      list = list.filter((c) => new Date(c.createdAt || now) >= past30);
+    } else if (dateRangePreset === '7D') {
+      const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      list = list.filter((c) => new Date(c.createdAt || now) >= past7);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (c) =>
+          (c.complaintId && c.complaintId.toLowerCase().includes(q)) ||
+          (c.title && c.title.toLowerCase().includes(q)) ||
+          (c.department && c.department.toLowerCase().includes(q)) ||
+          (c.category && c.category.toLowerCase().includes(q)) ||
+          (c.location && c.location.toLowerCase().includes(q)) ||
+          (c.description && c.description.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [complaints, dateRangePreset, searchQuery]);
+
+  // Filtered Audits based on Date Range and Search Query
+  const filteredAudits = useMemo(() => {
+    let list = audits;
+    const now = new Date();
+
+    if (dateRangePreset === 'THIS_MONTH') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      list = list.filter((a) => new Date(a.scheduled_date || a.createdAt || now) >= startOfMonth);
+    } else if (dateRangePreset === '30D') {
+      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      list = list.filter((a) => new Date(a.scheduled_date || a.createdAt || now) >= past30);
+    } else if (dateRangePreset === '7D') {
+      const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      list = list.filter((a) => new Date(a.scheduled_date || a.createdAt || now) >= past7);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (a) =>
+          (a.audit_number && a.audit_number.toLowerCase().includes(q)) ||
+          (a.title && a.title.toLowerCase().includes(q)) ||
+          (a.department && a.department.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [audits, dateRangePreset, searchQuery]);
+
   // ---------------------------------------------------------------------------
-  // 1. TOP 8 METRICS CALCULATION (Accurate counts aligned with design)
+  // 1. TOP 8 METRICS CALCULATION (100% Dynamic from live records)
   // ---------------------------------------------------------------------------
   const metrics = useMemo(() => {
-    const rawTotalNC = complaints.length;
-    const rawOpenNC = complaints.filter((c) =>
+    const totalNCs = filteredComplaints.length;
+    const openNCs = filteredComplaints.filter((c) =>
       ['Open', 'Assigned', 'In Progress'].includes(c.status)
     ).length;
-    const rawClosedNC = complaints.filter((c) =>
+    const closedNCs = filteredComplaints.filter((c) =>
       ['Closed', 'Verified'].includes(c.status)
     ).length;
-    const rawPendingCAP = complaints.filter((c) =>
-      ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework'].includes(c.status)
+    const pendingCAPs = filteredComplaints.filter((c) =>
+      ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework'].includes(c.status) ||
+      (Boolean(c.capRequired) && !['Closed', 'Verified'].includes(c.status))
     ).length;
 
-    // Use live counts or default reference numbers from the visual specification
-    const totalAudits = audits.length > 0 ? Math.max(audits.length, 48) : 48;
-    const completedAudits = audits.filter((a) => a.status === 'Completed').length > 0
-      ? audits.filter((a) => a.status === 'Completed').length
-      : 32;
-    const scheduledAudits = audits.filter((a) => a.status === 'Scheduled').length > 0
-      ? audits.filter((a) => a.status === 'Scheduled').length
-      : 10;
-    const overdueAudits = audits.filter((a) => a.status === 'Overdue').length > 0
-      ? audits.filter((a) => a.status === 'Overdue').length
-      : 6;
-
-    const totalNCs = rawTotalNC > 0 ? rawTotalNC : 28;
-    const openNCs = rawTotalNC > 0 ? rawOpenNC : 16;
-    const closedNCs = rawTotalNC > 0 ? rawClosedNC : 10;
-    const pendingCAPs = rawTotalNC > 0 ? rawPendingCAP : 12;
+    const totalAudits = filteredAudits.length;
+    const completedAudits = filteredAudits.filter((a) => a.status === 'Completed').length;
+    const scheduledAudits = filteredAudits.filter((a) =>
+      ['Scheduled', 'Planned', 'In Progress'].includes(a.status)
+    ).length;
+    const overdueAudits = filteredAudits.filter((a) => {
+      if (a.status === 'Overdue') return true;
+      if (a.status !== 'Completed' && a.scheduled_date) {
+        return new Date(a.scheduled_date) < new Date();
+      }
+      return false;
+    }).length;
 
     return {
       totalAudits,
@@ -161,31 +218,67 @@ export const AuditProDashboard = ({
       closedNCs,
       pendingCAPs,
     };
-  }, [complaints, audits]);
+  }, [filteredComplaints, filteredAudits]);
 
   // ---------------------------------------------------------------------------
-  // 2. AUDIT PERFORMANCE TREND DATA (Apr - Sep)
+  // 2. AUDIT PERFORMANCE TREND DATA (Dynamically computed from actual records)
   // ---------------------------------------------------------------------------
   const trendData = useMemo(() => {
-    return [
-      { month: 'Apr', completed: 25, planned: 30, score: 78 },
-      { month: 'May', completed: 22, planned: 28, score: 79 },
-      { month: 'Jun', completed: 32, planned: 35, score: 85 },
-      { month: 'Jul', completed: 34, planned: 38, score: 84 },
-      { month: 'Aug', completed: 33, planned: 36, score: 86 },
-      { month: 'Sep', completed: 32, planned: 38, score: 92 },
-    ];
-  }, []);
+    const months = [];
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = d.toLocaleString('en-US', { month: 'short' });
+      const year = d.getFullYear();
+      const monthIndex = d.getMonth();
+
+      const monthAudits = audits.filter((a) => {
+        const date = new Date(a.scheduled_date || a.createdAt);
+        return date.getFullYear() === year && date.getMonth() === monthIndex;
+      });
+      const monthCompletedAudits = monthAudits.filter((a) => a.status === 'Completed');
+
+      const monthComplaints = complaints.filter((c) => {
+        const date = new Date(c.createdAt);
+        return date.getFullYear() === year && date.getMonth() === monthIndex;
+      });
+      const monthClosedComplaints = monthComplaints.filter((c) =>
+        ['Closed', 'Verified'].includes(c.status)
+      );
+
+      const planned = monthAudits.length > 0 ? monthAudits.length : monthComplaints.length;
+      const completed = monthAudits.length > 0 ? monthCompletedAudits.length : monthClosedComplaints.length;
+
+      let score = 100;
+      if (monthAudits.length > 0) {
+        const completedPct = Math.round((monthCompletedAudits.length / monthAudits.length) * 100);
+        score = Math.max(50, completedPct);
+      } else if (monthComplaints.length > 0) {
+        const resRate = Math.round((monthClosedComplaints.length / monthComplaints.length) * 100);
+        score = Math.max(50, resRate);
+      }
+
+      months.push({
+        month: monthName,
+        completed,
+        planned,
+        score,
+      });
+    }
+
+    return months;
+  }, [audits, complaints]);
 
   // ---------------------------------------------------------------------------
-  // 3. NC SEVERITY BREAKDOWN (Donut breakdown)
+  // 3. NC SEVERITY BREAKDOWN (Dynamically computed from complaints)
   // ---------------------------------------------------------------------------
   const severityBreakdown = useMemo(() => {
     let high = 0;
     let med = 0;
     let low = 0;
 
-    complaints.forEach((c) => {
+    filteredComplaints.forEach((c) => {
       const p = (c.priority || c.riskSeverity || '').toUpperCase();
       if (p === 'CRITICAL' || p === 'HIGH' || p === 'MAJOR') high++;
       else if (p === 'LOW' || p === 'MINOR') low++;
@@ -195,10 +288,10 @@ export const AuditProDashboard = ({
     const total = high + med + low;
     if (total === 0) {
       return {
-        total: 28,
-        high: { count: 8, pct: 29 },
-        med: { count: 14, pct: 50 },
-        low: { count: 6, pct: 21 },
+        total: 0,
+        high: { count: 0, pct: 0 },
+        med: { count: 0, pct: 0 },
+        low: { count: 0, pct: 0 },
       };
     }
 
@@ -208,10 +301,10 @@ export const AuditProDashboard = ({
       med: { count: med, pct: Math.round((med / total) * 100) },
       low: { count: low, pct: Math.round((low / total) * 100) },
     };
-  }, [complaints]);
+  }, [filteredComplaints]);
 
   // ---------------------------------------------------------------------------
-  // 4. CAP STATUS BREAKDOWN (Donut breakdown)
+  // 4. CAP STATUS BREAKDOWN (Dynamically computed from NC/CAP details)
   // ---------------------------------------------------------------------------
   const capStatusBreakdown = useMemo(() => {
     let submitted = 0;
@@ -219,21 +312,26 @@ export const AuditProDashboard = ({
     let pending = 0;
     let notSubmitted = 0;
 
-    complaints.forEach((c) => {
-      if (c.status === 'Closed' || c.status === 'Verified' || c.cap?.verifiedEffective) submitted++;
-      else if (c.status === 'In Progress' || c.status === 'Assigned') inProgress++;
-      else if (['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)) pending++;
-      else notSubmitted++;
+    filteredComplaints.forEach((c) => {
+      if (c.status === 'Closed' || c.status === 'Verified' || c.cap?.verifiedEffective) {
+        submitted++;
+      } else if (c.status === 'In Progress' || c.status === 'Assigned') {
+        inProgress++;
+      } else if (['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)) {
+        pending++;
+      } else {
+        notSubmitted++;
+      }
     });
 
     const total = submitted + inProgress + pending + notSubmitted;
     if (total === 0) {
       return {
-        total: 28,
-        submitted: { count: 10, pct: 36 },
-        inProgress: { count: 8, pct: 29 },
-        pending: { count: 6, pct: 21 },
-        notSubmitted: { count: 4, pct: 14 },
+        total: 0,
+        submitted: { count: 0, pct: 0 },
+        inProgress: { count: 0, pct: 0 },
+        pending: { count: 0, pct: 0 },
+        notSubmitted: { count: 0, pct: 0 },
       };
     }
 
@@ -244,87 +342,174 @@ export const AuditProDashboard = ({
       pending: { count: pending, pct: Math.round((pending / total) * 100) },
       notSubmitted: { count: notSubmitted, pct: Math.round((notSubmitted / total) * 100) },
     };
-  }, [complaints]);
+  }, [filteredComplaints]);
 
   // ---------------------------------------------------------------------------
-  // 5. DEPARTMENT PERFORMANCE MATRIX
+  // 5. DEPARTMENT PERFORMANCE MATRIX (Dynamic aggregation from database)
   // ---------------------------------------------------------------------------
   const departmentPerformanceList = useMemo(() => {
-    const list = [
-      { name: 'Production', icon: '🏭', audits: 12, score: 82, totalNC: 8, openNC: 4, closedNC: 3, pendingCAP: 2 },
-      { name: 'Quality', icon: '🔍', audits: 8, score: 76, totalNC: 6, openNC: 3, closedNC: 2, pendingCAP: 1 },
-      { name: 'Maintenance', icon: '⚙️', audits: 6, score: 68, totalNC: 5, openNC: 3, closedNC: 1, pendingCAP: 2 },
-      { name: 'Warehouse', icon: '📦', audits: 5, score: 71, totalNC: 3, openNC: 2, closedNC: 1, pendingCAP: 1 },
-      { name: 'Packing', icon: '🎁', audits: 7, score: 79, totalNC: 4, openNC: 2, closedNC: 1, pendingCAP: 1 },
-      { name: 'Logistics', icon: '🚚', audits: 4, score: 65, totalNC: 2, openNC: 1, closedNC: 1, pendingCAP: 0 },
-    ];
+    const deptIcons = {
+      Production: '🏭',
+      Quality: '🔍',
+      Maintenance: '⚙️',
+      Warehouse: '📦',
+      Packing: '🎁',
+      Logistics: '🚚',
+      Cutting: '✂️',
+      Finishing: '👔',
+      Safety: '🦺',
+      HR: '👥',
+    };
+
+    const knownDepts = new Set([
+      'Production',
+      'Quality',
+      'Maintenance',
+      'Warehouse',
+      'Packing',
+      'Logistics',
+    ]);
+
+    if (complianceData?.departments && Array.isArray(complianceData.departments)) {
+      complianceData.departments.forEach((d) => {
+        if (d.department) knownDepts.add(d.department);
+      });
+    }
+
+    complaints.forEach((c) => {
+      if (c.department) knownDepts.add(c.department);
+    });
+
+    audits.forEach((a) => {
+      if (a.department) knownDepts.add(a.department);
+    });
+
+    const list = Array.from(knownDepts).map((deptName) => {
+      const compRecord = complianceData?.departments?.find(
+        (d) => d.department?.toLowerCase() === deptName.toLowerCase()
+      );
+
+      const deptAudits = audits.filter(
+        (a) => a.department && a.department.toLowerCase() === deptName.toLowerCase()
+      );
+
+      const deptComplaints = complaints.filter(
+        (c) => c.department && c.department.toLowerCase() === deptName.toLowerCase()
+      );
+
+      const totalNC = deptComplaints.length;
+      const openNC = deptComplaints.filter((c) =>
+        ['Open', 'Assigned', 'In Progress'].includes(c.status)
+      ).length;
+      const closedNC = deptComplaints.filter((c) =>
+        ['Closed', 'Verified'].includes(c.status)
+      ).length;
+      const pendingCAP = deptComplaints.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework'].includes(c.status) ||
+        (Boolean(c.capRequired) && !['Closed', 'Verified'].includes(c.status))
+      ).length;
+
+      let score = 100;
+      if (compRecord && typeof compRecord.score === 'number') {
+        score = Math.round(compRecord.score);
+      } else if (totalNC > 0) {
+        score = Math.max(0, Math.min(100, Math.round(100 - (openNC / totalNC) * 35 - (pendingCAP / totalNC) * 25)));
+      } else if (deptAudits.length > 0) {
+        const completedCount = deptAudits.filter((a) => a.status === 'Completed').length;
+        score = Math.round((completedCount / deptAudits.length) * 100);
+      }
+
+      return {
+        name: deptName,
+        icon: deptIcons[deptName] || '🏢',
+        audits: deptAudits.length,
+        score,
+        totalNC,
+        openNC,
+        closedNC,
+        pendingCAP,
+      };
+    });
+
+    list.sort((a, b) => b.totalNC - a.totalNC || a.name.localeCompare(b.name));
 
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
     return list.filter((d) => d.name.toLowerCase().includes(q));
-  }, [searchQuery]);
+  }, [complianceData, complaints, audits, searchQuery]);
 
   // ---------------------------------------------------------------------------
-  // 6. OVERDUE & PENDING WORK TABLE
+  // 6. OVERDUE & PENDING WORK TABLE (Dynamic from actual audits, NCs, and CAPs)
   // ---------------------------------------------------------------------------
   const overdueWorkList = useMemo(() => {
-    const list = [
-      {
-        type: 'Audit',
-        id: 'A-014',
-        dept: 'Production',
-        assignedTo: 'Ramesh Kumar',
-        dueDate: '2025-09-20',
-        daysOverdue: 5,
-        status: 'Overdue',
-        priority: 'High',
-        title: 'Line 1 Stitching & Needle Safety Inspection',
-      },
-      {
-        type: 'NC',
-        id: 'NC-023',
-        dept: 'Quality',
-        assignedTo: 'Siva',
-        dueDate: '2025-09-21',
-        daysOverdue: 4,
-        status: 'Overdue',
-        priority: 'High',
-        title: 'Broken needle fragment missing in sewing bin',
-      },
-      {
-        type: 'CAP',
-        id: 'CAP-007',
-        dept: 'Maintenance',
-        assignedTo: 'Manikandan',
-        dueDate: '2025-09-22',
-        daysOverdue: 3,
-        status: 'Overdue',
-        priority: 'Medium',
-        title: 'Compressor airline moisture separator replacement',
-      },
-      {
-        type: 'Audit',
-        id: 'A-017',
-        dept: 'Warehouse',
-        assignedTo: 'Karthik',
-        dueDate: '2025-09-24',
-        daysOverdue: 1,
-        status: 'Due Soon',
-        priority: 'Medium',
-        title: 'Raw fabric roll lot traceability & barcode check',
-      },
-      {
-        type: 'NC',
-        id: 'NC-028',
-        dept: 'Packing',
-        assignedTo: 'Selvam',
-        dueDate: '2025-09-25',
-        daysOverdue: 0,
-        status: 'Due Soon',
-        priority: 'Low',
-        title: 'Outer carton barcode label misaligned',
-      },
-    ];
+    const list = [];
+    const today = new Date();
+
+    // 1. Audits pending or overdue
+    audits.forEach((a) => {
+      const scheduledDate = a.scheduled_date ? new Date(a.scheduled_date) : null;
+      const isCompleted = a.status === 'Completed';
+      const isOverdue = a.status === 'Overdue' || (scheduledDate && scheduledDate < today && !isCompleted);
+
+      if (!isCompleted) {
+        const daysOverdue = isOverdue && scheduledDate ? Math.max(1, Math.ceil((today - scheduledDate) / (1000 * 60 * 60 * 24))) : 0;
+        list.push({
+          type: 'Audit',
+          id: a.audit_number || a._id || `A-${a.id}`,
+          dept: a.department || 'General',
+          assignedTo: typeof a.auditor === 'object' ? (a.auditor?.name || 'Assigned Auditor') : (a.auditor || 'Auditor'),
+          dueDate: scheduledDate ? scheduledDate.toISOString().slice(0, 10) : 'Not scheduled',
+          daysOverdue,
+          status: isOverdue ? 'Overdue' : a.status || 'Scheduled',
+          priority: isOverdue ? 'High' : 'Medium',
+          title: a.title || `${a.department} Internal Inspection`,
+        });
+      }
+    });
+
+    // 2. NCs & CAPs pending or overdue
+    complaints.forEach((c) => {
+      const isClosed = ['Closed', 'Verified'].includes(c.status);
+      const isPendingCAP = ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework'].includes(c.status);
+      const deadline = c.deadlineTimestamp ? new Date(c.deadlineTimestamp) : c.dueDate ? new Date(c.dueDate) : null;
+      const isOverdue = !isClosed && deadline && deadline < today;
+      const daysOverdue = isOverdue ? Math.max(1, Math.ceil((today - deadline) / (1000 * 60 * 60 * 24))) : 0;
+
+      const assignedName = typeof c.assignedTo === 'object' ? (c.assignedTo?.name || 'Assigned Staff') : (c.assignedTo || 'Unassigned');
+
+      if (isPendingCAP) {
+        list.push({
+          type: 'CAP',
+          id: c.complaintId ? `CAP-${c.complaintId.replace(/^CMP-/, '')}` : (c.id || 'CAP-REQ'),
+          dept: c.department || 'Factory',
+          assignedTo: assignedName,
+          dueDate: deadline ? deadline.toISOString().slice(0, 10) : 'Pending Review',
+          daysOverdue,
+          status: isOverdue ? 'Overdue' : 'Under Review',
+          priority: (c.priority || c.riskSeverity || 'High').charAt(0).toUpperCase() + (c.priority || c.riskSeverity || 'High').slice(1).toLowerCase(),
+          title: c.title || c.description || `${c.department} Corrective Action Plan`,
+        });
+      } else if (!isClosed) {
+        list.push({
+          type: 'NC',
+          id: c.complaintId || `NC-${c.id || c._id}`,
+          dept: c.department || 'Factory',
+          assignedTo: assignedName,
+          dueDate: deadline ? deadline.toISOString().slice(0, 10) : 'Open',
+          daysOverdue,
+          status: isOverdue ? 'Overdue' : c.status || 'Open',
+          priority: (c.priority || c.riskSeverity || 'Medium').charAt(0).toUpperCase() + (c.priority || c.riskSeverity || 'Medium').slice(1).toLowerCase(),
+          title: c.title || c.description || `${c.category || 'Quality'} Non-Conformance`,
+        });
+      }
+    });
+
+    // Sort: Overdue items first, then by days overdue descending
+    list.sort((a, b) => {
+      if (a.status === 'Overdue' && b.status !== 'Overdue') return -1;
+      if (a.status !== 'Overdue' && b.status === 'Overdue') return 1;
+      return b.daysOverdue - a.daysOverdue;
+    });
 
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
@@ -333,115 +518,237 @@ export const AuditProDashboard = ({
         item.id.toLowerCase().includes(q) ||
         item.dept.toLowerCase().includes(q) ||
         item.assignedTo.toLowerCase().includes(q) ||
-        item.type.toLowerCase().includes(q)
+        item.type.toLowerCase().includes(q) ||
+        item.title.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [audits, complaints, searchQuery]);
 
   // ---------------------------------------------------------------------------
-  // 7. DEPARTMENT-WISE NCs HORIZONTAL BARS
+  // 7. DEPARTMENT-WISE NCs HORIZONTAL BARS (Dynamic from live complaints)
   // ---------------------------------------------------------------------------
   const departmentNCBars = useMemo(() => {
-    return [
-      { name: 'Production', count: 8, color: 'bg-blue-500', barBg: 'bg-blue-100 dark:bg-blue-950/60' },
-      { name: 'Quality', count: 6, color: 'bg-teal-500', barBg: 'bg-teal-100 dark:bg-teal-950/60' },
-      { name: 'Maintenance', count: 5, color: 'bg-amber-500', barBg: 'bg-amber-100 dark:bg-amber-950/60' },
-      { name: 'Warehouse', count: 3, color: 'bg-purple-500', barBg: 'bg-purple-100 dark:bg-purple-950/60' },
-      { name: 'Packing', count: 4, color: 'bg-pink-500', barBg: 'bg-pink-100 dark:bg-pink-950/60' },
-      { name: 'Logistics', count: 2, color: 'bg-cyan-500', barBg: 'bg-cyan-100 dark:bg-cyan-950/60' },
+    const countsByDept = {};
+    filteredComplaints.forEach((c) => {
+      const dept = c.department || 'General';
+      countsByDept[dept] = (countsByDept[dept] || 0) + 1;
+    });
+
+    const colors = [
+      { color: 'bg-blue-500', barBg: 'bg-blue-100 dark:bg-blue-950/60' },
+      { color: 'bg-teal-500', barBg: 'bg-teal-100 dark:bg-teal-950/60' },
+      { color: 'bg-amber-500', barBg: 'bg-amber-100 dark:bg-amber-950/60' },
+      { color: 'bg-purple-500', barBg: 'bg-purple-100 dark:bg-purple-950/60' },
+      { color: 'bg-pink-500', barBg: 'bg-pink-100 dark:bg-pink-950/60' },
+      { color: 'bg-cyan-500', barBg: 'bg-cyan-100 dark:bg-cyan-950/60' },
     ];
-  }, []);
+
+    const sortedDepts = Object.keys(countsByDept).sort((a, b) => countsByDept[b] - countsByDept[a]);
+    const deptsToDisplay = sortedDepts.length > 0
+      ? sortedDepts.slice(0, 6)
+      : ['Production', 'Quality', 'Maintenance', 'Warehouse', 'Packing', 'Logistics'];
+
+    return deptsToDisplay.map((name, idx) => ({
+      name,
+      count: countsByDept[name] || 0,
+      color: colors[idx % colors.length].color,
+      barBg: colors[idx % colors.length].barBg,
+    }));
+  }, [filteredComplaints]);
 
   // ---------------------------------------------------------------------------
-  // 8. RECENT ACTIVITY FEED
+  // 8. RECENT ACTIVITY FEED (Dynamically gathered from complaints and audits)
   // ---------------------------------------------------------------------------
   const recentActivities = useMemo(() => {
-    return [
-      {
-        id: 'act-1',
-        title: 'New NC created',
-        detail: 'NC-028 • Packaging issue in machine',
-        time: '10:24 AM',
-        icon: AlertTriangle,
-        iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400',
-      },
-      {
-        id: 'act-2',
-        title: 'Audit completed',
-        detail: 'A-017 • Production Line Audit',
-        time: '09:45 AM',
-        icon: CheckCircle2,
-        iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
-      },
-      {
-        id: 'act-3',
-        title: 'CAP submitted',
-        detail: 'CAP-007 • Maintenance Dept',
-        time: '08:32 AM',
-        icon: CheckCheck,
-        iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
-      },
-      {
-        id: 'act-4',
-        title: 'NC assigned',
-        detail: 'NC-023 • Quality Dept',
-        time: 'Yesterday',
-        icon: User,
-        iconBg: 'bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
-      },
-      {
-        id: 'act-5',
-        title: 'Department updated',
-        detail: 'Logistics team added',
-        time: 'Yesterday',
-        icon: Building2,
-        iconBg: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-400',
-      },
-    ];
-  }, []);
+    const activities = [];
+
+    complaints.forEach((c) => {
+      const createdDate = c.createdAt ? new Date(c.createdAt) : null;
+      if (createdDate) {
+        activities.push({
+          id: `act-nc-${c._id || c.id || c.complaintId}`,
+          title: 'New NC created',
+          detail: `${c.complaintId || 'NC'} • ${c.title || c.category || c.department || 'Issue logged'}`,
+          timestamp: createdDate,
+          icon: AlertTriangle,
+          iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400',
+        });
+      }
+
+      if (['Closed', 'Verified'].includes(c.status)) {
+        const completedDate = c.actualCompletedAt ? new Date(c.actualCompletedAt) : c.updatedAt ? new Date(c.updatedAt) : createdDate;
+        if (completedDate) {
+          activities.push({
+            id: `act-nc-close-${c._id || c.id || c.complaintId}`,
+            title: 'NC closed & verified',
+            detail: `${c.complaintId || 'NC'} • ${c.department || 'Resolved'}`,
+            timestamp: completedDate,
+            icon: CheckCircle2,
+            iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
+          });
+        }
+      }
+
+      if (['CAP Submitted', 'Under Review'].includes(c.status) || c.cap?.submittedAt) {
+        const capDate = c.cap?.submittedAt ? new Date(c.cap.submittedAt) : c.updatedAt ? new Date(c.updatedAt) : createdDate;
+        if (capDate) {
+          activities.push({
+            id: `act-cap-${c._id || c.id || c.complaintId}`,
+            title: 'CAP submitted',
+            detail: `${c.complaintId ? `CAP-${c.complaintId.replace(/^CMP-/, '')}` : 'CAP'} • ${c.department || 'Under Review'}`,
+            timestamp: capDate,
+            icon: CheckCheck,
+            iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+          });
+        }
+      }
+    });
+
+    audits.forEach((a) => {
+      if (a.status === 'Completed' && (a.completed_date || a.updatedAt)) {
+        activities.push({
+          id: `act-audit-done-${a._id || a.id || a.audit_number}`,
+          title: 'Audit completed',
+          detail: `${a.audit_number || 'Audit'} • ${a.title || a.department}`,
+          timestamp: new Date(a.completed_date || a.updatedAt),
+          icon: CheckCircle2,
+          iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
+        });
+      } else if (a.createdAt || a.scheduled_date) {
+        activities.push({
+          id: `act-audit-sched-${a._id || a.id || a.audit_number}`,
+          title: 'Audit scheduled',
+          detail: `${a.audit_number || 'Audit'} • ${a.department || 'Inspection'}`,
+          timestamp: new Date(a.scheduled_date || a.createdAt),
+          icon: Calendar,
+          iconBg: 'bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
+        });
+      }
+    });
+
+    activities.sort((a, b) => b.timestamp - a.timestamp);
+
+    const formatTimeAgo = (date) => {
+      if (!date || isNaN(date.getTime())) return 'Recently';
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays < 7) return `${diffDays}d ago`;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    return activities.slice(0, 5).map((act) => ({
+      ...act,
+      time: formatTimeAgo(act.timestamp),
+    }));
+  }, [complaints, audits]);
 
   // ---------------------------------------------------------------------------
-  // 9. QUICK INSIGHTS
+  // 9. QUICK INSIGHTS (Computed dynamically from current NC and Audit status)
   // ---------------------------------------------------------------------------
   const quickInsights = useMemo(() => {
-    return [
-      {
+    const insights = [];
+
+    // 1. Overdue status
+    if (metrics.overdueAudits > 0) {
+      insights.push({
         id: 'ins-1',
-        title: 'Overdue audits increased by 50%',
-        desc: '6 audits are overdue. Immediate action required.',
+        title: `${metrics.overdueAudits} ${metrics.overdueAudits === 1 ? 'audit is' : 'audits are'} overdue`,
+        desc: 'Immediate action required to resolve pending audit items.',
         icon: AlertOctagon,
         iconColor: 'text-rose-600 dark:text-rose-400',
         cardBg: 'hover:bg-rose-50/50 dark:hover:bg-rose-950/20 border-rose-100 dark:border-rose-900/40',
         targetSec: 'audits',
-      },
-      {
+      });
+    } else {
+      insights.push({
+        id: 'ins-1',
+        title: 'All audits on schedule',
+        desc: '0 overdue audits across all factory departments.',
+        icon: CheckCircle2,
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+        cardBg: 'hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40',
+        targetSec: 'audits',
+      });
+    }
+
+    // 2. Highest NC department
+    const deptCounts = {};
+    complaints.forEach((c) => {
+      const dept = c.department || 'General';
+      deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+    });
+    const sortedDepts = Object.entries(deptCounts).sort((a, b) => b[1] - a[1]);
+
+    if (sortedDepts.length > 0 && sortedDepts[0][1] > 0) {
+      const [topDept, topCount] = sortedDepts[0];
+      const pct = complaints.length > 0 ? Math.round((topCount / complaints.length) * 100) : 0;
+      insights.push({
         id: 'ins-2',
-        title: 'Production has highest NC count',
-        desc: '8 NCs (29% of total). Focus on recurring issues.',
+        title: `${topDept} has highest NC count`,
+        desc: `${topCount} NCs (${pct}% of total). Focus on recurring issues.`,
         icon: AlertTriangle,
         iconColor: 'text-amber-600 dark:text-amber-400',
         cardBg: 'hover:bg-amber-50/50 dark:hover:bg-amber-950/20 border-amber-100 dark:border-amber-900/40',
         targetSec: 'departments',
-      },
-      {
-        id: 'ins-3',
-        title: 'CAP submission rate improved',
-        desc: 'From 62% to 78% this month.',
+      });
+    } else {
+      insights.push({
+        id: 'ins-2',
+        title: 'Zero open non-conformances',
+        desc: 'All factory departments operating within quality standards.',
         icon: CheckCircle2,
         iconColor: 'text-emerald-600 dark:text-emerald-400',
         cardBg: 'hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40',
-        targetSec: 'reports',
-      },
-      {
-        id: 'ins-4',
-        title: 'Average NC closure time',
-        desc: '5.2 days (↓ 18% from last month).',
-        icon: Clock,
-        iconColor: 'text-purple-600 dark:text-purple-400',
-        cardBg: 'hover:bg-purple-50/50 dark:hover:bg-purple-950/20 border-purple-100 dark:border-purple-900/40',
-        targetSec: 'reports',
-      },
-    ];
-  }, []);
+        targetSec: 'departments',
+      });
+    }
+
+    // 3. CAP status
+    const totalNCs = metrics.totalNCs;
+    const pendingCAPs = metrics.pendingCAPs;
+    if (pendingCAPs > 0) {
+      insights.push({
+        id: 'ins-3',
+        title: `${pendingCAPs} CAPs awaiting verification`,
+        desc: 'Review submitted action plans for root cause prevention.',
+        icon: Hourglass,
+        iconColor: 'text-sky-600 dark:text-cyan-400',
+        cardBg: 'hover:bg-sky-50/50 dark:hover:bg-sky-950/20 border-sky-100 dark:border-sky-900/40',
+        targetSec: 'nc-cap',
+      });
+    } else {
+      insights.push({
+        id: 'ins-3',
+        title: 'All CAPs verified & up to date',
+        desc: '100% of corrective action plans processed.',
+        icon: CheckCircle2,
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+        cardBg: 'hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40',
+        targetSec: 'nc-cap',
+      });
+    }
+
+    // 4. Resolution rate
+    const resolutionRate = totalNCs > 0 ? Math.round((metrics.closedNCs / totalNCs) * 100) : 100;
+    insights.push({
+      id: 'ins-4',
+      title: `NC resolution rate: ${resolutionRate}%`,
+      desc: `${metrics.closedNCs} of ${totalNCs} NCs closed and verified.`,
+      icon: CheckCheck,
+      iconColor: 'text-purple-600 dark:text-purple-400',
+      cardBg: 'hover:bg-purple-50/50 dark:hover:bg-purple-950/20 border-purple-100 dark:border-purple-900/40',
+      targetSec: 'reports',
+    });
+
+    return insights;
+  }, [metrics, complaints]);
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
@@ -477,16 +784,16 @@ export const AuditProDashboard = ({
                 <button
                   type="button"
                   onClick={() => {
-                    setDateRangePreset('SEP_2025');
+                    setDateRangePreset('ALL');
                     setIsDateMenuOpen(false);
                   }}
                   className={`w-full text-left px-3 py-2 rounded-lg font-medium cursor-pointer ${
-                    dateRangePreset === 'SEP_2025'
+                    dateRangePreset === 'ALL'
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-cyan-300 font-bold'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  01 Sep 2025 - 30 Sep 2025
+                  All Time History (Live)
                 </button>
                 <button
                   type="button"
@@ -529,20 +836,6 @@ export const AuditProDashboard = ({
                   }`}
                 >
                   Past 7 Days
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDateRangePreset('ALL');
-                    setIsDateMenuOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded-lg font-medium cursor-pointer ${
-                    dateRangePreset === 'ALL'
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-cyan-300 font-bold'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  All Time History
                 </button>
               </div>
             )}
@@ -606,7 +899,7 @@ export const AuditProDashboard = ({
               {metrics.totalAudits}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +12%</span> vs. last month
+              <span className="text-blue-600 dark:text-cyan-400 font-bold">{metrics.completedAudits} of {metrics.totalAudits}</span> completed
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-blue-600 dark:text-cyan-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -633,7 +926,11 @@ export const AuditProDashboard = ({
               {metrics.completedAudits}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +10%</span> vs. last month
+              {metrics.totalAudits > 0 ? (
+                <><span className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.round((metrics.completedAudits / metrics.totalAudits) * 100)}%</span> completion rate</>
+              ) : (
+                <><span className="text-slate-400 font-bold">0%</span> completion rate</>
+              )}
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -660,7 +957,7 @@ export const AuditProDashboard = ({
               {metrics.scheduledAudits}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +11%</span> vs. last month
+              <span className="text-purple-600 dark:text-purple-400 font-bold">{metrics.scheduledAudits}</span> pending inspection
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-purple-600 dark:text-purple-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -687,7 +984,11 @@ export const AuditProDashboard = ({
               {metrics.overdueAudits}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-rose-600 dark:text-rose-400 font-bold">↑ +50%</span> vs. last month
+              {metrics.overdueAudits > 0 ? (
+                <><span className="text-rose-600 dark:text-rose-400 font-bold">{metrics.overdueAudits} overdue</span> requires action</>
+              ) : (
+                <><span className="text-emerald-600 dark:text-emerald-400 font-bold">0 overdue</span> on schedule</>
+              )}
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-rose-600 dark:text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -714,7 +1015,7 @@ export const AuditProDashboard = ({
               {metrics.totalNCs}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +7%</span> vs. last month
+              <span className="text-amber-600 dark:text-amber-400 font-bold">{metrics.openNCs} active</span> NC records
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-amber-600 dark:text-amber-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -741,7 +1042,11 @@ export const AuditProDashboard = ({
               {metrics.openNCs}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-rose-600 dark:text-rose-400 font-bold">↑ +23%</span> vs. last month
+              {metrics.totalNCs > 0 ? (
+                <><span className="text-rose-600 dark:text-rose-400 font-bold">{Math.round((metrics.openNCs / metrics.totalNCs) * 100)}%</span> of total NCs</>
+              ) : (
+                <><span className="text-emerald-600 dark:text-emerald-400 font-bold">0%</span> active NCs</>
+              )}
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-rose-600 dark:text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -768,7 +1073,11 @@ export const AuditProDashboard = ({
               {metrics.closedNCs}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +25%</span> vs. last month
+              {metrics.totalNCs > 0 ? (
+                <><span className="text-emerald-600 dark:text-emerald-400 font-bold">{Math.round((metrics.closedNCs / metrics.totalNCs) * 100)}%</span> resolution rate</>
+              ) : (
+                <><span className="text-slate-400 font-bold">0%</span> resolution rate</>
+              )}
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-emerald-600 dark:text-emerald-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -795,7 +1104,11 @@ export const AuditProDashboard = ({
               {metrics.pendingCAPs}
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold">↑ +9%</span> vs. last month
+              {metrics.pendingCAPs > 0 ? (
+                <><span className="text-sky-600 dark:text-cyan-400 font-bold">{metrics.pendingCAPs} CAPs</span> awaiting review</>
+              ) : (
+                <><span className="text-emerald-600 dark:text-emerald-400 font-bold">All clear</span> 0 pending CAPs</>
+              )}
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-sky-600 dark:text-cyan-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -846,105 +1159,111 @@ export const AuditProDashboard = ({
 
             {/* SVG Combo Chart (Grouped Bars + Line on Dual Axis) */}
             <div className="relative h-56 w-full pt-2">
-              <svg viewBox="0 0 540 200" className="w-full h-full overflow-visible">
-                {/* Horizontal Grid lines */}
-                {[0, 25, 50, 75, 100].map((val, idx) => {
-                  const y = 170 - (val / 100) * 140;
-                  return (
-                    <g key={val}>
-                      <line
-                        x1="30"
-                        y1={y}
-                        x2="500"
-                        y2={y}
-                        stroke="#e2e8f0"
-                        strokeDasharray={idx === 0 ? 'none' : '3,3'}
-                        className="dark:stroke-slate-800"
-                      />
-                      {/* Left Y-axis labels (Counts: 0 to 50) */}
-                      <text
-                        x="24"
-                        y={y + 3}
-                        fontSize="9"
-                        fill="#94a3b8"
-                        textAnchor="end"
-                        fontFamily="monospace"
-                      >
-                        {val / 2}
-                      </text>
-                      {/* Right Y-axis labels (Scores: 60% to 100%) */}
-                      <text
-                        x="506"
-                        y={y + 3}
-                        fontSize="9"
-                        fill="#94a3b8"
-                        textAnchor="start"
-                        fontFamily="monospace"
-                      >
-                        {60 + Math.round(val * 0.4)}%
-                      </text>
-                    </g>
-                  );
-                })}
+              {(() => {
+                const maxTrendCount = Math.max(5, ...trendData.map((d) => Math.max(d.planned, d.completed)));
 
-                {/* Bars for Planned & Completed */}
-                {trendData.map((d, i) => {
-                  const groupX = 55 + i * 74;
-                  const plannedHeight = (d.planned / 50) * 140;
-                  const completedHeight = (d.completed / 50) * 140;
+                const linePoints = trendData.map((d, i) => {
+                  const x = 55 + i * 74 + 15;
+                  const y = 170 - (Math.min(100, Math.max(0, d.score)) / 100) * 140;
+                  return { x, y, score: d.score, month: d.month };
+                });
 
-                  return (
-                    <g key={d.month} className="cursor-pointer group">
-                      {/* Planned Audits Bar (Sky blue) */}
-                      <rect
-                        x={groupX}
-                        y={170 - plannedHeight}
-                        width="14"
-                        height={plannedHeight}
-                        rx="3"
-                        fill="#7dd3fc"
-                        className="transition-all hover:opacity-80"
-                      />
+                const dPath = linePoints.reduce((acc, pt, idx) => {
+                  return idx === 0 ? `M ${pt.x},${pt.y}` : `${acc} L ${pt.x},${pt.y}`;
+                }, '');
 
-                      {/* Completed Audits Bar (Blue 600) */}
-                      <rect
-                        x={groupX + 16}
-                        y={170 - completedHeight}
-                        width="14"
-                        height={completedHeight}
-                        rx="3"
-                        fill="#2563eb"
-                        className="transition-all hover:opacity-90"
-                      />
+                return (
+                  <svg viewBox="0 0 540 200" className="w-full h-full overflow-visible">
+                    {/* Horizontal Grid lines */}
+                    {[0, 25, 50, 75, 100].map((val, idx) => {
+                      const y = 170 - (val / 100) * 140;
+                      return (
+                        <g key={val}>
+                          <line
+                            x1="30"
+                            y1={y}
+                            x2="500"
+                            y2={y}
+                            stroke="#e2e8f0"
+                            strokeDasharray={idx === 0 ? 'none' : '3,3'}
+                            className="dark:stroke-slate-800"
+                          />
+                          {/* Left Y-axis labels */}
+                          <text
+                            x="24"
+                            y={y + 3}
+                            fontSize="9"
+                            fill="#94a3b8"
+                            textAnchor="end"
+                            fontFamily="monospace"
+                          >
+                            {Math.round((val / 100) * maxTrendCount)}
+                          </text>
+                          {/* Right Y-axis labels */}
+                          <text
+                            x="506"
+                            y={y + 3}
+                            fontSize="9"
+                            fill="#94a3b8"
+                            textAnchor="start"
+                            fontFamily="monospace"
+                          >
+                            {val}%
+                          </text>
+                        </g>
+                      );
+                    })}
 
-                      {/* Month X label */}
-                      <text
-                        x={groupX + 15}
-                        y="188"
-                        fontSize="10"
-                        fontWeight="600"
-                        fill="#64748b"
-                        textAnchor="middle"
-                      >
-                        {d.month}
-                      </text>
-                    </g>
-                  );
-                })}
+                    {/* Bars for Planned & Completed */}
+                    {trendData.map((d, i) => {
+                      const groupX = 55 + i * 74;
+                      const plannedHeight = maxTrendCount > 0 ? (d.planned / maxTrendCount) * 140 : 0;
+                      const completedHeight = maxTrendCount > 0 ? (d.completed / maxTrendCount) * 140 : 0;
 
-                {/* Score Line (Score 60% to 100% -> scale (score - 60) / 40 * 140) */}
-                {(() => {
-                  const linePoints = trendData.map((d, i) => {
-                    const x = 55 + i * 74 + 15;
-                    const y = 170 - ((d.score - 60) / 40) * 140;
-                    return { x, y, score: d.score, month: d.month };
-                  });
+                      return (
+                        <g key={d.month} className="cursor-pointer group">
+                          {/* Planned Audits Bar (Sky blue) */}
+                          <rect
+                            x={groupX}
+                            y={170 - plannedHeight}
+                            width="14"
+                            height={plannedHeight}
+                            rx="3"
+                            fill="#7dd3fc"
+                            className="transition-all hover:opacity-80"
+                          >
+                            <title>{`${d.month} Planned: ${d.planned}`}</title>
+                          </rect>
 
-                  const dPath = linePoints.reduce((acc, pt, idx) => {
-                    return idx === 0 ? `M ${pt.x},${pt.y}` : `${acc} L ${pt.x},${pt.y}`;
-                  }, '');
+                          {/* Completed Audits Bar (Blue 600) */}
+                          <rect
+                            x={groupX + 16}
+                            y={170 - completedHeight}
+                            width="14"
+                            height={completedHeight}
+                            rx="3"
+                            fill="#2563eb"
+                            className="transition-all hover:opacity-90"
+                          >
+                            <title>{`${d.month} Completed: ${d.completed}`}</title>
+                          </rect>
 
-                  return (
+                          {/* Month X label */}
+                          <text
+                            x={groupX + 15}
+                            y="188"
+                            fontSize="10"
+                            fontWeight="600"
+                            fill="#64748b"
+                            textAnchor="middle"
+                          >
+                            {d.month}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Score Line */}
                     <g>
                       <path
                         d={dPath}
@@ -968,9 +1287,9 @@ export const AuditProDashboard = ({
                         </circle>
                       ))}
                     </g>
-                  );
-                })()}
-              </svg>
+                  </svg>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1248,46 +1567,56 @@ export const AuditProDashboard = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {departmentPerformanceList.map((d) => (
-                    <tr
-                      key={d.name}
-                      onClick={() => onDrilldownDepartment && onDrilldownDepartment(d.name)}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>{d.icon}</span>
-                        <span className="group-hover:text-blue-600 transition-colors">{d.name}</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-700 dark:text-slate-300">
-                        {d.audits}
-                      </td>
-                      <td className="py-2.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200 w-8">
-                            {d.score}%
-                          </span>
-                          <div className="w-20 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500 rounded-full"
-                              style={{ width: `${d.score}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {d.totalNC}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
-                        {d.openNC}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {d.closedNC}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600 dark:text-slate-400">
-                        {d.pendingCAP}
+                  {departmentPerformanceList.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-8 text-center text-slate-400">
+                        <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
+                        <p className="font-bold text-slate-700 dark:text-slate-300">No departments match your filter</p>
+                        <p className="text-xs text-slate-400">Try clearing the search query or changing filters.</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    departmentPerformanceList.map((d) => (
+                      <tr
+                        key={d.name}
+                        onClick={() => onDrilldownDepartment && onDrilldownDepartment(d.name)}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                      >
+                        <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span>{d.icon}</span>
+                          <span className="group-hover:text-blue-600 transition-colors">{d.name}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-700 dark:text-slate-300">
+                          {d.audits}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200 w-8">
+                              {d.score}%
+                            </span>
+                            <div className="w-20 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 rounded-full"
+                                style={{ width: `${d.score}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
+                          {d.totalNC}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
+                          {d.openNC}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {d.closedNC}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-600 dark:text-slate-400">
+                          {d.pendingCAP}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1337,66 +1666,76 @@ export const AuditProDashboard = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {overdueWorkList.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => setSelectedInspectionItem(item)}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            item.type === 'Audit'
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-cyan-300'
-                              : item.type === 'NC'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-300'
-                          }`}
-                        >
-                          {item.type}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
-                        {item.id}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
-                        {item.dept}
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                        {item.assignedTo}
-                      </td>
-                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                        {item.dueDate}
-                      </td>
-                      <td className="py-2.5 px-2 text-center font-mono font-bold text-rose-600">
-                        {item.daysOverdue}
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            item.status === 'Overdue'
-                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                            item.priority === 'High'
-                              ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/60'
-                              : item.priority === 'Medium'
-                              ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/60'
-                              : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60'
-                          }`}
-                        >
-                          {item.priority}
-                        </span>
+                  {overdueWorkList.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="py-8 text-center text-slate-400">
+                        <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500 opacity-80" />
+                        <p className="font-bold text-slate-700 dark:text-slate-300">All tasks are up to date</p>
+                        <p className="text-xs text-slate-400">No overdue audits, NCs, or pending CAPs found.</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    overdueWorkList.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => setSelectedInspectionItem(item)}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group"
+                      >
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              item.type === 'Audit'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-cyan-300'
+                                : item.type === 'NC'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950 dark:text-rose-300'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-300'
+                            }`}
+                          >
+                            {item.type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                          {item.id}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
+                          {item.dept}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                          {item.assignedTo}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                          {item.dueDate}
+                        </td>
+                        <td className="py-2.5 px-2 text-center font-mono font-bold text-rose-600">
+                          {item.daysOverdue}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              item.status === 'Overdue'
+                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              item.priority === 'High'
+                                ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/60'
+                                : item.priority === 'Medium'
+                                ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/60'
+                                : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60'
+                            }`}
+                          >
+                            {item.priority}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1426,22 +1765,33 @@ export const AuditProDashboard = ({
             </div>
 
             <div className="space-y-3 pt-1">
-              {departmentNCBars.map((item) => (
-                <div key={item.name} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-medium text-slate-700 dark:text-slate-300">
-                    <span>{item.name}</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                      {item.count}
-                    </span>
-                  </div>
-                  <div className={`w-full h-2 rounded-full ${item.barBg} overflow-hidden`}>
-                    <div
-                      className={`h-full rounded-full ${item.color} transition-all duration-500`}
-                      style={{ width: `${(item.count / 10) * 100}%` }}
-                    />
-                  </div>
+              {departmentNCBars.length === 0 || departmentNCBars.every((d) => d.count === 0) ? (
+                <div className="py-6 text-center text-slate-400">
+                  <CheckCircle2 className="w-6 h-6 mx-auto mb-1.5 text-emerald-500 opacity-80" />
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">No non-conformances</p>
+                  <p className="text-[11px] text-slate-400">All departments currently have 0 NCs recorded.</p>
                 </div>
-              ))}
+              ) : (
+                (() => {
+                  const maxNC = Math.max(1, ...departmentNCBars.map((d) => d.count));
+                  return departmentNCBars.map((item) => (
+                    <div key={item.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-medium text-slate-700 dark:text-slate-300">
+                        <span>{item.name}</span>
+                        <span className="font-mono font-bold text-slate-900 dark:text-white">
+                          {item.count}
+                        </span>
+                      </div>
+                      <div className={`w-full h-2 rounded-full ${item.barBg} overflow-hidden`}>
+                        <div
+                          className={`h-full rounded-full ${item.color} transition-all duration-500`}
+                          style={{ width: `${(item.count / maxNC) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ));
+                })()
+              )}
             </div>
           </div>
         </div>
@@ -1469,32 +1819,40 @@ export const AuditProDashboard = ({
             </div>
 
             <div className="space-y-3">
-              {recentActivities.map((act) => {
-                const IconComponent = act.icon;
-                return (
-                  <div
-                    key={act.id}
-                    className="flex items-start justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${act.iconBg}`}>
-                        <IconComponent className="w-3.5 h-3.5" />
-                      </span>
-                      <div>
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                          {act.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                          {act.detail}
-                        </p>
+              {recentActivities.length === 0 ? (
+                <div className="py-6 text-center text-slate-400">
+                  <Clock className="w-6 h-6 mx-auto mb-1.5 text-slate-400 opacity-60" />
+                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">No recent activity</p>
+                  <p className="text-[11px] text-slate-400">Live audit and NC events will appear here.</p>
+                </div>
+              ) : (
+                recentActivities.map((act) => {
+                  const IconComponent = act.icon;
+                  return (
+                    <div
+                      key={act.id}
+                      className="flex items-start justify-between gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${act.iconBg}`}>
+                          <IconComponent className="w-3.5 h-3.5" />
+                        </span>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                            {act.title}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {act.detail}
+                          </p>
+                        </div>
                       </div>
+                      <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                        {act.time}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                      {act.time}
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
