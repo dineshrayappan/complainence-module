@@ -26,13 +26,17 @@ export const SidebarNavigation = ({
   const { isAdmin, isAuditor } = useAuth();
 
   const navItems = [
-    {
-      id: 'dashboard',
-      label: 'Dashboard',
-      icon: LayoutDashboard,
-      badge: null,
-      badgeColor: '',
-    },
+    ...(isAdmin || isAuditor
+      ? [
+          {
+            id: 'dashboard',
+            label: 'Dashboard',
+            icon: LayoutDashboard,
+            badge: null,
+            badgeColor: '',
+          },
+        ]
+      : []),
     // {
     //   id: 'tasks',
     //   label: 'NC Tasks',

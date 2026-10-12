@@ -82,9 +82,27 @@ export const App = () => {
   const [toastMessage, setToastMessage] = useState(null);
 
   // Navigation & Sidebar States
-  const [currentNavSection, setCurrentNavSection] = useState('dashboard'); // 'dashboard', 'tasks', 'audits', 'nc', 'cap', 'departments', 'work-operations', 'requirements', 'reports', 'settings'
+  const [currentNavSection, setCurrentNavSection] = useState(() => {
+    try {
+      const stored = localStorage.getItem('garment_qms_user');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u.role === 'SUPERVISOR' || u.role === 'ACTION_PERSON') {
+          return 'nc-cap';
+        }
+      }
+    } catch (e) {}
+    return 'dashboard';
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [workOpsDept, setWorkOpsDept] = useState('ALL');
+
+  // Ensure supervisor/department users cannot view or land on the dashboard
+  useEffect(() => {
+    if (user && !isAdmin && !isAuditor && currentNavSection === 'dashboard') {
+      setCurrentNavSection('nc-cap');
+    }
+  }, [user, isAdmin, isAuditor, currentNavSection]);
 
   // Filter States
   const [activeTab, setActiveTab] = useState('all');
@@ -562,7 +580,7 @@ export const App = () => {
               </span>
               <span>•</span>
               <span>12–24h SLA</span>
-              {currentNavSection !== 'dashboard' && (
+              {currentNavSection !== 'dashboard' && (isAdmin || isAuditor) && (
                 <>
                   <span>•</span>
                   <button
@@ -578,7 +596,7 @@ export const App = () => {
           </div>
 
           {/* Main View Switcher driven by Sidebar */}
-          {currentNavSection === 'dashboard' ? (
+          {currentNavSection === 'dashboard' && (isAdmin || isAuditor) ? (
             <FactoryComplianceHome
               onNavigateSection={(sec) => {
                 const targetSec = (sec === 'nc' || sec === 'cap') ? 'nc-cap' : sec;
@@ -589,7 +607,7 @@ export const App = () => {
               onDrilldownDepartment={handleDrilldownDepartment}
               onOpenNewComplaint={() => setIsNewModalOpen(true)}
             />
-          ) : currentNavSection === 'departments' ? (
+          ) : currentNavSection === 'departments' && (isAdmin || isAuditor) ? (
             <DepartmentComplianceDashboard
               onSelectDepartment={handleDrilldownDepartment}
               onClose={() => setCurrentNavSection('dashboard')}
@@ -601,7 +619,7 @@ export const App = () => {
           ) : currentNavSection === 'work-operations' ? (
             <DepartmentWorkOperations
               initialDepartment={workOpsDept}
-              onBackToScorecard={() => setCurrentNavSection('departments')}
+              onBackToScorecard={isAdmin || isAuditor ? () => setCurrentNavSection('departments') : undefined}
             />
           ) : currentNavSection === 'requirements' ? (
             <RequirementsComplianceView
