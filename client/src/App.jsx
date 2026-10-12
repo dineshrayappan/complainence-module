@@ -28,7 +28,7 @@ import FactoryComplianceHome from './components/FactoryComplianceHome';
 import RequirementsComplianceView from './components/RequirementsComplianceView';
 import ReportsView from './components/ReportsView';
 import AuditManagementDashboard from './components/AuditManagementDashboard';
-import { Crown, BarChart3, Users, Building2, Flame, CheckSquare, Search, Filter } from 'lucide-react';
+import { BarChart3, Users, Building2, Flame, CheckSquare, Search, Filter } from 'lucide-react';
 
 // Safe localStorage caching helper namespaced by user to prevent QuotaExceededError and cross-account data leaks
 const getCacheKey = (user) => `garment_qms_cached_complaints_${user?.employeeId || user?.id || user?._id || 'guest'}`;

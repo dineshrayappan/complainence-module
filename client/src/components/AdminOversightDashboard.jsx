@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Crown,
   AlertTriangle,
   Clock,
   CheckCircle2,
@@ -177,7 +176,7 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
       <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-rose-500/10 border border-amber-300/40 dark:border-amber-700/30 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 shadow-sm backdrop-blur-md">
         <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
           <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center shadow-md shadow-orange-500/20 shrink-0">
-            <Crown className="w-5 h-5 sm:w-6 sm:h-6" />
+            <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">

@@ -5,7 +5,7 @@ import {
   KeyRound,
   ShieldCheck,
   Wrench,
-  Crown,
+  UserCog,
   Search,
   Copy,
   Check,
@@ -592,7 +592,7 @@ export const AdminUserManagement = () => {
         <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/20 shadow-xs col-span-2 sm:col-span-4 lg:col-span-1">
           <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 text-xs font-semibold mb-1">
             <span>Admins</span>
-            <Crown className="w-4 h-4 text-amber-500" />
+            <UserCog className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-300">
             {adminCount}

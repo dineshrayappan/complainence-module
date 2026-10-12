@@ -5,7 +5,6 @@ import {
   LogOut,
   ShieldCheck,
   Wrench,
-  Crown,
   RefreshCw,
   Camera,
   Layers,
@@ -278,7 +277,7 @@ export const Header = ({
                     : 'bg-gradient-to-tr from-emerald-600 to-teal-600'
                 }`}
               >
-                {isAdmin ? <Crown className="w-3.5 h-3.5" /> : user?.name?.charAt(0) || 'U'}
+                {user?.name?.charAt(0) || (isAdmin ? 'A' : 'U')}
               </div>
 
               <div className="flex flex-col">
