@@ -87,7 +87,7 @@ export const App = () => {
       const stored = localStorage.getItem('garment_qms_user');
       if (stored) {
         const u = JSON.parse(stored);
-        if (u.role === 'SUPERVISOR' || u.role === 'ACTION_PERSON') {
+        if (u.role === 'SUPERVISOR' || u.role === 'ACTION_PERSON' || (u.role !== 'ADMIN' && u.role !== 'AUDITOR' && !u.isUniversal)) {
           return 'nc-cap';
         }
       }
@@ -97,12 +97,20 @@ export const App = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [workOpsDept, setWorkOpsDept] = useState('ALL');
 
-  // Ensure supervisor/department users cannot view or land on the dashboard
+  // Supervisor user check (department persona)
+  const isSupervisorUser = user && (user.role === 'SUPERVISOR' || user.role === 'ACTION_PERSON' || (!isAdmin && !isAuditor));
+  
+  // Department (supervisor) page strictly permits only: nc-cap, work-operations, reports. Dashboard is completely removed.
+  const effectiveNavSection = (isSupervisorUser && currentNavSection !== 'work-operations' && currentNavSection !== 'reports')
+    ? 'nc-cap'
+    : currentNavSection;
+
+  // Ensure supervisor/department users cannot view or land on the dashboard or unauthorized sections
   useEffect(() => {
-    if (user && !isAdmin && !isAuditor && currentNavSection === 'dashboard') {
+    if (isSupervisorUser && currentNavSection !== 'nc-cap' && currentNavSection !== 'work-operations' && currentNavSection !== 'reports') {
       setCurrentNavSection('nc-cap');
     }
-  }, [user, isAdmin, isAuditor, currentNavSection]);
+  }, [isSupervisorUser, currentNavSection]);
 
   // Filter States
   const [activeTab, setActiveTab] = useState('all');
@@ -529,9 +537,12 @@ export const App = () => {
       <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
         {/* Left Sidebar Navigation */}
         <SidebarNavigation
-          currentSection={currentNavSection}
+          currentSection={effectiveNavSection}
           onSelectSection={(sec) => {
-            const targetSec = (sec === 'nc' || sec === 'cap') ? 'nc-cap' : sec;
+            let targetSec = (sec === 'nc' || sec === 'cap') ? 'nc-cap' : sec;
+            if (isSupervisorUser && targetSec !== 'nc-cap' && targetSec !== 'work-operations' && targetSec !== 'reports') {
+              targetSec = 'nc-cap';
+            }
             setCurrentNavSection(targetSec);
             if (sec === 'tasks') {
               setActiveTab('open');
@@ -580,7 +591,7 @@ export const App = () => {
               </span>
               <span>•</span>
               <span>12–24h SLA</span>
-              {currentNavSection !== 'dashboard' && (isAdmin || isAuditor) && (
+              {effectiveNavSection !== 'dashboard' && (isAdmin || isAuditor) && (
                 <>
                   <span>•</span>
                   <button
@@ -596,7 +607,7 @@ export const App = () => {
           </div>
 
           {/* Main View Switcher driven by Sidebar */}
-          {currentNavSection === 'dashboard' && (isAdmin || isAuditor) ? (
+          {effectiveNavSection === 'dashboard' && (isAdmin || isAuditor) ? (
             <FactoryComplianceHome
               onNavigateSection={(sec) => {
                 const targetSec = (sec === 'nc' || sec === 'cap') ? 'nc-cap' : sec;
@@ -607,7 +618,7 @@ export const App = () => {
               onDrilldownDepartment={handleDrilldownDepartment}
               onOpenNewComplaint={() => setIsNewModalOpen(true)}
             />
-          ) : currentNavSection === 'departments' && (isAdmin || isAuditor) ? (
+          ) : effectiveNavSection === 'departments' && (isAdmin || isAuditor) ? (
             <DepartmentComplianceDashboard
               onSelectDepartment={handleDrilldownDepartment}
               onClose={() => setCurrentNavSection('dashboard')}
@@ -616,25 +627,25 @@ export const App = () => {
                 setCurrentNavSection('work-operations');
               }}
             />
-          ) : currentNavSection === 'work-operations' ? (
+          ) : effectiveNavSection === 'work-operations' ? (
             <DepartmentWorkOperations
               initialDepartment={workOpsDept}
               onBackToScorecard={isAdmin || isAuditor ? () => setCurrentNavSection('departments') : undefined}
             />
-          ) : currentNavSection === 'requirements' ? (
+          ) : effectiveNavSection === 'requirements' && (isAdmin || isAuditor) ? (
             <RequirementsComplianceView
               onSelectRequirement={(clause) => {
                 setSearchTerm(clause);
                 setCurrentNavSection('nc-cap');
               }}
             />
-          ) : currentNavSection === 'reports' ? (
+          ) : effectiveNavSection === 'reports' ? (
             <ReportsView complaints={complaints} />
-          ) : currentNavSection === 'settings' ? (
+          ) : effectiveNavSection === 'settings' ? (
             isAdmin ? (
               <AdminUserManagement />
             ) : null
-          ) : currentNavSection === 'audits' ? (
+          ) : effectiveNavSection === 'audits' && (isAdmin || isAuditor) ? (
             <AuditManagementDashboard
               onOpenNewComplaint={handleOpenNewComplaintWithPrefill}
               onSelectNCFilter={(filter) => {
@@ -646,7 +657,7 @@ export const App = () => {
             /* NC Register / Tasks / Audits / CAP */
             <>
               {/* Optional Section Guidance Banner */}
-              {currentNavSection === 'tasks' && (
+              {effectiveNavSection === 'tasks' && (
                 <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />
@@ -660,7 +671,7 @@ export const App = () => {
                 </div>
               )}
 
-              {currentNavSection === 'audits' && (
+              {effectiveNavSection === 'audits' && (
                 <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 mb-4 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -680,7 +691,7 @@ export const App = () => {
                 </div>
               )}
 
-              {(currentNavSection === 'nc-cap' || currentNavSection === 'nc' || currentNavSection === 'cap') && (
+              {(effectiveNavSection === 'nc-cap' || effectiveNavSection === 'nc' || effectiveNavSection === 'cap') && (
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-indigo-500/10 border border-amber-500/20 dark:border-amber-500/30 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-amber-500/20 dark:bg-amber-500/30 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 border border-amber-500/30">

@@ -23,88 +23,94 @@ export const SidebarNavigation = ({
   isOpen = false,
   onClose,
 }) => {
-  const { isAdmin, isAuditor } = useAuth();
+  const { user, isAdmin, isAuditor } = useAuth();
+  const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || (!isAdmin && !isAuditor);
 
-  const navItems = [
-    ...(isAdmin || isAuditor
-      ? [
-          {
-            id: 'dashboard',
-            label: 'Dashboard',
-            icon: LayoutDashboard,
-            badge: null,
-            badgeColor: '',
-          },
-        ]
-      : []),
-    // {
-    //   id: 'tasks',
-    //   label: 'NC Tasks',
-    //   icon: ClipboardList,
-    //   badge: counts.tasks || null,
-    //   badgeColor: 'bg-indigo-500 text-white',
-    //   hidden: true,
-    // },
-    // {
-    //   id: 'audits',
-    //   label: 'Audits',
-    //   icon: ShieldCheck,
-    //   badge: counts.audits !== undefined && counts.audits !== null && counts.audits > 0 ? String(counts.audits) : null,
-    //   badgeColor: 'bg-purple-500 text-white',
-    // },
-    {
-      id: 'nc-cap',
-      label: 'NC/CAP',
-      icon: FileCheck,
-      badge:
-        (counts.openNC || 0) + (counts.cap || 0) > 0
-          ? String((counts.openNC || 0) + (counts.cap || 0))
-          : null,
-      badgeColor: 'bg-amber-500 text-white',
-    },
-    { isDivider: true },
-   // {
-     // id: 'departments',
-     // label: 'Departments',
-     // icon: Building2,
-     // badge: counts.deptCount !== undefined && counts.deptCount !== null && counts.deptCount > 0 ? String(counts.deptCount) : null,
-     // badgeColor: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200',
-   // },
-    {
-      id: 'work-operations',
-      label: 'Work Operations',
-      icon: Activity,
-      badge: counts.activeTasks !== undefined && counts.activeTasks !== null && counts.activeTasks > 0 ? String(counts.activeTasks) : 'Live',
-      badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-cyan-400 border border-indigo-500/20',
-    },
-    //{
-      //id: 'requirements',
-      //label: 'Requirements',
-      //icon: BookOpen,
-      //badge: 'ISO / SA',
-      //badgeColor: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20',
-    //},
-    { isDivider: true },
-    {
-      id: 'reports',
-      label: 'Reports',
-      icon: BarChart3,
-      badge: null,
-      badgeColor: '',
-    },
-    ...(isAdmin
-      ? [
+  const navItems = isSupervisor
+    ? [
+        {
+          id: 'nc-cap',
+          label: 'NC/CAP',
+          icon: FileCheck,
+          badge:
+            (counts.openNC || 0) + (counts.cap || 0) > 0
+              ? String((counts.openNC || 0) + (counts.cap || 0))
+              : null,
+          badgeColor: 'bg-amber-500 text-white',
+        },
         { isDivider: true },
         {
-          id: 'settings',
-          label: 'Settings',
-          icon: Settings,
-          badge: 'Admin',
-          badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+          id: 'work-operations',
+          label: 'Work Operations',
+          icon: Activity,
+          badge:
+            counts.activeTasks !== undefined && counts.activeTasks !== null && counts.activeTasks > 0
+              ? String(counts.activeTasks)
+              : 'Live',
+          badgeColor:
+            'bg-indigo-500/10 text-indigo-600 dark:text-cyan-400 border border-indigo-500/20',
+        },
+        { isDivider: true },
+        {
+          id: 'reports',
+          label: 'Reports',
+          icon: BarChart3,
+          badge: null,
+          badgeColor: '',
         },
       ]
-      : []),
-  ];
+    : [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          icon: LayoutDashboard,
+          badge: null,
+          badgeColor: '',
+        },
+        {
+          id: 'nc-cap',
+          label: 'NC/CAP',
+          icon: FileCheck,
+          badge:
+            (counts.openNC || 0) + (counts.cap || 0) > 0
+              ? String((counts.openNC || 0) + (counts.cap || 0))
+              : null,
+          badgeColor: 'bg-amber-500 text-white',
+        },
+        { isDivider: true },
+        {
+          id: 'work-operations',
+          label: 'Work Operations',
+          icon: Activity,
+          badge:
+            counts.activeTasks !== undefined && counts.activeTasks !== null && counts.activeTasks > 0
+              ? String(counts.activeTasks)
+              : 'Live',
+          badgeColor:
+            'bg-indigo-500/10 text-indigo-600 dark:text-cyan-400 border border-indigo-500/20',
+        },
+        { isDivider: true },
+        {
+          id: 'reports',
+          label: 'Reports',
+          icon: BarChart3,
+          badge: null,
+          badgeColor: '',
+        },
+        ...(isAdmin
+          ? [
+              { isDivider: true },
+              {
+                id: 'settings',
+                label: 'Settings',
+                icon: Settings,
+                badge: 'Admin',
+                badgeColor:
+                  'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+              },
+            ]
+          : []),
+      ];
 
   const handleItemClick = (id) => {
     onSelectSection(id);
