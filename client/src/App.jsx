@@ -25,6 +25,7 @@ import DepartmentComplianceDashboard from './components/DepartmentComplianceDash
 import DepartmentWorkOperations from './components/DepartmentWorkOperations';
 import SidebarNavigation from './components/SidebarNavigation';
 import FactoryComplianceHome from './components/FactoryComplianceHome';
+import AuditProDashboard from './components/AuditProDashboard';
 import RequirementsComplianceView from './components/RequirementsComplianceView';
 import ReportsView from './components/ReportsView';
 import AuditManagementDashboard from './components/AuditManagementDashboard';
@@ -614,7 +615,7 @@ export const App = () => {
 
           {/* Main View Switcher driven by Sidebar */}
           {effectiveNavSection === 'dashboard' && (isAdmin || isAuditor) ? (
-            <FactoryComplianceHome
+            <AuditProDashboard
               onNavigateSection={(sec) => {
                 const targetSec = (sec === 'nc' || sec === 'cap') ? 'nc-cap' : sec;
                 setCurrentNavSection(targetSec);
@@ -623,6 +624,7 @@ export const App = () => {
               }}
               onDrilldownDepartment={handleDrilldownDepartment}
               onOpenNewComplaint={() => setIsNewModalOpen(true)}
+              onViewComplaint={handleOpenDetailModal}
             />
           ) : effectiveNavSection === 'departments' && (isAdmin || isAuditor) ? (
             <DepartmentComplianceDashboard
@@ -655,8 +657,8 @@ export const App = () => {
                 setCurrentNavSection('nc-cap');
               }}
             />
-          ) : effectiveNavSection === 'settings' ? (
-            isAdmin ? (
+          ) : (effectiveNavSection === 'settings' || effectiveNavSection === 'users') ? (
+            isAdmin || isAuditor ? (
               <AdminUserManagement />
             ) : null
           ) : effectiveNavSection === 'audits' && (isAdmin || isAuditor) ? (
