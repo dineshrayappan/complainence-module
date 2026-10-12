@@ -22,7 +22,6 @@ import {
   Sparkles,
   Calendar,
   ListChecks,
-  Sliders,
   HelpCircle,
   UserCheck,
   AlertCircle,
@@ -140,69 +139,6 @@ const AUDIT_DEPARTMENTS = [
   },
 ];
 
-// Standard garment quality audit requirements & clauses
-const AUDIT_REQUIREMENTS = [
-  {
-    id: 'AQL 1.5 Workmanship Standard',
-    title: 'AQL 1.5 Workmanship Standard',
-    standard: 'AQL Level II (Major 1.5 / Minor 4.0)',
-    desc: 'Garment appearance, sewing tolerance, and buyer visual acceptance threshold.',
-  },
-  {
-    id: 'ISO 9001:2015 Clause 8.5',
-    title: 'ISO 9001:2015 Clause 8.5',
-    standard: 'Production & Service Provision',
-    desc: 'Controlled conditions, validation of stitching processes, and traceability.',
-  },
-  {
-    id: 'ISO 9001:2015 Clause 8.7',
-    title: 'ISO 9001:2015 Clause 8.7',
-    standard: 'Control of Nonconforming Outputs',
-    desc: 'Identification, segregation, and disposition of non-conforming garment units.',
-  },
-  {
-    id: 'Buyer Technical Audit Standard',
-    title: 'Buyer Technical Audit Standard',
-    standard: 'Brand SOP & Tech Pack Tolerance',
-    desc: 'Measurement chart variance, seam allowance, and technical construction rules.',
-  },
-  {
-    id: 'Needle Policy & Metal Detection Procedure',
-    title: 'Needle Policy & Metal Detection',
-    standard: 'Safety & Metal Contamination Free',
-    desc: '9-point calibration, daily log, and broken needle retrieval record.',
-  },
-  {
-    id: 'Seam Strength & SPI Standard',
-    title: 'Seam Strength & SPI Standard',
-    standard: 'Stitches Per Inch & Seam Elasticity',
-    desc: 'Minimum 10–12 SPI compliance and cross-seam burst strength testing.',
-  },
-  {
-    id: 'Fabric 4-Point System Standard',
-    title: 'Fabric 4-Point System Standard',
-    standard: 'ASTM D5430 Visual Flaw Scoring',
-    desc: 'Yarn flaws, holes, barre, and color shading within 4-point penalty limit.',
-  },
-  {
-    id: 'Safety & Factory Floor Compliance',
-    title: 'Safety & Factory Floor Compliance',
-    standard: 'PPE, Eye Shield & Needle Guards',
-    desc: 'Machine safety guards, eye protection, clean floor aisles, and ergonomics.',
-  },
-  {
-    id: 'None of Other',
-    title: 'None of Other',
-    standard: 'Other / Custom Standard',
-    desc: 'Standard or clause not listed above. Manually specify custom requirement.',
-  },
-  {
-    id: 'Custom Audit Requirement',
-    title: 'Custom Audit Requirement',
-    standard: 'Specific Contract or Buyer SOP',
-    desc: 'Custom audit clause specified manually by the internal auditor.',
-  },
-];
 
 // Predefined Defect Findings for Describe Finding selection
 const PREDEFINED_FINDINGS = [
@@ -264,50 +200,21 @@ const RISK_LEVELS = [
   },
 ];
 
-// Auditor Verification Methods
-const VERIFICATION_METHODS = [
-  {
-    id: 'Physical Floor Re-inspection',
-    title: 'Physical Floor Re-inspection',
-    desc: 'Auditor conducts on-site 100% floor audit at the designated workstation.',
-  },
-  {
-    id: 'High-Res Photo & Video Proof Review',
-    title: 'High-Res Photo & Video Proof Review',
-    desc: 'Digital verification of supervisor after-rectification photos and machine settings.',
-  },
-  {
-    id: 'Statistical AQL 1.5 Re-sampling',
-    title: 'Statistical AQL 1.5 Re-sampling',
-    desc: 'Auditor randomly pulls a fresh sample batch (50–125 pcs) from finished output.',
-  },
-  {
-    id: 'Seam Tension & Dimension Gauge Check',
-    title: 'Seam Tension & Dimension Gauge Check',
-    desc: 'Caliper, SPI glass, and tensile gauge physical verification of rectifications.',
-  },
-];
-
-
-
-// Workflow Stage Definitions matching the requested flow
+// Workflow Stage Definitions for the 8-stage step-by-step wizard
 const WORKFLOW_STEPS = [
   { id: 1, label: 'Department', short: 'Dept' },
-  { id: 2, label: 'Requirement', short: 'Standard' },
-  { id: 3, label: 'Describe Finding', short: 'Finding' },
-  { id: 4, label: 'Risk / Severity', short: 'Severity' },
-  { id: 5, label: 'Responsible Person', short: 'Assignee' },
-  { id: 6, label: 'Set Due Date', short: 'Due Date' },
-  { id: 7, label: 'CAP Required', short: 'CAPA' },
-  { id: 8, label: 'Evidence', short: 'Proof' },
-  { id: 9, label: 'Verification', short: 'Verify' },
-  { id: 10, label: 'Close NC Protocol', short: 'Issue NC' },
+  { id: 2, label: 'Describe Finding', short: 'Finding' },
+  { id: 3, label: 'Risk / Severity', short: 'Severity' },
+  { id: 4, label: 'Responsible Person', short: 'Assignee' },
+  { id: 5, label: 'Set Due Date', short: 'Due Date' },
+  { id: 6, label: 'CAP Required', short: 'CAPA' },
+  { id: 7, label: 'Evidence', short: 'Proof' },
+  { id: 8, label: 'Close NC Protocol', short: 'Issue NC' },
 ];
 
 export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = null }) => {
   const fileInputRef = useRef(null);
   const [currentStep, setCurrentStep] = useState(1);
-  const [viewMode, setViewMode] = useState('wizard'); // 'wizard' (step-by-step) or 'all' (complete audit sheet)
 
   // Supervisors from server
   const [supervisors, setSupervisors] = useState([]);
@@ -315,52 +222,41 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Form State corresponding to the 10 workflow stages
+  // Form State corresponding to the workflow stages
   // Stage 1: Select Department & Location
   const [department, setDepartment] = useState('Production');
   const [location, setLocation] = useState('Production Floor - Sewing Section');
 
-  // Stage 2: Select Requirement
-  const [requirement, setRequirement] = useState('AQL 1.5 Workmanship Standard');
-  const [customRequirement, setCustomRequirement] = useState('');
-  const [isManualRequirement, setIsManualRequirement] = useState(false);
-
-  // Stage 3: Describe Finding & Category
+  // Stage 2: Describe Finding & Category
   const [category, setCategory] = useState('Stitching Fault');
   const [description, setDescription] = useState('');
   const [selectedFinding, setSelectedFinding] = useState('');
   const [isManualFinding, setIsManualFinding] = useState(false);
 
-  // Stage 4: Risk / Severity
+  // Stage 3: Risk / Severity
   const [priority, setPriority] = useState('HIGH');
 
-  // Stage 5: Assign Responsible Person
+  // Stage 4: Assign Responsible Person
   const [assignedToUserId, setAssignedToUserId] = useState('');
   const [contactSearch, setContactSearch] = useState('');
   const [liveEmployees, setLiveEmployees] = useState([]);
 
-  // Stage 6: Set Due Date & SLA
+  // Stage 5: Set Due Date & SLA
   const [deadlineHours, setDeadlineHours] = useState(16);
   const [customDueDate, setCustomDueDate] = useState('');
   const [useCustomDate, setUseCustomDate] = useState(false);
 
-  // Stage 7: CAP Required
+  // Stage 6: CAP Required
   const [capRequired, setCapRequired] = useState(true);
   const [immediateContainment, setImmediateContainment] = useState('');
   const [capDirective, setCapDirective] = useState('');
 
-  // Stage 8: Evidence Photo
+  // Stage 7: Evidence Photo
   const [beforeFile, setBeforeFile] = useState(null);
   const [photoBase64, setPhotoBase64] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [imageMeta, setImageMeta] = useState(null);
   const [compressing, setCompressing] = useState(false);
-
-  // Stage 9: Verification Method
-  const [verificationMethod, setVerificationMethod] = useState('Physical Floor Re-inspection');
-  const [verificationCriteria, setVerificationCriteria] = useState(
-    'Line supervisor must present 20 consecutive defect-free garments with verified tension balance.'
-  );
 
   // Load supervisors on open
   useEffect(() => {
@@ -414,19 +310,11 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     }
   }, [isOpen]);
 
-  // Apply prefill data from audit checklist (department, requirement, description)
+  // Apply prefill data from audit checklist (department, description)
   useEffect(() => {
     if (isOpen && prefillData) {
       if (prefillData.department) {
         handleDepartmentChange(prefillData.department);
-      }
-      if (prefillData.requirement) {
-        const reqVal = prefillData.requirement;
-        setRequirement(reqVal);
-        if (!AUDIT_REQUIREMENTS.some((r) => r.id === reqVal)) {
-          setCustomRequirement(reqVal);
-          setIsManualRequirement(true);
-        }
       }
       if (prefillData.description) {
         setDescription(prefillData.description);
@@ -547,15 +435,11 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       setError('Please select a department.');
       return false;
     }
-    if (step === 2 && requirement === 'Custom Audit Requirement' && !customRequirement.trim()) {
-      setError('Please enter your custom audit requirement standard.');
-      return false;
-    }
-    if (step === 3 && !description.trim()) {
+    if (step === 2 && !description.trim()) {
       setError('Please provide a description of the defect finding.');
       return false;
     }
-    if (step === 8 && !previewUrl && !beforeFile) {
+    if (step === 7 && !previewUrl && !beforeFile) {
       setError('Mandatory Before Photo proof is required to document this audit defect.');
       return false;
     }
@@ -564,7 +448,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(10, prev + 1));
+      setCurrentStep((prev) => Math.min(8, prev + 1));
     }
   };
 
@@ -588,20 +472,16 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
     // Final checks
     if (!previewUrl && !beforeFile) {
-      setCurrentStep(8);
+      setCurrentStep(7);
       setError('Mandatory Before Photo proof is required to document this audit defect.');
       return;
     }
 
     if (!description.trim()) {
-      setCurrentStep(3);
+      setCurrentStep(2);
       setError('Please provide a description of the defect finding.');
       return;
     }
-
-    const effectiveReq = (requirement === 'Custom Audit Requirement' || requirement === 'None of Other' || isManualRequirement)
-      ? (customRequirement.trim() || requirement)
-      : requirement;
 
     const assignedId = effectiveAssignedId || assignedToUserId || selectedSupervisor?._id || selectedSupervisor?.id || '';
 
@@ -615,15 +495,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       formData.append('riskSeverity', priority || 'HIGH');
       formData.append('description', description.trim());
       formData.append('findingDescription', description.trim());
-      formData.append('requirement', effectiveReq);
       formData.append('isDraft', isDraft ? 'true' : 'false');
       formData.append('capRequired', capRequired ? 'true' : 'false');
       if (capRequired) {
         formData.append('immediateCorrection', immediateContainment.trim());
         formData.append('correctiveAction', capDirective.trim());
       }
-      formData.append('verificationMethod', verificationMethod);
-      formData.append('verificationCriteria', verificationCriteria);
       formData.append('assignedToUserId', assignedId);
       formData.append('assignedToId', assignedId);
       formData.append('deadlineHours', deadlineHours.toString());
@@ -675,23 +552,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
-                10-Stage Closed-Loop Garment Audit Rectification Workflow
+                Step-by-Step Closed-Loop Garment Audit Rectification Wizard
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Toggle view mode between step wizard and full audit sheet */}
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'wizard' ? 'all' : 'wizard')}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title="Switch between Guided Step Wizard and All-in-One Audit Sheet"
-            >
-              <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
-              <span>{viewMode === 'wizard' ? 'Full Audit Sheet' : 'Step Wizard'}</span>
-            </button>
-
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -757,7 +623,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
           )}
 
           {/* ---------------- STAGE 1: SELECT DEPARTMENT ---------------- */}
-          {(viewMode === 'all' || currentStep === 1) && (
+          {currentStep === 1 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -856,127 +722,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </section>
           )}
 
-          {/* ---------------- STAGE 2: SELECT REQUIREMENT ---------------- */}
-          {(viewMode === 'all' || currentStep === 2) && (
-            <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                    2
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
-                      Select Requirement
-                    </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Standard quality clause, buyer SOP, or ISO compliance requirement breached.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Requirement Dropdown / Select List */}
-              <div className="pt-1">
-                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1.5">
-                  Requirement Standard
-                </label>
-                <select
-                  value={requirement}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setRequirement(val);
-                    if (val === 'None of Other' || val === 'Custom Audit Requirement') {
-                      setIsManualRequirement(true);
-                    } else {
-                      setIsManualRequirement(false);
-                    }
-                  }}
-                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 font-medium"
-                >
-                  {AUDIT_REQUIREMENTS.map((req) => (
-                    <option key={req.id} value={req.id}>
-                      {req.title} {req.standard ? `— ${req.standard}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
-                {AUDIT_REQUIREMENTS.map((req) => {
-                  const isSelected = requirement === req.id;
-                  return (
-                    <div
-                      key={req.id}
-                      onClick={() => {
-                        setRequirement(req.id);
-                        if (req.id === 'None of Other' || req.id === 'Custom Audit Requirement') {
-                          setIsManualRequirement(true);
-                        } else {
-                          setIsManualRequirement(false);
-                        }
-                      }}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                        isSelected
-                          ? 'border-indigo-600 bg-indigo-50/90 dark:bg-indigo-950/70 text-indigo-950 dark:text-indigo-100 ring-2 ring-indigo-500/20 shadow-xs'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-cyan-400">
-                            {req.standard}
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />}
-                        </div>
-                        <div className="font-bold text-xs text-slate-900 dark:text-white">
-                          {req.title}
-                        </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                          {req.desc}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Manual Entry field when None of Other, Custom Audit Requirement, or custom value */}
-              {(requirement === 'None of Other' || requirement === 'Custom Audit Requirement' || isManualRequirement) ? (
-                <div className="pt-2 animate-fadeIn">
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
-                    Custom Requirement Standard
-                  </label>
-                  <input
-                    type="text"
-                    value={customRequirement}
-                    onChange={(e) => setCustomRequirement(e.target.value)}
-                    placeholder="Enter custom requirement standard..."
-                    className="w-full p-2.5 text-xs rounded-xl border border-indigo-300 dark:border-indigo-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-              ) : (
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRequirement('None of Other');
-                      setIsManualRequirement(true);
-                    }}
-                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    + Enter Custom Requirement
-                  </button>
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* ---------------- STAGE 3: DESCRIBE FINDING ---------------- */}
-          {(viewMode === 'all' || currentStep === 3) && (
+          {/* ---------------- STAGE 2: DESCRIBE FINDING ---------------- */}
+          {currentStep === 2 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                  3
+                  2
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -1120,12 +871,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </section>
           )}
 
-          {/* ---------------- STAGE 4: RISK / SEVERITY ---------------- */}
-          {(viewMode === 'all' || currentStep === 4) && (
+          {/* ---------------- STAGE 3: RISK / SEVERITY ---------------- */}
+          {currentStep === 3 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                  4
+                  3
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -1166,13 +917,13 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </section>
           )}
 
-          {/* ---------------- STAGE 5: ASSIGN RESPONSIBLE PERSON ---------------- */}
-          {(viewMode === 'all' || currentStep === 5) && (
+          {/* ---------------- STAGE 4: ASSIGN RESPONSIBLE PERSON ---------------- */}
+          {currentStep === 4 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                    5
+                    4
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -1333,12 +1084,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </section>
           )}
 
-          {/* ---------------- STAGE 6: SET DUE DATE ---------------- */}
-          {(viewMode === 'all' || currentStep === 6) && (
+          {/* ---------------- STAGE 5: SET DUE DATE ---------------- */}
+          {currentStep === 5 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                  6
+                  5
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -1421,12 +1172,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </section>
           )}
 
-          {/* ---------------- STAGE 7: CAP REQUIRED ---------------- */}
-          {(viewMode === 'all' || currentStep === 7) && (
+          {/* ---------------- STAGE 6: CAP REQUIRED ---------------- */}
+          {currentStep === 6 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                  7
+                  6
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -1564,13 +1315,13 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </section>
           )}
 
-          {/* ---------------- STAGE 8: EVIDENCE ---------------- */}
-          {(viewMode === 'all' || currentStep === 8) && (
+          {/* ---------------- STAGE 7: EVIDENCE ---------------- */}
+          {currentStep === 7 && (
             <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                    8
+                    7
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
@@ -1633,85 +1384,22 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   </span>
                 </div>
               )}
-
-
             </section>
           )}
 
-          {/* ---------------- STAGE 9: VERIFICATION ---------------- */}
-          {(viewMode === 'all' || currentStep === 9) && (
-            <section className="space-y-3 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
-                  9
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
-                    Auditor Verification Protocol
-                  </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Define how you (the Auditor) will inspect and verify rectification before final closure.
-                  </p>
-                </div>
-              </div>
-
-              {/* Verification Method Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                {VERIFICATION_METHODS.map((method) => {
-                  const isSelected = verificationMethod === method.id;
-                  return (
-                    <div
-                      key={method.id}
-                      onClick={() => setVerificationMethod(method.id)}
-                      className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/60 ring-2 ring-indigo-500/20'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-xs text-slate-900 dark:text-white">
-                          {method.title}
-                        </span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />}
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                        {method.desc}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Auditor Sign-off Criteria / Verification Notes */}
-              <div className="pt-2">
-                <label className="block font-bold text-slate-700 dark:text-slate-300 text-xs mb-1">
-                  Auditor Verification Sign-off Criteria
-                </label>
-                <input
-                  type="text"
-                  value={verificationCriteria}
-                  onChange={(e) => setVerificationCriteria(e.target.value)}
-                  placeholder="e.g. Line supervisor must present 20 consecutive defect-free garments with verified tension balance."
-                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </section>
-          )}
-
-          {/* ---------------- STAGE 10: CLOSE NC PROTOCOL ---------------- */}
-          {(viewMode === 'all' || currentStep === 10) && (
+          {/* ---------------- STAGE 8: CLOSE NC PROTOCOL ---------------- */}
+          {currentStep === 8 && (
             <section className="space-y-4 p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center font-bold text-xs">
-                  10
+                  8
                 </div>
                 <div>
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm">
                     Close NC Protocol & Review Summary
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Review all 10 stages of the Non-Conformance defect ticket prior to issuing.
+                    Review all 8 stages of the Non-Conformance defect ticket prior to issuing.
                   </p>
                 </div>
               </div>
@@ -1737,17 +1425,6 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Requirement Standard
-                    </span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {(requirement === 'Custom Audit Requirement' || requirement === 'None of Other' || isManualRequirement)
-                        ? customRequirement || requirement
-                        : requirement}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                       Assigned Line In-Charge
                     </span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
@@ -1768,10 +1445,19 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      CAP & Verification Method
+                      CAP Requirement
                     </span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {capRequired ? 'CAP Mandatory' : 'Direct Rework'} • {verificationMethod}
+                      {capRequired ? 'CAP Mandatory' : 'Direct Rework'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Workstation / Location
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {location || 'General Section'}
                     </span>
                   </div>
                 </div>
@@ -1804,7 +1490,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
           {/* WIZARD NAVIGATION FOOTER */}
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
             <div>
-              {viewMode === 'wizard' && currentStep > 1 && (
+              {currentStep > 1 && (
                 <button
                   type="button"
                   onClick={handlePrev}
@@ -1825,7 +1511,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 Cancel
               </button>
 
-              {viewMode === 'wizard' && currentStep < 10 ? (
+              {currentStep < 8 ? (
                 <button
                   type="button"
                   onClick={handleNext}
