@@ -19,7 +19,6 @@ import NewComplaintModal from './components/NewComplaintModal';
 import ActionTakenModal from './components/ActionTakenModal';
 import ComplaintDetailModal from './components/ComplaintDetailModal';
 import LoginPage from './components/LoginPage';
-import AdminOversightDashboard from './components/AdminOversightDashboard';
 import AdminUserManagement from './components/AdminUserManagement';
 import DepartmentComplianceDashboard from './components/DepartmentComplianceDashboard';
 import DepartmentWorkOperations from './components/DepartmentWorkOperations';
@@ -28,7 +27,6 @@ import FactoryComplianceHome from './components/FactoryComplianceHome';
 import AuditProDashboard from './components/AuditProDashboard';
 import RequirementsComplianceView from './components/RequirementsComplianceView';
 import ReportsView from './components/ReportsView';
-import AuditManagementDashboard from './components/AuditManagementDashboard';
 import { BarChart3, Users, Building2, Flame, CheckSquare, Search, Filter } from 'lucide-react';
 
 // Safe localStorage caching helper namespaced by user to prevent QuotaExceededError and cross-account data leaks
@@ -282,7 +280,7 @@ export const App = () => {
 
   // On ticket created: Optimistic instant display + reset filters
   const handleNewComplaintSuccess = (newTicket) => {
-    showToast(`Audit Defect (NC ${newTicket?.complaintId || ''}) logged and saved successfully!`);
+    showToast(`Non-Conformance (NC ${newTicket?.complaintId || ''}) logged and saved successfully!`);
 
     // Reset filters so the new ticket is immediately visible
     setCategoryFilter('');
@@ -350,7 +348,7 @@ export const App = () => {
 
   // On action submitted: Optimistic update + silent refresh
   const handleActionSuccess = (updatedTicket) => {
-    showToast(`Proof for NC ${updatedTicket?.complaintId || ''} submitted for Audit Verification!`);
+    showToast(`Proof for NC ${updatedTicket?.complaintId || ''} submitted for Verification!`);
     setActiveTab('all');
     if (updatedTicket) {
       const ticketId = updatedTicket._id || updatedTicket.id;
@@ -389,7 +387,7 @@ export const App = () => {
     loadData(false);
   };
 
-  // Open NC modal with optional prefill data (called from AuditManagementDashboard checklist)
+  // Open NC modal with optional prefill data
   const handleOpenNewComplaintWithPrefill = (prefill) => {
     setNcPrefillData(prefill || null);
     setIsNewModalOpen(true);
@@ -562,7 +560,6 @@ export const App = () => {
           counts={{
             openNC: derivedCounts.open ?? 0,
             overdueNC: derivedCounts.overdueCount ?? 0,
-            audits: metrics?.totalAudits ?? 0,
             tasks: complaints.filter((c) => ['Open', 'Assigned', 'In Progress', 'Rejected / Rework'].includes(c.status)).length,
             cap: (derivedCounts.capSubmitted || 0) + (derivedCounts.underReview || 0),
             deptCount: (metrics?.departments || []).length || 0,
@@ -661,16 +658,8 @@ export const App = () => {
             isAdmin ? (
               <AdminUserManagement />
             ) : null
-          ) : effectiveNavSection === 'audits' && (isAdmin || isAuditor) ? (
-            <AuditManagementDashboard
-              onOpenNewComplaint={handleOpenNewComplaintWithPrefill}
-              onSelectNCFilter={(filter) => {
-                setActiveTab(filter);
-                setCurrentNavSection('nc-cap');
-              }}
-            />
           ) : (
-            /* NC Register / Tasks / Audits / CAP */
+            /* NC Register / Tasks / CAP */
             <>
               {/* Optional Section Guidance Banner */}
               {effectiveNavSection === 'tasks' && (
@@ -684,26 +673,6 @@ export const App = () => {
                   <span className="text-slate-500 font-mono text-[11px]">
                     Displaying active defects needing floor rectification
                   </span>
-                </div>
-              )}
-
-              {effectiveNavSection === 'audits' && (
-                <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 mb-4 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    <span className="font-bold text-purple-950 dark:text-purple-200">
-                      Audit Inspection Findings & Defect Rounds
-                    </span>
-                  </div>
-                  {isAuditor && (
-                    <button
-                      type="button"
-                      onClick={() => setIsNewModalOpen(true)}
-                      className="px-3 py-1.5 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-500 cursor-pointer"
-                    >
-                      + Log New Audit NC
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -743,7 +712,7 @@ export const App = () => {
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
                       >
                         <PlusCircle className="w-3.5 h-3.5" />
-                        <span>+ Log Audit NC</span>
+                        <span>+ Log NC</span>
                       </button>
                     )}
                   </div>
@@ -829,7 +798,7 @@ export const App = () => {
                       className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/30 transition-colors cursor-pointer"
                     >
                       <PlusCircle className="w-4 h-4" />
-                      <span>Log Audit Defect (NC)</span>
+                      <span>Log Defect (NC)</span>
                     </button>
                   )}
                 </div>

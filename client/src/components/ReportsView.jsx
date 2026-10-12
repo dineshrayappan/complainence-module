@@ -1642,7 +1642,7 @@ export const ReportsView = ({
           }`}
         >
           <Layers className="w-4 h-4" />
-          <span>Master Audit Register</span>
+          <span>Master NC Register</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500">
             {filteredComplaints.length}
           </span>
