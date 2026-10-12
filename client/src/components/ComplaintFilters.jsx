@@ -131,11 +131,11 @@ export const ComplaintFilters = ({
           disabled={loading}
           title="Refresh defect records"
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors shrink-0 shadow-xs cursor-pointer ml-1"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600 dark:text-blue-400' : ''}`} />
-          <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
-        </button>
-      </div>
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600 dark:text-blue-400' : ''}`} />
+            <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </button>
+        </div>
 
       {/* 2. Decoupled Filters Row: Search, Deadline Condition, Category, Priority */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
