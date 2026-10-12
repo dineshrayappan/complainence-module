@@ -1651,11 +1651,14 @@ const getAdminOversightStats = async (req, res) => {
         (c) => c.status !== 'Closed' && new Date(c.deadlineTimestamp) < now
       );
 
-      const closedOnTime = closedTickets.filter((c) => {
-        if (!c.actualCompletedAt) return true;
-        return new Date(c.actualCompletedAt) <= new Date(c.deadlineTimestamp);
-      }).length;
-      const complianceRate = closedTickets.length > 0 ? Math.round((closedOnTime / closedTickets.length) * 100) : 100;
+      const capResolved = assignedTickets.filter((c) => ['Closed', 'Verified'].includes(c.status)).length;
+      const capSubmitted = assignedTickets.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)
+      ).length;
+      const overdueCount = overdue.length;
+      const complianceRate = assignedTickets.length > 0
+        ? Math.max(0, Math.min(100, Math.round(((capResolved * 100 + capSubmitted * 50 - overdueCount * 20) / assignedTickets.length))))
+        : null;
 
       return {
         _id: sup._id || sup.id,
@@ -2018,35 +2021,57 @@ const getDepartmentComplianceStats = async (req, res) => {
       });
 
       const totalNC = deptComplaints.length;
-      const openNC = deptComplaints.filter((c) => c.status !== 'Closed').length;
-      const overdueNC = deptComplaints.filter((c) => {
-        return c.status !== 'Closed' && new Date(c.deadlineTimestamp) < now;
-      }).length;
       const closedNC = deptComplaints.filter((c) => c.status === 'Closed').length;
       const verifiedNC = deptComplaints.filter((c) => c.status === 'Verified').length;
-      const capSubmittedNC = deptComplaints.filter((c) => c.status === 'CAP Submitted').length;
-      const underReviewNC = deptComplaints.filter((c) => c.status === 'Under Review').length;
+      const capSubmittedNC = deptComplaints.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)
+      ).length;
+      const openNC = deptComplaints.filter((c) => !['Closed', 'Verified'].includes(c.status)).length;
+      const overdueNC = deptComplaints.filter((c) => {
+        return !['Closed', 'Verified'].includes(c.status) && new Date(c.deadlineTimestamp) < now;
+      }).length;
       const draftNC = deptComplaints.filter((c) => c.status === 'Draft').length;
 
-      // ── Weighted Compliance & Risk Scoring (scoringEngine) ──────────────────
-      // Maps NC priority → severity weight; NC workflow status → point score.
-      // Compliance Score = Σ(achieved weighted pts) / Σ(max weighted pts) × 100
-      // Risk Score = Critical / High / Medium / Low based on NC severity mix.
-      const scoring = computeDepartmentNCScore(deptComplaints, now);
-      const complianceScore = scoring.complianceScore;
+      // When department has NO NCs logged, do NOT assign default fake 100%
+      if (totalNC === 0) {
+        return {
+          department: deptName,
+          score: null,
+          hasNC: false,
+          totalNC: 0,
+          openNC: 0,
+          overdueNC: 0,
+          capPercent: null,
+          closedNC: 0,
+          verifiedNC: 0,
+          capSubmittedNC: 0,
+          underReviewNC: 0,
+          draftNC: 0,
+          statusLevel: 'NO_DATA',
+          statusColor: 'slate',
+          statusEmoji: '⚪',
+          riskScore: 'None',
+          riskColor: 'slate',
+          riskEmoji: '⚪',
+          riskLevel: 0,
+          criticalNC: 0,
+          majorNC: 0,
+          overdueCap: 0,
+        };
+      }
 
-      // CAP compliance calculation (kept for capPercent column)
-      const capRequiredItems = deptComplaints.filter((c) => c.capRequired !== false);
-      const capCompletedItems = capRequiredItems.filter((c) =>
-        ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status) ||
-        (c.capPlan && (c.capPlan.immediateCorrection || c.capPlan.correctiveAction)) ||
-        c.afterPhoto
-      );
-      const capPercent = capRequiredItems.length > 0
-        ? Math.round((capCompletedItems.length / capRequiredItems.length) * 100)
-        : totalNC > 0 ? 100 : 100;
+      // ── NC / CAP Driven Compliance Scoring ─────────────────────────────────
+      // Resolved CAP (Closed/Verified) = 100 pts per item
+      // In-Progress CAP (CAP Submitted/Under Review) = 50 pts per item
+      // Unresolved Open NC = 0 pts
+      // Overdue Penalty = -20 pts per breached item
+      const capResolved = closedNC + verifiedNC;
+      const capPercent = Math.round((capResolved / totalNC) * 100);
 
-      // Threshold level determination (for color coding)
+      const rawScore = ((capResolved * 100) + (capSubmittedNC * 50) - (overdueNC * 20)) / totalNC;
+      const complianceScore = Math.max(0, Math.min(100, Math.round(rawScore)));
+
+      // Threshold classification based on actual NC/CAP resolution
       let statusLevel = 'CRITICAL';
       let statusColor = 'rose';
       let statusEmoji = '🔴';
@@ -2060,9 +2085,34 @@ const getDepartmentComplianceStats = async (req, res) => {
         statusEmoji = '🟡';
       }
 
+      // Dynamic Risk Rating based on NC Severity and Overdue Status
+      let riskScore = 'Low';
+      let riskColor = 'emerald';
+      let riskEmoji = '🟢';
+      let riskLevel = 1;
+      const hasCriticalNC = deptComplaints.some((c) => (c.priority || '').toUpperCase() === 'CRITICAL' && !['Closed', 'Verified'].includes(c.status));
+
+      if (overdueNC > 0 || hasCriticalNC) {
+        riskScore = 'Critical';
+        riskColor = 'rose';
+        riskEmoji = '🔴';
+        riskLevel = 4;
+      } else if (capPercent < 50 || openNC > 3) {
+        riskScore = 'High';
+        riskColor = 'orange';
+        riskEmoji = '🟠';
+        riskLevel = 3;
+      } else if (openNC > 0) {
+        riskScore = 'Medium';
+        riskColor = 'amber';
+        riskEmoji = '🟡';
+        riskLevel = 2;
+      }
+
       return {
         department: deptName,
         score: complianceScore,
+        hasNC: true,
         openNC,
         overdueNC,
         capPercent,
@@ -2070,38 +2120,41 @@ const getDepartmentComplianceStats = async (req, res) => {
         closedNC,
         verifiedNC,
         capSubmittedNC,
-        underReviewNC,
         draftNC,
         statusLevel,
         statusColor,
         statusEmoji,
-        // ── New weighted scoring fields ──────────────────────────────────────
-        riskScore: scoring.riskScore,           // 'Low' | 'Medium' | 'High' | 'Critical'
-        riskColor: scoring.riskColor,           // tailwind color name
-        riskEmoji: scoring.riskEmoji,           // emoji indicator
-        riskLevel: scoring.riskLevel,           // numeric 1-4 for sorting
-        criticalNC: scoring.criticalNCCount,    // count of Critical-weight NCs
-        majorNC: scoring.majorNCCount,          // count of Major-weight NCs
-        overdueCap: scoring.overdueCAPCount,    // overdue CAP tickets
-        weightedAchieved: scoring.weightedAchieved,
-        weightedMax: scoring.weightedMax,
+        riskScore,
+        riskColor,
+        riskEmoji,
+        riskLevel,
+        criticalNC: deptComplaints.filter((c) => (c.priority || '').toUpperCase() === 'CRITICAL').length,
+        majorNC: deptComplaints.filter((c) => (c.priority || '').toUpperCase() === 'HIGH').length,
+        overdueCap: overdueNC,
       };
     });
 
-    // Sort by score descending (top performing first)
-    departmentStats.sort((a, b) => b.score - a.score);
+    // Sort: Departments with actual NC activity first, sorted by score descending, followed by empty departments
+    departmentStats.sort((a, b) => {
+      if (a.hasNC && !b.hasNC) return -1;
+      if (!a.hasNC && b.hasNC) return 1;
+      if (a.score !== null && b.score !== null) return b.score - a.score;
+      return a.department.localeCompare(b.department);
+    });
 
-    // Factory Overall Compliance Score (average of active departments or 100% when clean)
-    const validScores = departmentStats.filter((d) => d.totalNC > 0);
-    const overallScore = validScores.length > 0
-      ? Math.round(validScores.reduce((acc, d) => acc + d.score, 0) / validScores.length)
-      : 100;
+    // Factory Overall Compliance Score (calculated solely across departments with NCs)
+    const activeDepts = departmentStats.filter((d) => d.hasNC && d.score !== null);
+    const overallScore = activeDepts.length > 0
+      ? Math.round(activeDepts.reduce((acc, d) => acc + d.score, 0) / activeDepts.length)
+      : null;
 
-    const totalOpenNC = departmentStats.reduce((sum, d) => sum + d.openNC, 0);
-    const totalOverdueNC = departmentStats.reduce((sum, d) => sum + d.overdueNC, 0);
-    const avgCapPercent = departmentStats.length > 0
-      ? Math.round(departmentStats.reduce((sum, d) => sum + d.capPercent, 0) / departmentStats.length)
-      : 100;
+    const totalPlantNC = allComplaints.length;
+    const totalOpenNC = allComplaints.filter((c) => !['Closed', 'Verified'].includes(c.status)).length;
+    const totalOverdueNC = allComplaints.filter((c) => !['Closed', 'Verified'].includes(c.status) && new Date(c.deadlineTimestamp) < now).length;
+    const totalClosedNC = allComplaints.filter((c) => ['Closed', 'Verified'].includes(c.status)).length;
+    const avgCapPercent = totalPlantNC > 0
+      ? Math.round((totalClosedNC / totalPlantNC) * 100)
+      : null;
 
     // Total audits from real database
     let totalAudits = 0;
@@ -2127,11 +2180,11 @@ const getDepartmentComplianceStats = async (req, res) => {
         return cDate.getFullYear() === year && cDate.getMonth() === monthIdx;
       });
 
-      const mOpen = inMonth.filter((c) => c.status !== 'Closed').length;
-      const mClosed = inMonth.filter((c) => c.status === 'Closed').length;
+      const mOpen = inMonth.filter((c) => !['Closed', 'Verified'].includes(c.status)).length;
+      const mClosed = inMonth.filter((c) => ['Closed', 'Verified'].includes(c.status)).length;
       const mCompliance = inMonth.length > 0
         ? Math.round((mClosed / inMonth.length) * 100)
-        : 100;
+        : null;
 
       monthlyTrend.push({
         month: mName,
@@ -2145,6 +2198,7 @@ const getDepartmentComplianceStats = async (req, res) => {
       success: true,
       thresholds,
       overallScore,
+      totalPlantNC,
       totalOpenNC,
       totalOverdueNC,
       totalAudits,

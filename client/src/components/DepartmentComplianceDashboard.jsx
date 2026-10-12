@@ -159,6 +159,20 @@ export const DepartmentComplianceDashboard = ({
 
   // Helper to get status color and badge based on configurable thresholds
   const getScoreClassification = (score, high = highThreshold, mod = moderateThreshold) => {
+    if (score === null || score === undefined) {
+      return {
+        level: 'NO_DATA',
+        label: 'No NCs',
+        dot: '⚪',
+        textColor: 'text-slate-500 dark:text-slate-400',
+        bgColor: 'bg-slate-50 dark:bg-slate-900/60',
+        borderColor: 'border-slate-200 dark:border-slate-800',
+        progressColor: 'bg-slate-300 dark:bg-slate-700',
+        ringColor: 'stroke-slate-300 dark:stroke-slate-700',
+        badgeBg: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+        riskLabel: 'No Active NCs',
+      };
+    }
     if (score >= high) {
       return {
         level: 'HIGH',
@@ -217,19 +231,28 @@ export const DepartmentComplianceDashboard = ({
     });
 
     return list.sort((a, b) => {
-      if (sortBy === 'score-desc') return b.score - a.score;
-      if (sortBy === 'score-asc') return a.score - b.score;
-      if (sortBy === 'overdue-desc') return b.overdueNC - a.overdueNC;
-      if (sortBy === 'open-desc') return b.openNC - a.openNC;
-      if (sortBy === 'risk-desc') return (b.riskLevel || 1) - (a.riskLevel || 1);
+      if (sortBy === 'score-desc') {
+        if (a.hasNC && !b.hasNC) return -1;
+        if (!a.hasNC && b.hasNC) return 1;
+        return (b.score ?? -1) - (a.score ?? -1);
+      }
+      if (sortBy === 'score-asc') {
+        if (a.hasNC && !b.hasNC) return -1;
+        if (!a.hasNC && b.hasNC) return 1;
+        return (a.score ?? 999) - (b.score ?? 999);
+      }
+      if (sortBy === 'overdue-desc') return (b.overdueNC || 0) - (a.overdueNC || 0);
+      if (sortBy === 'open-desc') return (b.openNC || 0) - (a.openNC || 0);
+      if (sortBy === 'risk-desc') return (b.riskLevel || 0) - (a.riskLevel || 0);
       return 0;
     });
   }, [departmentsList, searchQuery, sortBy]);
 
-  // Key performers
-  const topDepartment = departmentsList.length > 0 ? departmentsList[0] : null;
+  // Key performers (strictly based on actual NC activity)
+  const activeWithNCs = departmentsList.filter((d) => d.hasNC && d.score !== null);
+  const topDepartment = activeWithNCs.length > 0 ? activeWithNCs[0] : null;
   const criticalDepartment =
-    departmentsList.length > 0 ? [...departmentsList].sort((a, b) => a.score - b.score)[0] : null;
+    activeWithNCs.length > 0 ? [...activeWithNCs].sort((a, b) => a.score - b.score)[0] : null;
 
   if (loading && !data) {
     return (
@@ -331,11 +354,11 @@ export const DepartmentComplianceDashboard = ({
           </div>
           <div>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-baseline gap-1">
-              <span>{data?.overallScore ?? 100}%</span>
+              <span>{data?.overallScore !== null && data?.overallScore !== undefined ? `${data.overallScore}%` : '—'}</span>
               <span className="text-xs font-bold text-slate-400">Score</span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              Across all {departmentsList.length} plant divisions
+              {data?.totalPlantNC > 0 ? `Across ${data.totalPlantNC} Total NCs` : 'Zero NC complaints logged'}
             </p>
           </div>
         </div>
@@ -349,15 +372,31 @@ export const DepartmentComplianceDashboard = ({
             <span className="text-sm">🏆</span>
           </div>
           <div>
-            <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight flex items-center gap-1.5">
-              <span>{topDepartment?.department || '—'}</span>
-              <span className="text-sm font-mono font-extrabold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.2 rounded border border-emerald-300">
-                {topDepartment ? `${topDepartment.score}%` : '100%'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {topDepartment ? `${topDepartment.openNC ?? 0} Open • ${topDepartment.overdueNC ?? 0} Overdue • ${topDepartment.capPercent ?? 100}% CAP` : 'No active division backlogs'}
-            </p>
+            {topDepartment && topDepartment.totalNC > 0 ? (
+              <>
+                <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight flex items-center gap-1.5">
+                  <span>{topDepartment.department}</span>
+                  <span className="text-sm font-mono font-extrabold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.2 rounded border border-emerald-300">
+                    {topDepartment.score}%
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  {topDepartment.openNC ?? 0} Open • {topDepartment.overdueNC ?? 0} Overdue • {topDepartment.capPercent ?? 0}% CAP
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-xl sm:text-2xl font-black text-slate-400 tracking-tight flex items-center gap-1.5">
+                  <span>—</span>
+                  <span className="text-xs font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                    No NCs Logged
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  No department NC activity recorded
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -390,15 +429,31 @@ export const DepartmentComplianceDashboard = ({
             <AlertTriangle className={`w-4 h-4 ${criticalDepartment && criticalDepartment.openNC > 0 ? 'text-amber-500' : 'text-slate-400'}`} />
           </div>
           <div>
-            <div className={`text-xl sm:text-2xl font-black tracking-tight flex items-center gap-1.5 ${criticalDepartment && criticalDepartment.openNC > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-              <span>{criticalDepartment && criticalDepartment.openNC > 0 ? criticalDepartment.department : 'All Compliant'}</span>
-              <span className={`text-sm font-mono font-extrabold px-2 py-0.2 rounded border ${criticalDepartment && criticalDepartment.openNC > 0 ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300' : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300'}`}>
-                {criticalDepartment && criticalDepartment.openNC > 0 ? `${criticalDepartment.score}%` : '100%'}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              {criticalDepartment && criticalDepartment.openNC > 0 ? `${criticalDepartment.openNC} Open NCs • ${criticalDepartment.overdueNC} Overdue` : 'Zero active quality breaches'}
-            </p>
+            {criticalDepartment && criticalDepartment.openNC > 0 ? (
+              <>
+                <div className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                  <span>{criticalDepartment.department}</span>
+                  <span className="text-sm font-mono font-extrabold px-2 py-0.2 rounded border bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300">
+                    {criticalDepartment.score !== null ? `${criticalDepartment.score}%` : '—'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  {criticalDepartment.openNC} Open NCs • {criticalDepartment.overdueNC} Overdue
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <span>All Clear</span>
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded border bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-300">
+                    0 Breaches
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Zero active quality breaches
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -504,12 +559,12 @@ export const DepartmentComplianceDashboard = ({
                     <td className="py-4 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <span className={`text-base font-black font-mono ${classification.textColor}`}>
-                          {dept.score}%
+                          {dept.score !== null ? `${dept.score}%` : '—'}
                         </span>
                         <div className="w-24 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden border border-slate-200 dark:border-slate-700">
                           <div
                             className={`h-full rounded-full ${classification.progressColor} transition-all duration-500`}
-                            style={{ width: `${dept.score}%` }}
+                            style={{ width: `${dept.score ?? 0}%` }}
                           />
                         </div>
                       </div>
@@ -523,11 +578,12 @@ export const DepartmentComplianceDashboard = ({
                           High: 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-700',
                           Medium: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700',
                           Low: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-700',
+                          None: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
                         };
-                        const risk = dept.riskScore || 'Low';
-                        const emoji = dept.riskEmoji || '🟢';
+                        const risk = dept.riskScore || 'None';
+                        const emoji = dept.riskEmoji || '⚪';
                         return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${riskBadge[risk] || riskBadge.Low}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${riskBadge[risk] || riskBadge.None}`}>
                             <span>{emoji}</span>
                             <span>{risk}</span>
                           </span>
@@ -580,12 +636,12 @@ export const DepartmentComplianceDashboard = ({
                     <td className="py-4 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold font-mono text-slate-800 dark:text-slate-200 w-9">
-                          {dept.capPercent}%
+                          {dept.capPercent !== null ? `${dept.capPercent}%` : '—'}
                         </span>
                         <div className="w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
                             className="h-full rounded-full bg-indigo-500"
-                            style={{ width: `${dept.capPercent}%` }}
+                            style={{ width: `${dept.capPercent ?? 0}%` }}
                           />
                         </div>
                       </div>
@@ -667,13 +723,13 @@ export const DepartmentComplianceDashboard = ({
                         Compliance Index
                       </span>
                       <span className={`text-xl font-black font-mono ${classification.textColor}`}>
-                        {dept.score}%
+                        {dept.score !== null ? `${dept.score}%` : '—'}
                       </span>
                     </div>
                     <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
                       <div
                         className={`h-full rounded-full ${classification.progressColor} transition-all duration-500`}
-                        style={{ width: `${dept.score}%` }}
+                        style={{ width: `${dept.score ?? 0}%` }}
                       />
                     </div>
                   </div>
@@ -717,7 +773,7 @@ export const DepartmentComplianceDashboard = ({
                         CAP %
                       </div>
                       <div className="text-base font-black text-purple-900 dark:text-cyan-200 font-mono mt-0.5">
-                        {dept.capPercent}%
+                        {dept.capPercent !== null ? `${dept.capPercent}%` : '—'}
                       </div>
                     </div>
                   </div>

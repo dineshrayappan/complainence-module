@@ -93,7 +93,7 @@ const computeChecklistScore = (items = []) => {
   const totalApplicable = compliantCount + observationCount + ncCount;
   const complianceScore = weightedMax > 0
     ? Math.round((weightedAchieved / weightedMax) * 100)
-    : 100; // no applicable items → full score
+    : null; // no applicable items → null (no fake 100%)
 
   return {
     complianceScore,
@@ -114,13 +114,16 @@ const computeChecklistScore = (items = []) => {
 
 /**
  * Derive a Risk Score label from NC severity counts and compliance %.
- * @param {number} complianceScore
+ * @param {number|null} complianceScore
  * @param {number} criticalNCCount
  * @param {number} majorNCCount
  * @param {number} overdueCAPCount
- * @returns {{ riskScore, riskColor, riskEmoji }}
+ * @returns {{ riskScore, riskColor, riskEmoji, riskLevel }}
  */
 const computeRiskScore = (complianceScore, criticalNCCount = 0, majorNCCount = 0, overdueCAPCount = 0) => {
+  if (complianceScore === null) {
+    return { riskScore: 'None', riskColor: 'slate', riskEmoji: '⚪', riskLevel: 0 };
+  }
   if (criticalNCCount > 0) {
     return { riskScore: 'Critical', riskColor: 'rose', riskEmoji: '🔴', riskLevel: 4 };
   }
@@ -153,6 +156,29 @@ const computeRiskScore = (complianceScore, criticalNCCount = 0, majorNCCount = 0
  * @returns full score object including riskScore
  */
 const computeDepartmentNCScore = (deptComplaints = [], now = new Date()) => {
+  if (!deptComplaints || deptComplaints.length === 0) {
+    return {
+      complianceScore: null,
+      totalApplicable: 0,
+      totalAssessed: 0,
+      weightedAchieved: 0,
+      weightedMax: 0,
+      compliantCount: 0,
+      observationCount: 0,
+      ncCount: 0,
+      naCount: 0,
+      pendingCount: 0,
+      criticalNCCount: 0,
+      majorNCCount: 0,
+      minorNCCount: 0,
+      riskScore: 'None',
+      riskColor: 'slate',
+      riskEmoji: '⚪',
+      riskLevel: 0,
+      overdueCAPCount: 0,
+    };
+  }
+
   const PRIORITY_TO_SEVERITY = {
     CRITICAL: 'Critical',
     HIGH: 'Major',

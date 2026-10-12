@@ -59,13 +59,22 @@ export const FactoryComplianceHome = ({
   };
 
   // 4 Primary Hero Metrics (Strictly Real Data, Zero Fake Placeholders)
-  const factoryScore = complianceData?.overallScore ?? 100;
+  const factoryScore = complianceData?.overallScore !== undefined ? complianceData.overallScore : null;
   const openNC = complianceData?.totalOpenNC ?? 0;
   const overdueNC = complianceData?.totalOverdueNC ?? 0;
   const totalAudits = complianceData?.totalAudits ?? 0;
 
   // Threshold color evaluator
   const getThresholdColor = (score) => {
+    if (score === null || score === undefined) {
+      return {
+        badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-300 dark:border-slate-700',
+        text: 'text-slate-500 dark:text-slate-400',
+        bar: 'from-slate-400 to-slate-500',
+        emoji: '⚪',
+        level: 'No NCs',
+      };
+    }
     if (score >= thresholds.highThreshold) {
       return {
         badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
@@ -249,11 +258,17 @@ export const FactoryComplianceHome = ({
 
           <div className="my-1 flex items-baseline gap-2">
             <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white font-sans">
-              {factoryScore}%
+              {factoryScore !== null ? `${factoryScore}%` : '—'}
             </span>
             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-              <TrendingUp className="w-3.5 h-3.5 inline mr-0.5" />
-              Live Index
+              {factoryScore !== null ? (
+                <>
+                  <TrendingUp className="w-3.5 h-3.5 inline mr-0.5" />
+                  Live Index
+                </>
+              ) : (
+                <span className="text-slate-400">Zero Active NCs</span>
+              )}
             </span>
           </div>
 
@@ -414,7 +429,7 @@ export const FactoryComplianceHome = ({
                           {dept.openNC} open
                         </span>
                         <span className={`font-mono font-extrabold text-xs ${colorInfo.text}`}>
-                          {dept.score}%
+                          {dept.score !== null ? `${dept.score}%` : '—'}
                         </span>
                         <span className="text-xs">{colorInfo.emoji}</span>
                       </div>
@@ -424,7 +439,7 @@ export const FactoryComplianceHome = ({
                     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
                       <div
                         className={`h-full rounded-full bg-gradient-to-r ${colorInfo.bar} transition-all duration-700`}
-                        style={{ width: `${Math.min(100, Math.max(10, dept.score))}%` }}
+                        style={{ width: `${dept.score !== null ? Math.min(100, Math.max(5, dept.score)) : 0}%` }}
                       />
                     </div>
                   </div>

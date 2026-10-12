@@ -108,7 +108,7 @@ export const RequirementsComplianceView = ({ complaints = [], onSelectRequiremen
 
     return baseStandards.map((std) => {
       // Find NCs matching this standard
-      const matchingNCs = openComplaints.filter((c) => {
+      const allMatching = complaints.filter((c) => {
         const reqStr = (c.requirement || '').toLowerCase();
         const catStr = (c.category || '').toLowerCase();
         const deptStr = (c.department || '').toLowerCase();
@@ -116,11 +116,19 @@ export const RequirementsComplianceView = ({ complaints = [], onSelectRequiremen
         return reqStr.includes(std.code.toLowerCase()) || catStr.includes(kw) || deptStr.includes(kw);
       });
 
-      const openCount = matchingNCs.length;
-      const score = openCount === 0 ? 100 : Math.max(70, 100 - openCount * 5);
+      const openCount = allMatching.filter((c) => !['Closed', 'Verified'].includes(c.status)).length;
+      const totalCount = allMatching.length;
+      const capResolved = allMatching.filter((c) => ['Closed', 'Verified'].includes(c.status)).length;
+      const capSubmitted = allMatching.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)
+      ).length;
+
+      const score = totalCount > 0
+        ? Math.max(0, Math.min(100, Math.round(((capResolved * 100) + (capSubmitted * 50)) / totalCount)))
+        : null;
 
       const clauses = std.clauses.map((cl, idx) => {
-        const clauseNCs = matchingNCs.filter((_, i) => i % std.clauses.length === idx);
+        const clauseNCs = allMatching.filter((c) => !['Closed', 'Verified'].includes(c.status)).filter((_, i) => i % std.clauses.length === idx);
         return {
           ...cl,
           ncCount: clauseNCs.length,
@@ -131,6 +139,7 @@ export const RequirementsComplianceView = ({ complaints = [], onSelectRequiremen
       return {
         ...std,
         score,
+        totalNC: totalCount,
         openNC: openCount,
         clauses,
       };
@@ -202,7 +211,7 @@ export const RequirementsComplianceView = ({ complaints = [], onSelectRequiremen
 
                 <div className="text-right shrink-0">
                   <div className="text-xl font-black text-slate-900 dark:text-white">
-                    {std.score}%
+                    {std.score !== null ? `${std.score}%` : '—'}
                   </div>
                   <div className="text-[10px] font-bold text-slate-400 uppercase">
                     Adherence
@@ -217,10 +226,15 @@ export const RequirementsComplianceView = ({ complaints = [], onSelectRequiremen
                     <AlertTriangle className="w-3.5 h-3.5" />
                     {std.openNC} Open Non-Conformances
                   </span>
-                ) : (
+                ) : std.totalNC > 0 ? (
                   <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     100% Compliant • Zero Active NCs
+                  </span>
+                ) : (
+                  <span className="text-slate-400 font-medium flex items-center gap-1">
+                    <span>⚪</span>
+                    No NCs Logged
                   </span>
                 )}
               </div>

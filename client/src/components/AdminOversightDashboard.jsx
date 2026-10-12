@@ -1122,20 +1122,22 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                     <td className="py-3 px-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                          {sup.complianceRate}%
+                          {sup.complianceRate !== null ? `${sup.complianceRate}%` : '—'}
                         </span>
-                        <div className="w-12 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden hidden sm:block">
-                          <div
-                            className={`h-full rounded-full ${
-                              sup.complianceRate >= 90
-                                ? 'bg-emerald-500'
-                                : sup.complianceRate >= 70
-                                ? 'bg-amber-500'
-                                : 'bg-rose-500'
-                            }`}
-                            style={{ width: `${sup.complianceRate}%` }}
-                          />
-                        </div>
+                        {sup.complianceRate !== null && (
+                          <div className="w-12 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden hidden sm:block">
+                            <div
+                              className={`h-full rounded-full ${
+                                sup.complianceRate >= 90
+                                  ? 'bg-emerald-500'
+                                  : sup.complianceRate >= 70
+                                  ? 'bg-amber-500'
+                                  : 'bg-rose-500'
+                              }`}
+                              style={{ width: `${sup.complianceRate}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

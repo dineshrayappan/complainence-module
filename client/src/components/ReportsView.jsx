@@ -39,7 +39,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
     if (c.status === 'Closed' || c.status === 'Verified') return false;
     return c.deadlineTimestamp && Date.now() > new Date(c.deadlineTimestamp).getTime();
   }).length;
-  const slaRate = totalNC > 0 ? Math.round(((totalNC - overdueCount) / totalNC) * 100) : 100;
+  const slaRate = totalNC > 0 ? Math.round(((totalNC - overdueCount) / totalNC) * 100) : null;
 
   // Filter complaints for on-screen preview
   const filteredComplaints = useMemo(() => {
@@ -176,7 +176,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         { label: 'Under Review', val: String(underReviewCount), col: [79, 70, 229] },
         { label: 'Overdue SLA', val: String(overdueCount), col: [225, 29, 72] },
         { label: 'Verified & Closed', val: String(closedCount), col: [16, 185, 129] },
-        { label: 'SLA Adherence Rate', val: `${slaRate}%`, col: [37, 99, 235] },
+        { label: 'SLA Adherence Rate', val: slaRate !== null ? `${slaRate}%` : '—', col: [37, 99, 235] },
       ];
 
       kpis.forEach((kpi, idx) => {
@@ -602,7 +602,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
 
         <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
           <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">SLA Compliance Rate</div>
-          <div className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">{slaRate}%</div>
+          <div className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">{slaRate !== null ? `${slaRate}%` : '—'}</div>
         </div>
       </div>
 
