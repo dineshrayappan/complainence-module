@@ -573,47 +573,45 @@ export const App = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden">
-          {/* Active Persona Banner (Only shown on sub-views, hidden on executive dashboard to avoid clutter) */}
-          {effectiveNavSection !== 'dashboard' && (
-            <div className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs mb-4 shadow-xs transition-colors">
-              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-xs" />
-                <span className="text-slate-600 dark:text-slate-300 truncate">
-                  Active Persona:{' '}
-                  <strong className="text-slate-900 dark:text-white font-bold">{user?.name}</strong>{' '}
-                  <span className="text-indigo-600 dark:text-cyan-400 font-mono font-semibold">({user?.employeeId}</span> •{' '}
-                  <span className="text-slate-500 dark:text-slate-400">{user?.department})</span>
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
-                <span>
-                  Scope:{' '}
-                  <strong className="text-slate-700 dark:text-slate-200 font-semibold">
-                    {isAdmin
-                      ? 'Executive Oversight'
-                      : isAuditor
-                        ? 'All 4 Plant Lines'
-                        : user?.department}
-                  </strong>
-                </span>
-                <span>•</span>
-                <span>12–24h SLA</span>
-                {(isAdmin || isAuditor) && (
-                  <>
-                    <span>•</span>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentNavSection('dashboard')}
-                      className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase transition-colors bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
-                    >
-                      ← Dashboard
-                    </button>
-                  </>
-                )}
-              </div>
+          {/* Active Persona Banner */}
+          <div className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs mb-4 shadow-xs transition-colors">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-xs" />
+              <span className="text-slate-600 dark:text-slate-300 truncate">
+                Active Persona:{' '}
+                <strong className="text-slate-900 dark:text-white font-bold">{user?.name}</strong>{' '}
+                <span className="text-indigo-600 dark:text-cyan-400 font-mono font-semibold">({user?.employeeId}</span> •{' '}
+                <span className="text-slate-500 dark:text-slate-400">{user?.department})</span>
+              </span>
             </div>
-          )}
+
+            <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-mono shrink-0">
+              <span>
+                Scope:{' '}
+                <strong className="text-slate-700 dark:text-slate-200 font-semibold">
+                  {isAdmin
+                    ? 'Executive Oversight'
+                    : isAuditor
+                      ? 'All 4 Plant Lines'
+                      : user?.department}
+                </strong>
+              </span>
+              <span>•</span>
+              <span>12–24h SLA</span>
+              {effectiveNavSection !== 'dashboard' && (isAdmin || isAuditor) && (
+                <>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentNavSection('dashboard')}
+                    className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase transition-colors bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
+                  >
+                    ← Factory Overview
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
 
           {/* Main View Switcher driven by Sidebar */}
           {effectiveNavSection === 'dashboard' && (isAdmin || isAuditor) ? (
@@ -659,8 +657,8 @@ export const App = () => {
                 setCurrentNavSection('nc-cap');
               }}
             />
-          ) : (effectiveNavSection === 'settings' || effectiveNavSection === 'users') ? (
-            isAdmin || isAuditor ? (
+          ) : effectiveNavSection === 'settings' ? (
+            isAdmin ? (
               <AdminUserManagement />
             ) : null
           ) : effectiveNavSection === 'audits' && (isAdmin || isAuditor) ? (
