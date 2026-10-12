@@ -640,7 +640,15 @@ export const App = () => {
               }}
             />
           ) : effectiveNavSection === 'reports' ? (
-            <ReportsView complaints={complaints} />
+            <ReportsView
+              complaints={complaints}
+              onViewDetails={handleOpenDetailModal}
+              onNavigateNC={(targetTab, filterVal) => {
+                if (filterVal) setSearchTerm(filterVal);
+                if (targetTab) setActiveTab(targetTab);
+                setCurrentNavSection('nc-cap');
+              }}
+            />
           ) : effectiveNavSection === 'settings' ? (
             isAdmin ? (
               <AdminUserManagement />
