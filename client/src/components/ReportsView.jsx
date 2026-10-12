@@ -1279,96 +1279,62 @@ export const ReportsView = ({
         </div>
       </div>
 
-      {/* 3. Interactive Department Wise Drill-Down Quick Chips */}
-      {departmentList.length > 0 && (
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Department-Wise Drill-Down</span>
-            </span>
-            <span className="text-[10px] font-mono text-slate-400">
-              {departmentList.length} Departments Active
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto horizontal-scroll-bar pb-1">
-            <button
-              type="button"
-              onClick={() => setDepartmentFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                departmentFilter === 'ALL'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              All Departments ({totalNC})
-            </button>
-
-            {departmentList.map((dept) => {
-              const count = departmentCounts[dept] || 0;
-              const isSelected = departmentFilter === dept;
-              return (
-                <button
-                  key={dept}
-                  type="button"
-                  onClick={() =>
-                    setDepartmentFilter(isSelected ? 'ALL' : dept)
-                  }
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  <span>{dept}</span>
-                  <span
-                    className={`px-1.5 py-0.2 text-[10px] rounded-full font-mono font-bold ${
-                      isSelected
-                        ? 'bg-white/20 text-white'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 4. COMPREHENSIVE MULTI-FILTER CONTROL PANEL */}
-      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-        {/* Filter Panel Header */}
-        <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-cyan-400 flex items-center justify-center font-bold">
+      {/* 3. COMPREHENSIVE DROPDOWN FILTERS BAR */}
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition-all">
+        {/* Dropdown Filters Header */}
+        <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-cyan-400 flex items-center justify-center font-bold shrink-0">
               <SlidersHorizontal className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                  Advanced Audit Filters
+                  Audit Dropdown Filters
                 </span>
                 {hasActiveFilters && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/60 dark:text-cyan-300">
                     {activeFilterCount} Active
                   </span>
                 )}
+                <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400">
+                  ({filteredComplaints.length} of {totalNC} NCs)
+                </span>
               </div>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                Date Range • Department • NC Status • Risk • Resolver • Auditor • Aging &amp; Recurrence
-              </span>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Filter by Date Range • Department • NC Status • Risk • Resolver • Auditor • Aging • Recurrence
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Keyword Search */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search keywords..."
+                className="pl-8 pr-7 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 w-44 sm:w-56"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 transition-colors cursor-pointer"
                 title="Reset all filters to default"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -1380,7 +1346,7 @@ export const ReportsView = ({
               type="button"
               onClick={() => setShowFiltersExpanded((prev) => !prev)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title={showFiltersExpanded ? 'Collapse filters' : 'Expand filters'}
+              title={showFiltersExpanded ? 'Collapse dropdown filters' : 'Expand dropdown filters'}
             >
               <ChevronDown
                 className={`w-4 h-4 transition-transform ${
@@ -1391,96 +1357,67 @@ export const ReportsView = ({
           </div>
         </div>
 
-        {/* Filter Input Grid */}
+        {/* Unified 8-Dropdown Filter Grid */}
         {showFiltersExpanded && (
-          <div className="p-4 sm:p-5 space-y-4">
-            {/* ROW 1: Date Range Filters & Presets */}
-            <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-950/40 border border-slate-200/70 dark:border-slate-800/80 space-y-2.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>1. Date Range Filter</span>
-                </span>
-
-                {/* Quick Presets */}
-                <div className="flex flex-wrap items-center gap-1 text-[11px]">
-                  {[
-                    { id: 'ALL', label: 'All Time' },
-                    { id: 'TODAY', label: 'Today' },
-                    { id: '7D', label: 'Last 7 Days' },
-                    { id: '30D', label: 'Last 30 Days' },
-                    { id: 'THIS_MONTH', label: 'This Month' },
-                    { id: 'CUSTOM', label: 'Custom' },
-                  ].map((preset) => (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      onClick={() => {
-                        setDatePreset(preset.id);
-                        if (preset.id !== 'CUSTOM') {
-                          setStartDate('');
-                          setEndDate('');
-                        }
-                      }}
-                      className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
-                        datePreset === preset.id
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/70 dark:border-slate-700/60'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Start & End Date Pickers */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    From Logged Date
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      setDatePreset('CUSTOM');
-                    }}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 font-sans"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    To Logged Date
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      setDatePreset('CUSTOM');
-                    }}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 font-sans"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ROW 2: Department, NC Status & Risk */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* 2. Department Wise Filter */}
+          <div className="p-4 sm:p-5 space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* 1. Date Range Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <Building2 className="w-3 h-3 text-indigo-500" />
-                  <span>2. Department</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-indigo-500" />
+                    <span>Date Range</span>
+                  </span>
+                  {datePreset !== 'ALL' && (
+                    <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-bold">Active</span>
+                  )}
+                </label>
+                <select
+                  value={datePreset}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDatePreset(val);
+                    if (val !== 'CUSTOM') {
+                      setStartDate('');
+                      setEndDate('');
+                    }
+                  }}
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    datePreset !== 'ALL'
+                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
+                >
+                  <option value="ALL">All Dates (All Time)</option>
+                  <option value="TODAY">Today</option>
+                  <option value="7D">Last 7 Days</option>
+                  <option value="30D">Last 30 Days</option>
+                  <option value="THIS_MONTH">This Month</option>
+                  <option value="CUSTOM">Custom Date Range...</option>
+                </select>
+              </div>
+
+              {/* 2. Department Dropdown */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Building2 className="w-3 h-3 text-indigo-500" />
+                    <span>Department</span>
+                  </span>
+                  {departmentFilter !== 'ALL' && (
+                    <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    departmentFilter !== 'ALL'
+                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
-                  <option value="ALL">All Departments ({totalNC})</option>
+                  <option value="ALL">All Departments ({totalNC} NCs)</option>
                   {departmentList.map((dept) => (
                     <option key={dept} value={dept}>
                       {dept} ({departmentCounts[dept] || 0} NCs)
@@ -1489,16 +1426,25 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 3a. NC Lifecycle Status */}
+              {/* 3. NC Lifecycle Status Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                  <span>3a. NC Status</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    <span>NC Status</span>
+                  </span>
+                  {statusFilter !== 'ALL' && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    statusFilter !== 'ALL'
+                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
                   <option value="ALL">All Lifecycle Statuses</option>
                   <option value="OPEN">Open / Assigned / In Progress</option>
@@ -1510,16 +1456,25 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 3b. Risk / Severity Filter */}
+              {/* 4. Risk / Severity Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3 text-amber-500" />
-                  <span>3b. Risk / Severity</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-500" />
+                    <span>Risk / Severity</span>
+                  </span>
+                  {riskFilter !== 'ALL' && (
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={riskFilter}
                   onChange={(e) => setRiskFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    riskFilter !== 'ALL'
+                      ? 'bg-amber-50/70 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
                   <option value="ALL">All Risk Levels</option>
                   <option value="CRITICAL">🔥 CRITICAL (Shipment Risk / Line Stop)</option>
@@ -1528,22 +1483,28 @@ export const ReportsView = ({
                   <option value="LOW">◽ LOW (Minor Observation)</option>
                 </select>
               </div>
-            </div>
 
-            {/* ROW 3: Responsible Person, Auditor, Aging & Repeat NC */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* 4a. Responsible Person Filter */}
+              {/* 5. Responsible Person Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <UserCheck className="w-3 h-3 text-indigo-500" />
-                  <span>4a. Responsible Person</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <UserCheck className="w-3 h-3 text-indigo-500" />
+                    <span>Responsible Person</span>
+                  </span>
+                  {responsibleFilter !== 'ALL' && (
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={responsibleFilter}
                   onChange={(e) => setResponsibleFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    responsibleFilter !== 'ALL'
+                      ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
-                  <option value="ALL">All Responsible Resolvers</option>
+                  <option value="ALL">All Responsible Resolvers ({responsibleList.length})</option>
                   {responsibleList.map((person) => (
                     <option key={person} value={person}>
                       {person}
@@ -1552,18 +1513,27 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 4b. Auditor Filter */}
+              {/* 6. Auditor Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-purple-500" />
-                  <span>4b. Auditor / Created By</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-purple-500" />
+                    <span>Auditor / Created By</span>
+                  </span>
+                  {auditorFilter !== 'ALL' && (
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={auditorFilter}
                   onChange={(e) => setAuditorFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    auditorFilter !== 'ALL'
+                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
-                  <option value="ALL">All Auditors</option>
+                  <option value="ALL">All Auditors ({auditorList.length})</option>
                   {auditorList.map((auditor) => (
                     <option key={auditor} value={auditor}>
                       {auditor}
@@ -1572,16 +1542,25 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 5a. Ticket Aging Duration */}
+              {/* 7. Ticket Aging Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-blue-500" />
-                  <span>5a. Ticket Aging</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-blue-500" />
+                    <span>Ticket Aging</span>
+                  </span>
+                  {agingFilter !== 'ALL' && (
+                    <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={agingFilter}
                   onChange={(e) => setAgingFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    agingFilter !== 'ALL'
+                      ? 'bg-cyan-50/70 border-cyan-300 text-cyan-900 dark:bg-cyan-950/60 dark:border-cyan-700 dark:text-cyan-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
                   <option value="ALL">All Aging Durations</option>
                   <option value="FRESH">Fresh (&lt; 24 Hours)</option>
@@ -1591,29 +1570,85 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 5b. Repeat NC Recurrence Filter */}
+              {/* 8. Defect Recurrence Dropdown */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                  <Repeat className="w-3 h-3 text-purple-500" />
-                  <span>5b. Defect Recurrence</span>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Repeat className="w-3 h-3 text-purple-500" />
+                    <span>Defect Recurrence</span>
+                  </span>
+                  {repeatFilter !== 'ALL' && (
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold">Active</span>
+                  )}
                 </label>
                 <select
                   value={repeatFilter}
                   onChange={(e) => setRepeatFilter(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
+                    repeatFilter !== 'ALL'
+                      ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200'
+                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
                 >
                   <option value="ALL">All Defect Types</option>
-                  <option value="REPEAT">🔁 Repeat NCs Only (Freq ≥ 2)</option>
+                  <option value="REPEAT">🔁 Repeat NCs (Frequency ≥ 2)</option>
                   <option value="SINGLE">◽ First-Time / Single Defect</option>
                 </select>
               </div>
             </div>
 
-            {/* Active Filter Chips Strip */}
+            {/* Conditional Custom Date Range Picker Row (shown when datePreset === 'CUSTOM') */}
+            {datePreset === 'CUSTOM' && (
+              <div className="p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-800/80 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 dark:text-indigo-200 shrink-0">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+                  <span>Custom Date Range:</span>
+                </div>
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      From:
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      To:
+                    </label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                </div>
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStartDate('');
+                      setEndDate('');
+                    }}
+                    className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer shrink-0"
+                  >
+                    Clear Dates
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Active Filter Criteria Chips Strip */}
             {hasActiveFilters && (
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="text-[11px] font-bold text-slate-400 mr-1">
-                  Active Filter Criteria:
+              <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
+                  <Filter className="w-3 h-3" />
+                  <span>Active Filters:</span>
                 </span>
 
                 {searchTerm && (
@@ -1631,32 +1666,15 @@ export const ReportsView = ({
 
                 {datePreset !== 'ALL' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-cyan-300 border border-indigo-200 dark:border-indigo-800 text-[11px]">
-                    <span>Date: {datePreset}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDatePreset('ALL');
-                        setStartDate('');
-                        setEndDate('');
-                      }}
-                      className="hover:text-indigo-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {(startDate || endDate) && datePreset === 'CUSTOM' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-cyan-300 border border-indigo-200 dark:border-indigo-800 text-[11px]">
                     <span>
-                      Range: {startDate || 'Start'} → {endDate || 'End'}
+                      Date: {datePreset === 'CUSTOM' ? `${startDate || 'Start'} → ${endDate || 'End'}` : datePreset}
                     </span>
                     <button
                       type="button"
                       onClick={() => {
+                        setDatePreset('ALL');
                         setStartDate('');
                         setEndDate('');
-                        setDatePreset('ALL');
                       }}
                       className="hover:text-indigo-900 cursor-pointer"
                     >

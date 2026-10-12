@@ -8,6 +8,10 @@ export const ComplaintFilters = ({
   onSearchChange,
   deadlineFilter = '',
   onDeadlineChange,
+  onDeadlineFilterChange,
+  departmentFilter = '',
+  onDepartmentChange,
+  departments = [],
   categoryFilter,
   onCategoryChange,
   priorityFilter,
@@ -48,6 +52,11 @@ export const ComplaintFilters = ({
   const priorities = ['All Priorities', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 
   const tabsRef = useRef(null);
+
+  const handleDeadlineChange = (val) => {
+    if (onDeadlineChange) onDeadlineChange(val);
+    if (onDeadlineFilterChange) onDeadlineFilterChange(val);
+  };
 
   const scrollTabs = (direction) => {
     if (tabsRef.current) {
@@ -131,16 +140,16 @@ export const ComplaintFilters = ({
           disabled={loading}
           title="Refresh defect records"
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors shrink-0 shadow-xs cursor-pointer ml-1"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600 dark:text-blue-400' : ''}`} />
-            <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
-          </button>
-        </div>
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600 dark:text-blue-400' : ''}`} />
+          <span className="hidden sm:inline">{loading ? 'Refreshing...' : 'Refresh'}</span>
+        </button>
+      </div>
 
-      {/* 2. Decoupled Filters Row: Search, Deadline Condition, Category, Priority */}
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-        {/* Search */}
-        <div className="relative sm:col-span-5">
+      {/* 2. Comprehensive Dropdown Filters Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5">
+        {/* Search Input */}
+        <div className="relative sm:col-span-2 lg:col-span-3">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -152,18 +161,58 @@ export const ComplaintFilters = ({
           {searchTerm && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              title="Clear search"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
+        {/* Status Dropdown Filter (synced with activeTab) */}
+        <div className="sm:col-span-1 lg:col-span-2">
+          <select
+            value={activeTab}
+            onChange={(e) => onTabChange(e.target.value)}
+            aria-label="Filter by NC Status"
+            className="w-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium"
+          >
+            {tabs.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label} {typeof t.count === 'number' ? `(${t.count})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Department Dropdown Filter */}
+        {departments && departments.length > 0 && (
+          <div className="sm:col-span-1 lg:col-span-2">
+            <select
+              value={departmentFilter}
+              onChange={(e) => onDepartmentChange && onDepartmentChange(e.target.value)}
+              aria-label="Filter by Department"
+              className={`w-full text-xs sm:text-sm px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium ${
+                departmentFilter
+                  ? 'bg-indigo-50 text-indigo-900 border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-200 dark:border-indigo-700'
+                  : 'bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <option value="">All Departments</option>
+              {departments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Separate Deadline Condition Filter */}
-        <div className="sm:col-span-3">
+        <div className={`sm:col-span-1 ${departments && departments.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <select
             value={deadlineFilter}
-            onChange={(e) => onDeadlineChange && onDeadlineChange(e.target.value)}
+            onChange={(e) => handleDeadlineChange(e.target.value)}
             aria-label="Filter by Deadline Condition"
             className={`w-full text-xs sm:text-sm px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium ${
               deadlineFilter === 'Overdue'
@@ -182,11 +231,12 @@ export const ComplaintFilters = ({
         </div>
 
         {/* Category Filter */}
-        <div className="sm:col-span-2">
+        <div className={`sm:col-span-1 ${departments && departments.length > 0 ? 'lg:col-span-1.5' : 'lg:col-span-2'}`}>
           <select
             value={categoryFilter}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            aria-label="Filter by Defect Category"
+            className="w-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium"
           >
             {categories.map((c) => (
               <option key={c} value={c === 'All Categories' ? '' : c}>
@@ -197,11 +247,12 @@ export const ComplaintFilters = ({
         </div>
 
         {/* Priority Filter */}
-        <div className="sm:col-span-2">
+        <div className={`sm:col-span-1 ${departments && departments.length > 0 ? 'lg:col-span-1.5' : 'lg:col-span-2'}`}>
           <select
             value={priorityFilter}
             onChange={(e) => onPriorityChange(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            aria-label="Filter by Risk Priority"
+            className="w-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium"
           >
             {priorities.map((p) => (
               <option key={p} value={p === 'All Priorities' ? '' : p}>

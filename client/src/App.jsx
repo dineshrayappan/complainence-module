@@ -115,6 +115,7 @@ export const App = () => {
   // Filter States
   const [activeTab, setActiveTab] = useState('all');
   const [deadlineFilter, setDeadlineFilter] = useState(''); // '' (all), 'Overdue', 'Due Soon', 'Open', 'Closed'
+  const [departmentFilter, setDepartmentFilter] = useState('');
   const [adminActiveTab, setAdminActiveTab] = useState('departments'); // 'departments', 'oversight', 'users', 'register'
   const [showDeptCompliance, setShowDeptCompliance] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -491,9 +492,14 @@ export const App = () => {
         }
       }
 
+      // 3. Department dropdown filter
+      if (departmentFilter && c.department !== departmentFilter) {
+        return false;
+      }
+
       return true;
     });
-  }, [complaints, activeTab, deadlineFilter, user]);
+  }, [complaints, activeTab, deadlineFilter, departmentFilter, user]);
 
   // While verifying stored token on page refresh, prevent flashing login screen
   if (authLoading) {
@@ -750,7 +756,11 @@ export const App = () => {
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
                 deadlineFilter={deadlineFilter}
+                onDeadlineChange={setDeadlineFilter}
                 onDeadlineFilterChange={setDeadlineFilter}
+                departmentFilter={departmentFilter}
+                onDepartmentChange={setDepartmentFilter}
+                departments={Array.from(new Set(complaints.map((c) => c.department).filter(Boolean))).sort()}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 categoryFilter={categoryFilter}
