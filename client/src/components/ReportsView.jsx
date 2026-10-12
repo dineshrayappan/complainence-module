@@ -14,6 +14,8 @@ import {
   CheckCheck,
   ChevronDown,
   Info,
+  Repeat,
+  UserCheck,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -41,6 +43,75 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
   }).length;
   const slaRate = totalNC > 0 ? Math.round(((totalNC - overdueCount) / totalNC) * 100) : null;
 
+  // Helper to extract clean text safely
+  const getFindingText = (c) => {
+    return c.describeFinding || c.findingDescription || c.description || c.title || 'No defect description logged.';
+  };
+
+  // Helper to normalize issue key for frequency calculation (how many times the same issue has occurred)
+  const getIssueKey = (c) => {
+    const finding = (c.describeFinding || c.findingDescription || c.description || c.title || '').trim().toLowerCase();
+    if (finding && finding !== 'no defect description logged.') return finding;
+    return (c.category || 'General Quality Defect').trim().toLowerCase();
+  };
+
+  // Calculate issue frequency map: count occurrences of each issue across the complaints dataset
+  const issueFrequencyMap = useMemo(() => {
+    const map = {};
+    (complaints || []).forEach((c) => {
+      const key = getIssueKey(c);
+      map[key] = (map[key] || 0) + 1;
+    });
+    return map;
+  }, [complaints]);
+
+  // Frequency getter: returns the exact count of times this same issue has occurred
+  const getIssueFrequency = (c) => {
+    const key = getIssueKey(c);
+    return issueFrequencyMap[key] || 1;
+  };
+
+  const getImmediateCorrectionText = (c) => {
+    return c.cap?.immediateCorrection || c.actionNotes || 'Pending immediate containment action from supervisor.';
+  };
+
+  // Root cause of the issue (5-Why analysis)
+  const getRootCauseText = (c) => {
+    return c.cap?.rootCause || c.feedbackRemarks || c.actionNotes || 'Pending 5-Why root cause analysis.';
+  };
+
+  const getCorrectiveActionText = (c) => {
+    return c.cap?.correctiveAction || c.actionNotes || 'Pending corrective action execution.';
+  };
+
+  const getPreventiveActionText = (c) => {
+    return c.cap?.preventiveAction || 'Pending systemic recurrence prevention procedure.';
+  };
+
+  // Assigned To: the person responsible for resolving the issue
+  const getAssignedToName = (c) => {
+    if (c.assignedTo?.name && c.assignedTo.name !== 'Unassigned') {
+      return c.assignedTo.name;
+    }
+    if (typeof c.cap?.responsiblePerson === 'object' && c.cap?.responsiblePerson?.name) {
+      return c.cap.responsiblePerson.name;
+    }
+    if (typeof c.cap?.responsiblePerson === 'string' && c.cap.responsiblePerson.trim()) {
+      return c.cap.responsiblePerson.trim();
+    }
+    return c.assignedTo?.name || 'Assigned Line In-Charge';
+  };
+
+  const getResponsiblePerson = (c) => {
+    return getAssignedToName(c);
+  };
+
+  const getCapTargetDate = (c) => {
+    if (c.cap?.targetDate) return new Date(c.cap.targetDate).toLocaleDateString();
+    if (c.deadlineTimestamp) return new Date(c.deadlineTimestamp).toLocaleDateString();
+    return 'Not Specified';
+  };
+
   // Filter complaints for on-screen preview
   const filteredComplaints = useMemo(() => {
     return complaints.filter((c) => {
@@ -57,47 +128,13 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         (c.complaintId || '').toLowerCase().includes(term) ||
         (c.department || '').toLowerCase().includes(term) ||
         (c.location || '').toLowerCase().includes(term) ||
-        (c.describeFinding || c.findingDescription || c.description || c.title || '').toLowerCase().includes(term) ||
-        (c.assignedTo?.name || '').toLowerCase().includes(term) ||
-        (c.cap?.rootCause || '').toLowerCase().includes(term);
+        (getFindingText(c)).toLowerCase().includes(term) ||
+        (getAssignedToName(c)).toLowerCase().includes(term) ||
+        (getRootCauseText(c)).toLowerCase().includes(term);
 
       return matchesStatus && matchesSearch;
     });
-  }, [complaints, statusFilter, searchTerm]);
-
-  // Helper to extract clean text safely
-  const getFindingText = (c) => {
-    return c.describeFinding || c.findingDescription || c.description || c.title || 'No defect description logged.';
-  };
-
-  const getImmediateCorrectionText = (c) => {
-    return c.cap?.immediateCorrection || c.actionNotes || 'Pending immediate containment action from supervisor.';
-  };
-
-  const getRootCauseText = (c) => {
-    return c.cap?.rootCause || c.feedbackRemarks || 'Pending 5-Why root cause analysis from supervisor.';
-  };
-
-  const getCorrectiveActionText = (c) => {
-    return c.cap?.correctiveAction || c.actionNotes || 'Pending corrective action execution.';
-  };
-
-  const getPreventiveActionText = (c) => {
-    return c.cap?.preventiveAction || 'Pending systemic recurrence prevention procedure.';
-  };
-
-  const getResponsiblePerson = (c) => {
-    if (typeof c.cap?.responsiblePerson === 'object' && c.cap?.responsiblePerson?.name) {
-      return c.cap.responsiblePerson.name;
-    }
-    return c.cap?.responsiblePerson || c.assignedTo?.name || 'Assigned Line In-Charge';
-  };
-
-  const getCapTargetDate = (c) => {
-    if (c.cap?.targetDate) return new Date(c.cap.targetDate).toLocaleDateString();
-    if (c.deadlineTimestamp) return new Date(c.deadlineTimestamp).toLocaleDateString();
-    return 'Not Specified';
-  };
+  }, [complaints, statusFilter, searchTerm, issueFrequencyMap]);
 
   // =========================================================================
   // 1. COMPLETE A-TO-Z PDF AUDIT REPORT DOWNLOAD HANDLER
@@ -199,7 +236,15 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
       doc.text('1. Master Non-Conformance (NC) Status Index', margin, 192);
 
       const summaryTableHeaders = [
-        ['NC ID', 'Line / Location', 'Department', 'Severity', 'Assigned In-Charge', 'Target SLA', 'CAP Status', 'Final Status'],
+        [
+          'NC ID',
+          'Dept / Line',
+          'Defect Finding & Frequency',
+          'Root Cause of Issue',
+          'Assigned To (Responsible)',
+          'CAP / Due',
+          'Status',
+        ],
       ];
 
       const summaryTableRows = complaints.map((c) => {
@@ -209,14 +254,18 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
           c.deadlineTimestamp &&
           Date.now() > new Date(c.deadlineTimestamp).getTime();
 
+        const freq = getIssueFrequency(c);
+        const finding = getFindingText(c);
+        const rootCause = getRootCauseText(c);
+        const assignedName = getAssignedToName(c);
+
         return [
           c.complaintId || 'NC-N/A',
-          (c.location || 'Line Floor').slice(0, 18),
-          c.department || 'N/A',
-          c.priority || c.riskSeverity || 'Medium',
-          (c.assignedTo?.name || 'Unassigned').slice(0, 16),
-          c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A',
-          c.cap?.status || (c.capRequired ? 'Required' : 'Direct Fix'),
+          `${c.department || 'N/A'}\n(${c.location || 'Floor'})`,
+          `${finding.slice(0, 42)}${finding.length > 42 ? '...' : ''}\n[Freq: ${freq} time${freq > 1 ? 's' : ''}]`,
+          `${rootCause.slice(0, 50)}${rootCause.length > 50 ? '...' : ''}`,
+          `${assignedName.slice(0, 22)}`,
+          `${c.cap?.status || (c.capRequired ? 'CAP Req' : 'Direct')}\n${c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A'}`,
           isOverdue ? 'OVERDUE' : c.status || 'Open',
         ];
       });
@@ -230,24 +279,23 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         headStyles: {
           fillColor: [30, 41, 59],
           textColor: [255, 255, 255],
-          fontSize: 7.5,
+          fontSize: 7.2,
           fontStyle: 'bold',
           halign: 'left',
         },
         styles: {
-          fontSize: 7.5,
-          cellPadding: 4,
+          fontSize: 7.2,
+          cellPadding: 3.5,
           overflow: 'linebreak',
         },
         columnStyles: {
-          0: { cellWidth: 65, fontStyle: 'bold' },
-          1: { cellWidth: 75 },
-          2: { cellWidth: 65 },
-          3: { cellWidth: 50 },
-          4: { cellWidth: 80 },
-          5: { cellWidth: 60 },
-          6: { cellWidth: 65 },
-          7: { cellWidth: 60, fontStyle: 'bold' },
+          0: { cellWidth: 55, fontStyle: 'bold' },
+          1: { cellWidth: 68 },
+          2: { cellWidth: 108 },
+          3: { cellWidth: 112 },
+          4: { cellWidth: 78, fontStyle: 'bold' },
+          5: { cellWidth: 50 },
+          6: { cellWidth: 52, fontStyle: 'bold' },
         },
         alternateRowStyles: {
           fillColor: [248, 250, 252],
@@ -285,6 +333,10 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         const deadlineDateStr = c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleString() : 'N/A';
         const closedDateStr = c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure';
 
+        const freq = getIssueFrequency(c);
+        const assignedName = getAssignedToName(c);
+        const rootCause = getRootCauseText(c);
+
         // Record Title Bar
         doc.setFillColor(241, 245, 249); // slate-100
         doc.setDrawColor(...borderLine);
@@ -315,7 +367,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         // Structured Table for A-to-Z Lifecycle
         const recordDetails = [
           [
-            { content: 'STAGE 1: NC CREATION & DEFECT FINDING', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
+            { content: 'STAGE 1: NC CREATION & ISSUE FREQUENCY', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
           ],
           [
             { content: 'Logged Date & Time:', styles: { fontStyle: 'bold', cellWidth: 140 } },
@@ -330,30 +382,34 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
             { content: getFindingText(c) },
           ],
           [
+            { content: 'Issue Occurrence Frequency:', styles: { fontStyle: 'bold', textColor: [67, 56, 202] } },
+            { content: `${freq} time(s) — The same issue has occurred ${freq} time(s) across quality records.` },
+          ],
+          [
             { content: 'Verification Method / Evidence:', styles: { fontStyle: 'bold' } },
             { content: `Method: ${c.verificationMethod || 'Physical Floor Re-inspection'}  |  Before Photo Evidence: ${c.beforePhoto ? 'Attached (Recorded on File)' : 'None'}` },
           ],
           [
-            { content: 'STAGE 2: ASSIGNMENT & SLA GOVERNANCE', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
+            { content: 'STAGE 2: ASSIGNED RESPONSIBILITY & SLA GOVERNANCE', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
           ],
           [
-            { content: 'Assigned Line In-Charge:', styles: { fontStyle: 'bold' } },
-            { content: `${c.assignedTo?.name || 'Unassigned'}  (ID: ${c.assignedTo?.employeeId || 'N/A'} • ${c.assignedTo?.designation || 'Supervisor'} • Phone: ${c.assignedTo?.mobileNumber || 'N/A'})` },
+            { content: 'Assigned To (Responsible):', styles: { fontStyle: 'bold', textColor: [67, 56, 202] } },
+            { content: `${assignedName}  (Responsible Person for Resolving Issue • Employee ID: ${c.assignedTo?.employeeId || 'N/A'} • Designation: ${c.assignedTo?.designation || 'Supervisor'} • Mobile: ${c.assignedTo?.mobileNumber || 'N/A'})` },
           ],
           [
             { content: 'SLA Duration & Target Deadline:', styles: { fontStyle: 'bold' } },
             { content: `Target Duration: ${c.deadlineHours || 24} Hours  |  Target Due Date: ${deadlineDateStr}  |  SLA Condition: ${isOverdue ? 'Overdue Breach' : 'Within SLA Window'}` },
           ],
           [
-            { content: 'STAGE 3: CORRECTIVE ACTION PLAN (CAP) SUBMISSION', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
+            { content: 'STAGE 3: ROOT CAUSE ANALYSIS & CORRECTIVE ACTION PLAN', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
           ],
           [
             { content: '1. Immediate Containment Action:', styles: { fontStyle: 'bold' } },
             { content: getImmediateCorrectionText(c) },
           ],
           [
-            { content: '2. Root Cause Analysis (5-Why):', styles: { fontStyle: 'bold' } },
-            { content: getRootCauseText(c) },
+            { content: '2. Root Cause of the Issue:', styles: { fontStyle: 'bold', textColor: [180, 83, 9] } },
+            { content: rootCause },
           ],
           [
             { content: '3. Corrective Action (Permanent Fix):', styles: { fontStyle: 'bold' } },
@@ -365,7 +421,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
           ],
           [
             { content: 'CAP Governance & After Proof:', styles: { fontStyle: 'bold' } },
-            { content: `Responsible: ${getResponsiblePerson(c)}  |  Target Date: ${getCapTargetDate(c)}  |  After Photo Proof: ${c.afterPhoto ? 'Verified & Uploaded' : 'Pending Floor Proof'}` },
+            { content: `Responsible: ${assignedName}  |  Target Date: ${getCapTargetDate(c)}  |  After Photo Proof: ${c.afterPhoto ? 'Verified & Uploaded' : 'Pending Floor Proof'}` },
           ],
           [
             { content: 'STAGE 4: AUDITOR VERIFICATION & FINAL CLOSURE', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
@@ -441,8 +497,9 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         'Auditor Employee ID',
         'Auditor Role',
         'Defect Finding & Description',
+        'Issue Frequency (Times Occurred)',
         'Before Photo Evidence Status',
-        'Assigned Line In-Charge (Supervisor)',
+        'Assigned To (Responsible for Resolving)',
         'Assigned Supervisor Employee ID',
         'Assigned Supervisor Designation',
         'Assigned Supervisor Mobile Contact',
@@ -452,7 +509,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         'CAP Requirement',
         'CAP Lifecycle Status',
         'Immediate Correction (Containment Action)',
-        'Root Cause Analysis (5-Why / 6M)',
+        'Root Cause of the Issue (5-Why Analysis)',
         'Corrective Action (Permanent Fix)',
         'Preventive Action (Systemic Recurrence Prevention)',
         'CAP Responsible Person',
@@ -484,8 +541,9 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
           `"${c.createdBy?.employeeId || ''}"`,
           `"${c.createdBy?.role || ''}"`,
           `"${getFindingText(c).replace(/"/g, '""')}"`,
+          `"${getIssueFrequency(c)}"`,
           `"${c.beforePhoto ? 'Yes (Photo Captured)' : 'No Photo'}"`,
-          `"${(c.assignedTo?.name || '').replace(/"/g, '""')}"`,
+          `"${getAssignedToName(c).replace(/"/g, '""')}"`,
           `"${c.assignedTo?.employeeId || ''}"`,
           `"${(c.assignedTo?.designation || '').replace(/"/g, '""')}"`,
           `"${c.assignedTo?.mobileNumber || ''}"`,
@@ -630,15 +688,15 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
             <ul className="mt-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Stage 1:</strong> NC Number, Auditor, Line Location, Requirement Standard &amp; Full Finding Description.</span>
+                <span><strong>Stage 1:</strong> NC Number, Auditor, Line Location, Full Finding Description &amp; <strong>Issue Occurrence Frequency</strong>.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Stage 2:</strong> Assigned Supervisor, Designation, Contact Number &amp; SLA Target Timeline.</span>
+                <span><strong>Stage 2:</strong> <strong>Assigned To (Responsible for Resolving)</strong>, Designation, Mobile Contact &amp; SLA Target Timeline.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Stage 3:</strong> Containment Correction, 5-Why Root Cause, Permanent Corrective Action, Preventive Action &amp; Proof.</span>
+                <span><strong>Stage 3:</strong> <strong>5-Why Root Cause of the Issue</strong>, Immediate Containment, Permanent Corrective Action &amp; Proof.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
@@ -675,25 +733,25 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
               Complete A-to-Z Defect &amp; CAP Master Spreadsheet (CSV)
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-              Exhaustive 33-column tabular dataset formatted for Microsoft Excel, Google Sheets, and Business Intelligence analysis:
+              Exhaustive 34-column tabular dataset formatted for Microsoft Excel, Google Sheets, and Business Intelligence analysis:
             </p>
 
             <ul className="mt-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Every NC Attribute:</strong> Identification, Department, Line Floor, Standard Breached, Auditor Name &amp; Role.</span>
+                <span><strong>Defect Finding &amp; Issue Frequency:</strong> Full finding narrative and exact count of how many times the same issue occurred.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Complete 4-Part CAP:</strong> Containment Action, 5-Why Root Cause, Corrective Action, Preventive Action.</span>
+                <span><strong>Root Cause of the Issue:</strong> Structured 5-Why analysis plus containment, corrective, and preventive action steps.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Full Accountability:</strong> Assigned Supervisor, Employee ID, Mobile Contact, Responsible Person &amp; Target Date.</span>
+                <span><strong>Assigned To (Responsible):</strong> Explicit identification of the person responsible for resolving the issue with contact details.</span>
               </li>
               <li className="flex items-start gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                <span><strong>Verification Audit Trail:</strong> Verification method, photo proof flags, closure timestamps &amp; rejection remarks.</span>
+                <span><strong>Verification Audit Trail:</strong> Verification method, photo proof flags, SLA compliance condition &amp; closure timestamps.</span>
               </li>
             </ul>
           </div>
@@ -723,7 +781,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
               </span>
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Review how your non-conformances and CAP submissions appear before exporting.
+              Review how your non-conformances, issue frequencies, root causes, and assigned resolvers appear before exporting.
             </p>
           </div>
 
@@ -766,9 +824,9 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 text-[11px] font-bold text-slate-600 dark:text-slate-400">
                   <th className="py-3 px-4">NC ID &amp; Location</th>
-                  <th className="py-3 px-4">Requirement &amp; Finding</th>
-                  <th className="py-3 px-4">Line In-Charge</th>
-                  <th className="py-3 px-4">CAP Submission (Root Cause &amp; Fix)</th>
+                  <th className="py-3 px-4">Issue Finding &amp; Frequency</th>
+                  <th className="py-3 px-4">Assigned To (Responsible)</th>
+                  <th className="py-3 px-4">Root Cause &amp; CAP Fix</th>
                   <th className="py-3 px-4">Timeline &amp; SLA</th>
                   <th className="py-3 px-4 text-center">Status</th>
                 </tr>
@@ -780,6 +838,10 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
                     c.status !== 'Verified' &&
                     c.deadlineTimestamp &&
                     Date.now() > new Date(c.deadlineTimestamp).getTime();
+
+                  const freq = getIssueFrequency(c);
+                  const assignedName = getAssignedToName(c);
+                  const rootCause = getRootCauseText(c);
 
                   return (
                     <tr key={c._id || c.id || c.complaintId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
@@ -802,6 +864,11 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
                         <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">
                           {getFindingText(c)}
                         </p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                            Issue Frequency: {freq} time{freq > 1 ? 's' : ''}
+                          </span>
+                        </div>
                         <div className="text-[10px] text-slate-400 mt-1">
                           Auditor: {c.createdBy?.name || 'Quality Team'} ({c.createdBy?.role || 'AUDITOR'})
                         </div>
@@ -809,7 +876,10 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
 
                       <td className="py-3.5 px-4 align-top whitespace-nowrap">
                         <div className="font-bold text-slate-900 dark:text-slate-200">
-                          {c.assignedTo?.name || 'Unassigned'}
+                          {assignedName}
+                        </div>
+                        <div className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                          Responsible for Resolving
                         </div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400">
                           {c.assignedTo?.designation || 'Supervisor'}
@@ -820,13 +890,15 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
                       </td>
 
                       <td className="py-3.5 px-4 align-top max-w-sm">
-                        <div className="text-[11px]">
-                          <span className="font-bold text-amber-700 dark:text-amber-400">Root Cause: </span>
-                          <span className="text-slate-600 dark:text-slate-300 line-clamp-1">
-                            {c.cap?.rootCause || c.feedbackRemarks || 'Pending 5-Why analysis'}
+                        <div className="p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 text-[11px] mb-1.5">
+                          <span className="font-bold text-amber-800 dark:text-amber-300 block text-[10px] uppercase tracking-wider">
+                            Root Cause:
+                          </span>
+                          <span className="text-slate-700 dark:text-slate-300 line-clamp-2">
+                            {rootCause}
                           </span>
                         </div>
-                        <div className="text-[11px] mt-1">
+                        <div className="text-[11px]">
                           <span className="font-bold text-blue-700 dark:text-cyan-400">Fix: </span>
                           <span className="text-slate-600 dark:text-slate-300 line-clamp-1">
                             {c.cap?.correctiveAction || c.actionNotes || 'Pending corrective action'}
@@ -835,7 +907,7 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
                         <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
                           <span>Proof: {c.afterPhoto ? 'Uploaded' : 'Pending'}</span>
                           <span>•</span>
-                          <span>Resp: {getResponsiblePerson(c)}</span>
+                          <span>Target: {getCapTargetDate(c)}</span>
                         </div>
                       </td>
 
