@@ -451,14 +451,14 @@ export const ComplaintDetailModal = ({
             </div>
           </div>
 
-          {/* Section 2: NC Audit Governance & Standard Compliance */}
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shadow-2xs">
+          {/* Section 2: NC Audit Governance & CAP Status */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs shadow-2xs">
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block">
-                Audit Requirement Standard
+                Defect Category
               </span>
               <span className="font-extrabold text-slate-900 dark:text-white truncate block mt-0.5">
-                {complaint.requirement || 'AQL 1.5 Workmanship Standard'}
+                {complaint.category || 'Quality'}
               </span>
             </div>
             <div>
@@ -469,14 +469,6 @@ export const ComplaintDetailModal = ({
                 complaint.capRequired ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'
               }`}>
                 {complaint.capRequired ? 'Mandatory CAP (Root Cause Required)' : 'Direct Rectification'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block">
-                Auditor Verification Protocol
-              </span>
-              <span className="font-extrabold text-indigo-600 dark:text-cyan-400 truncate block mt-0.5">
-                {complaint.verificationMethod || 'Physical Floor Re-inspection'}
               </span>
             </div>
           </div>
@@ -672,7 +664,7 @@ export const ComplaintDetailModal = ({
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Non-Conformance (NC) ──► Immediate Correction ──► Root Cause ──► Corrective Action ──► Preventive Action ──► Evidence ──► Verification
+                    Non-Conformance (NC) ──► Immediate Correction ──► Root Cause ──► Corrective Action ──► Preventive Action ──► Evidence ──► Final Sign-off
                   </p>
                 </div>
               </div>
@@ -702,7 +694,7 @@ export const ComplaintDetailModal = ({
                     </span>
                   </div>
                   <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                    {complaint.location} — {complaint.requirement}
+                    {complaint.location}
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300 font-sans leading-relaxed">
                     {complaint.findingDescription || complaint.description}
@@ -894,7 +886,7 @@ export const ComplaintDetailModal = ({
                 </div>
               </div>
 
-              {/* BRANCH 8: Verification & Effectiveness Audit */}
+              {/* BRANCH 8: Effectiveness Audit & Sign-off */}
               <div className="relative group">
                 <div className={`absolute -left-6 sm:-left-7 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 shadow-xs ${
                   complaint.status === 'Closed' ? 'bg-emerald-600' : 'bg-cyan-500'
@@ -905,42 +897,22 @@ export const ComplaintDetailModal = ({
                       <span className="w-4 h-4 rounded-full bg-cyan-100 dark:bg-cyan-950 text-cyan-700 dark:text-cyan-300 flex items-center justify-center font-black text-[10px]">
                         8
                       </span>
-                      Verification &amp; Effectiveness Audit
+                      Final Review &amp; Effectiveness Sign-off
                     </span>
                     <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
                       complaint.status === 'Closed'
                         ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                        : complaint.status === 'Under Verification'
+                        : complaint.status === 'Under Verification' || complaint.status === 'Under Review'
                         ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                     }`}>
-                      {complaint.status === 'Closed' ? 'Verified Effective' : complaint.status}
+                      {complaint.status === 'Closed' ? 'Reviewed & Closed' : complaint.status}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Method</span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                        {complaint.verificationMethod || complaint.cap?.verificationMethod || 'Physical Floor Re-inspection'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Criteria</span>
-                      <span className="font-extrabold text-slate-800 dark:text-slate-200">
-                        {complaint.verificationCriteria || complaint.cap?.verificationCriteria || 'Zero defect recurrence & standard adherence'}
-                      </span>
-                    </div>
-                  </div>
-                  {complaint.cap?.verificationReadinessNotes && (
-                    <div className="text-[11px] text-slate-600 dark:text-slate-300 pt-1">
-                      <span className="font-bold text-slate-700 dark:text-slate-300">Supervisor Readiness Note: </span>
-                      {complaint.cap.verificationReadinessNotes}
-                    </div>
-                  )}
                   {complaint.status === 'Closed' && (
-                    <div className="text-[11px] text-emerald-700 dark:text-emerald-300 pt-1 flex items-center gap-1 font-semibold">
+                    <div className="text-[11px] text-emerald-700 dark:text-emerald-300 pt-1 flex items-center gap-1 font-semibold border-t border-slate-100 dark:border-slate-800">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Audit Sign-off: Verified effective by QA Auditor. Closure granted.</span>
+                      <span>Audit Sign-off: Rectification approved by QA Auditor. Closure granted.</span>
                     </div>
                   )}
                 </div>

@@ -68,11 +68,11 @@ const AUDIT_DEPARTMENTS = [
   {
     id: 'Quality',
     name: 'Quality',
-    group: 'QA / QC & AQL',
+    group: 'QA / QC',
     code: 'QA',
-    desc: 'Quality Assurance, In-Line QC, End-Line & Pre-Shipment AQL Audits',
-    focus: 'AQL 1.5 standards, measurement tolerance & visual inspection',
-    defaultLocation: 'QA Inspection Table - AQL Room',
+    desc: 'Quality Assurance & Line Inspection',
+    focus: 'Quality workmanship, tolerance & visual inspection',
+    defaultLocation: 'QA Inspection Table - Inspection Room',
   },
   {
     id: 'Production',
@@ -97,7 +97,7 @@ const AUDIT_DEPARTMENTS = [
     name: 'Store',
     group: 'Materials & Inventory',
     code: 'STR',
-    desc: 'Raw Material Store, Fabric Rolls (4-Point), Trims, Zippers & Thread Store',
+    desc: 'Raw Material Store, Fabric Rolls, Trims, Zippers & Thread Store',
     focus: 'Fabric roll shading, yarn flaws, inventory storage & trim defects',
     defaultLocation: 'Fabric & Raw Materials Store Bay',
   },
@@ -131,10 +131,10 @@ const AUDIT_DEPARTMENTS = [
   {
     id: 'Central Quality Audit',
     name: 'Central Quality Audit',
-    group: 'QA / Internal Audit',
+    group: 'Internal Audit',
     code: 'CQA',
-    desc: 'QA System Audits, Verification Protocols, Calibration Standards & Audit Checklists',
-    focus: 'Audit checklists, SOP adherence, gauge calibration & verification protocols',
+    desc: 'Quality Audits & Compliance Checklists',
+    focus: 'Audit checklists, SOP adherence & quality standards',
     defaultLocation: 'QA Audit Office & Standards Room',
   },
 ];
@@ -695,9 +695,6 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                         )}
                       </div>
                       <div className="font-extrabold text-xs text-slate-900 dark:text-white">{dept.name}</div>
-                      <div className="text-[10.5px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-snug">
-                        {dept.desc}
-                      </div>
                     </button>
                   );
                 })}
@@ -1477,10 +1474,10 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-cyan-400 shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="font-extrabold text-slate-900 dark:text-white">
-                    Closed-Loop NC Verification & Closure Protocol
+                    Closed-Loop NC Review &amp; Closure Protocol
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-                    Issuing this NC moves its status to <span className="font-bold text-indigo-600 dark:text-indigo-400">Assigned</span> and initiates the SLA timer. The line in-charge must complete rectification and submit After Photo proof. <strong className="text-slate-900 dark:text-white">This NC defect can ONLY be officially closed after you (the Auditor) approve verification.</strong>
+                    Issuing this NC moves its status to <span className="font-bold text-indigo-600 dark:text-indigo-400">Assigned</span> and initiates the SLA timer. The line in-charge must complete rectification and submit After Photo proof. <strong className="text-slate-900 dark:text-white">This NC defect can ONLY be officially closed after the Auditor reviews and approves rectification.</strong>
                   </p>
                 </div>
               </div>

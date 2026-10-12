@@ -374,8 +374,8 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
             { content: `${createdDateStr}  (Logged By: ${c.createdBy?.name || 'Auditor'} • ${c.createdBy?.role || 'AUDITOR'} • ID: ${c.createdBy?.employeeId || 'N/A'})` },
           ],
           [
-            { content: 'Audit Standard Breached:', styles: { fontStyle: 'bold' } },
-            { content: `${c.requirement || 'AQL 1.5 Workmanship Standard'}  |  Category: ${c.category || 'Quality'}  |  Severity: ${c.priority || c.riskSeverity || 'High'}` },
+            { content: 'Defect Category & Severity:', styles: { fontStyle: 'bold' } },
+            { content: `Category: ${c.category || 'Quality'}  |  Severity: ${c.priority || c.riskSeverity || 'High'}` },
           ],
           [
             { content: 'Defect Finding & Description:', styles: { fontStyle: 'bold' } },
@@ -386,8 +386,8 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
             { content: `${freq} time(s) — The same issue has occurred ${freq} time(s) across quality records.` },
           ],
           [
-            { content: 'Verification Method / Evidence:', styles: { fontStyle: 'bold' } },
-            { content: `Method: ${c.verificationMethod || 'Physical Floor Re-inspection'}  |  Before Photo Evidence: ${c.beforePhoto ? 'Attached (Recorded on File)' : 'None'}` },
+            { content: 'Photo Evidence Status:', styles: { fontStyle: 'bold' } },
+            { content: `Before Photo Evidence: ${c.beforePhoto ? 'Attached (Recorded on File)' : 'None'}  |  After Photo Evidence: ${c.afterPhoto ? 'Attached (Rectified)' : 'Pending'}` },
           ],
           [
             { content: 'STAGE 2: ASSIGNED RESPONSIBILITY & SLA GOVERNANCE', colSpan: 2, styles: { fillColor: [248, 250, 252], fontStyle: 'bold', textColor: [71, 85, 105] } },
@@ -490,8 +490,6 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
         'Department',
         'Line / Shopfloor Location',
         'Defect Category',
-        'Audit Standard / Requirement',
-        'Verification Method Required',
         'NC Logged Date & Time',
         'Auditor Name (Created By)',
         'Auditor Employee ID',
@@ -534,8 +532,6 @@ export const ReportsView = ({ complaints = [], departmentData = null }) => {
           `"${c.department || ''}"`,
           `"${c.location || ''}"`,
           `"${c.category || ''}"`,
-          `"${(c.requirement || '').replace(/"/g, '""')}"`,
-          `"${(c.verificationMethod || '').replace(/"/g, '""')}"`,
           `"${c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}"`,
           `"${(c.createdBy?.name || '').replace(/"/g, '""')}"`,
           `"${c.createdBy?.employeeId || ''}"`,
