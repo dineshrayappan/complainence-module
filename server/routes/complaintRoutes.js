@@ -5,6 +5,7 @@ const {
   getComplaints,
   getComplaintById,
   markInProgress,
+  pauseProgress,
   submitAction,
   verifyComplaint,
   addTimelineComment,
@@ -92,6 +93,9 @@ router.patch(
 
 // Update status to In Progress (Action Person, Supervisor, Auditor, or Admin)
 router.patch('/:id/in-progress', verifyToken, markInProgress);
+
+// Pause or stop floor containment back to Open status (Action Person, Supervisor, Auditor, or Admin)
+router.patch('/:id/stop-work', verifyToken, pauseProgress);
 
 // Submit Action Resolution (ACTION_PERSON or SUPERVISOR role strictly enforced + Multer file upload for After Photo)
 router.post(

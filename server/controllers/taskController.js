@@ -1,5 +1,6 @@
 const { isMongoConnected } = require('../config/db');
 const ComplianceTask = require('../models/ComplianceTask');
+const Complaint = require('../models/Complaint');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
@@ -229,7 +230,45 @@ const getTasks = async (req, res) => {
       tasks = mockStore.getTasks();
     }
 
-    const visible = applyVisibility(tasks, req.user);
+    // Also include active / open department NCs so supervisors can view & manage them in Department Work Operations
+    let complaints = [];
+    if (isMongoConnected()) {
+      try {
+        const cData = await Complaint.find().sort({ createdAt: -1 }).lean();
+        if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
+      } catch (e) {}
+    }
+    if (!complaints || complaints.length === 0) {
+      complaints = mockStore.getComplaints();
+    }
+
+    const ncTasks = complaints.map((c) => {
+      const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
+      const isBusy = c.status === 'In Progress';
+      return {
+        id: c.complaintId || c._id?.toString() || c.id,
+        _id: c._id?.toString() || c.id || c.complaintId,
+        complaintId: c.complaintId,
+        title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+        department: c.department,
+        description: c.findingDescription || c.description || 'Non-conformance rectification',
+        priority: c.priority || c.riskSeverity || 'HIGH',
+        dueDate: c.deadlineTimestamp || c.targetDate || c.createdAt,
+        status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
+        workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
+        startedAt: c.startedAt || null,
+        startedBy: c.startedBy || null,
+        completedAt: c.actualCompletedAt || null,
+        completedBy: c.completedBy || c.assignedTo || null,
+        proofPhoto: c.afterPhoto || null,
+        proofNotes: c.actionNotes || null,
+        assignedTo: c.assignedTo || {},
+        isNC: true,
+      };
+    });
+
+    const combined = [...tasks, ...ncTasks];
+    const visible = applyVisibility(combined, req.user);
     const now = new Date();
     const filtered = visible
       .filter((t) => matchesFilter(t, state, department))
@@ -535,6 +574,34 @@ const startTask = async (req, res) => {
       startedAt,
     };
 
+    if (task.isNC) {
+      const now = new Date();
+      if (isMongoConnected()) {
+        try {
+          const query = { $or: [{ complaintId: task.complaintId || task.id }] };
+          const cur = await Complaint.findOne(query);
+          if (cur) {
+            cur.status = 'In Progress';
+            cur.startedAt = now;
+            cur.startedBy = currentWorker;
+            if (!cur.assignedTo?.name) cur.assignedTo = currentWorker;
+            await cur.save();
+            mockStore.updateComplaint(cur._id.toString(), cur.toObject());
+          }
+        } catch (e) {}
+      }
+      mockStore.updateComplaint(task.complaintId || task.id, {
+        status: 'In Progress',
+        startedAt: now.toISOString(),
+        startedBy: currentWorker,
+      });
+      return res.json({
+        success: true,
+        message: `Work started on NC defect by ${currentWorker.name}. Status updated to In Progress / Busy.`,
+        task: { ...task, status: 'In Progress', workStatus: 'IN_PROGRESS', startedAt: now.toISOString(), startedBy: currentWorker },
+      });
+    }
+
     const existingMeta = extractTaskMeta(task) || {};
     const existingWorkers = Array.isArray(existingMeta.activeWorkers) ? existingMeta.activeWorkers : [];
     
@@ -653,6 +720,43 @@ const completeTask = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Completion details/notes are required before completing the task.',
+      });
+    }
+
+    if (task.isNC) {
+      const now = new Date();
+      const currentWorker = {
+        userId: req.user?.id || req.user?._id || '',
+        employeeId: req.user?.employeeId || '',
+        name: req.user?.name || '',
+        department: req.user?.department || task.department || '',
+      };
+      if (isMongoConnected()) {
+        try {
+          const query = { $or: [{ complaintId: task.complaintId || task.id }] };
+          const cur = await Complaint.findOne(query);
+          if (cur) {
+            cur.status = 'CAP Submitted';
+            cur.actualCompletedAt = now;
+            cur.afterPhoto = proofPhoto;
+            cur.actionNotes = proofNotes;
+            cur.completedBy = currentWorker;
+            await cur.save();
+            mockStore.updateComplaint(cur._id.toString(), cur.toObject());
+          }
+        } catch (e) {}
+      }
+      mockStore.updateComplaint(task.complaintId || task.id, {
+        status: 'CAP Submitted',
+        actualCompletedAt: now.toISOString(),
+        afterPhoto: proofPhoto,
+        actionNotes: proofNotes,
+        completedBy: currentWorker,
+      });
+      return res.json({
+        success: true,
+        message: `NC defect resolution completed with verified proof by ${currentWorker.name}! Reflected to Live Work Operations.`,
+        task: { ...task, status: 'Completed', workStatus: 'COMPLETED', completedAt: now.toISOString(), proofPhoto, proofNotes },
       });
     }
 
@@ -915,6 +1019,20 @@ const getEmployeeWorkStatus = async (req, res) => {
     // Enrich all tasks with live tracking metadata (startedAt, workStatus, proof)
     allTasks = (allTasks || []).map((t) => enrichTaskWithMeta(t));
 
+    // 2b. Fetch all Non-Conformance complaints so NC work reflects on Live Operations
+    let allComplaints = [];
+    if (isMongoConnected()) {
+      try {
+        const dbComplaints = await Complaint.find().lean();
+        if (dbComplaints) allComplaints = dbComplaints.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
+      } catch (e) {
+        console.warn('[TaskController:getEmployeeWorkStatus] complaints fetch fallback:', e.message);
+      }
+    }
+    if (!allComplaints || allComplaints.length === 0) {
+      allComplaints = mockStore.getComplaints();
+    }
+
     // Filter by department if specified
     const targetDept = department && department !== 'ALL' ? department.trim().toLowerCase() : null;
 
@@ -928,6 +1046,22 @@ const getEmployeeWorkStatus = async (req, res) => {
       const uEmp = (user.employeeId || '').toUpperCase();
       const uId = String(user.id || user._id || '');
       const uEmail = (user.email || '').toLowerCase();
+      const uName = (user.name || '').toLowerCase();
+      const userDept = (user.department || '').trim().toLowerCase();
+
+      // Check if employee is actively working on a Non-Conformance (NC)
+      const activeNC = allComplaints.find((c) => {
+        if (c.status !== 'In Progress') return false;
+        const startedEmp = (c.startedBy?.employeeId || '').toUpperCase();
+        const startedId = String(c.startedBy?.userId || '');
+        const assignedEmp = (c.assignedTo?.employeeId || '').toUpperCase();
+        const assignedId = String(c.assignedTo?.userId || '');
+        const assignedName = (c.assignedTo?.name || '').toLowerCase();
+
+        const isStarter = (uEmp && startedEmp === uEmp) || (uId && startedId === uId);
+        const isAssigned = (uEmp && assignedEmp === uEmp) || (uId && assignedId === uId) || (uName && assignedName === uName);
+        return isStarter || isAssigned;
+      });
 
       // 1. Is this employee actively working on any in-progress task?
       const activeTask = allTasks.find((t) => {
@@ -951,7 +1085,6 @@ const getEmployeeWorkStatus = async (req, res) => {
       });
 
       // 2. Check for tasks won/completed by this user
-      const userDept = (user.department || '').trim().toLowerCase();
       const completedTasks = allTasks
         .filter((t) => {
           if (t.status !== 'Completed' && t.workStatus !== 'COMPLETED' && !t.completedAt) return false;
@@ -963,7 +1096,18 @@ const getEmployeeWorkStatus = async (req, res) => {
         })
         .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
 
-      const latestCompleted = completedTasks[0] || null;
+      const completedNCs = allComplaints
+        .filter((c) => {
+          if (!['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status)) return false;
+          const compEmp = (c.completedBy?.employeeId || c.startedBy?.employeeId || c.assignedTo?.employeeId || '').toUpperCase();
+          const compId = String(c.completedBy?.userId || c.startedBy?.userId || c.assignedTo?.userId || '');
+          const compName = (c.completedBy?.name || c.assignedTo?.name || '').toLowerCase();
+          return (uEmp && compEmp === uEmp) || (uId && compId === uId) || (uName && compName === uName);
+        })
+        .sort((a, b) => new Date(b.actualCompletedAt || b.updatedAt || 0) - new Date(a.actualCompletedAt || a.updatedAt || 0));
+
+      const latestCompletedTask = completedTasks[0] || null;
+      const latestCompletedNC = completedNCs[0] || null;
 
       // 3. Open pending task eligible for this employee to start
       const openDeptTask = allTasks.find((t) => {
@@ -987,7 +1131,20 @@ const getEmployeeWorkStatus = async (req, res) => {
       let proofPhoto = null;
       let proofNotes = null;
 
-      if (activeTask) {
+      if (activeNC) {
+        status = 'In Progress / Busy';
+        currentTask = {
+          id: activeNC.complaintId || activeNC.id,
+          title: `NC: ${activeNC.complaintId} - ${activeNC.category || 'Floor Non-Conformance'}`,
+          priority: activeNC.priority || activeNC.riskSeverity || 'HIGH',
+          dueDate: activeNC.deadlineTimestamp || activeNC.createdAt,
+          department: activeNC.department,
+          isNC: true,
+          complaintId: activeNC.complaintId,
+        };
+        startTime = activeNC.startedAt || activeNC.updatedAt || null;
+        proofStatus = 'Pending Upload (Stop Work to Submit)';
+      } else if (activeTask) {
         status = 'In Progress / Busy';
         currentTask = {
           id: activeTask.id,
@@ -995,6 +1152,7 @@ const getEmployeeWorkStatus = async (req, res) => {
           priority: activeTask.priority,
           dueDate: activeTask.dueDate,
           department: activeTask.department,
+          isNC: false,
         };
         const workerEntry = Array.isArray(activeTask.activeWorkers)
           ? activeTask.activeWorkers.find(
@@ -1005,30 +1163,70 @@ const getEmployeeWorkStatus = async (req, res) => {
           : null;
         startTime = workerEntry?.startedAt || activeTask.startedAt || activeTask.updatedAt || null;
         proofStatus = 'Pending Upload';
-      } else if (latestCompleted) {
-        status = 'Completed';
-        currentTask = {
-          id: latestCompleted.id,
-          title: latestCompleted.title,
-          priority: latestCompleted.priority,
-          dueDate: latestCompleted.dueDate,
-          department: latestCompleted.department,
-        };
-        startTime = latestCompleted.startedAt || null;
-        completionTime = latestCompleted.completedAt || null;
-        proofStatus = latestCompleted.proofPhoto ? 'Verified / Uploaded' : 'Submitted';
-        proofPhoto = latestCompleted.proofPhoto || null;
-        proofNotes = latestCompleted.proofNotes || null;
-      } else if (openDeptTask) {
-        // Available, with an open task ready to start
-        status = 'Available';
-        currentTask = {
-          id: openDeptTask.id,
-          title: openDeptTask.title,
-          priority: openDeptTask.priority,
-          dueDate: openDeptTask.dueDate,
-          department: openDeptTask.department,
-        };
+      } else {
+        // Pick newest completed work between tasks and NCs
+        const candidates = [];
+        if (latestCompletedTask) {
+          candidates.push({
+            id: latestCompletedTask.id,
+            title: latestCompletedTask.title,
+            priority: latestCompletedTask.priority,
+            dueDate: latestCompletedTask.dueDate,
+            department: latestCompletedTask.department,
+            startedAt: latestCompletedTask.startedAt || null,
+            completedAt: latestCompletedTask.completedAt || null,
+            proofPhoto: latestCompletedTask.proofPhoto || null,
+            proofNotes: latestCompletedTask.proofNotes || null,
+            isNC: false,
+            timestamp: new Date(latestCompletedTask.completedAt || 0).getTime(),
+          });
+        }
+        if (latestCompletedNC) {
+          candidates.push({
+            id: latestCompletedNC.complaintId || latestCompletedNC.id,
+            title: `NC: ${latestCompletedNC.complaintId} - ${latestCompletedNC.category || 'Floor Rectification'}`,
+            priority: latestCompletedNC.priority || 'HIGH',
+            dueDate: latestCompletedNC.deadlineTimestamp,
+            department: latestCompletedNC.department,
+            startedAt: latestCompletedNC.startedAt || null,
+            completedAt: latestCompletedNC.actualCompletedAt || latestCompletedNC.updatedAt || null,
+            proofPhoto: latestCompletedNC.afterPhoto || null,
+            proofNotes: latestCompletedNC.actionNotes || latestCompletedNC.cap?.immediateCorrection || 'Rectification verified',
+            isNC: true,
+            complaintId: latestCompletedNC.complaintId,
+            timestamp: new Date(latestCompletedNC.actualCompletedAt || latestCompletedNC.updatedAt || 0).getTime(),
+          });
+        }
+        candidates.sort((a, b) => b.timestamp - a.timestamp);
+        const bestCompleted = candidates[0];
+
+        if (bestCompleted) {
+          status = 'Completed';
+          currentTask = {
+            id: bestCompleted.id,
+            title: bestCompleted.title,
+            priority: bestCompleted.priority,
+            dueDate: bestCompleted.dueDate,
+            department: bestCompleted.department,
+            isNC: bestCompleted.isNC,
+            complaintId: bestCompleted.complaintId,
+          };
+          startTime = bestCompleted.startedAt;
+          completionTime = bestCompleted.completedAt;
+          proofStatus = bestCompleted.proofPhoto ? 'Verified / Uploaded' : 'Submitted';
+          proofPhoto = bestCompleted.proofPhoto;
+          proofNotes = bestCompleted.proofNotes;
+        } else if (openDeptTask) {
+          // Available, with an open task ready to start
+          status = 'Available';
+          currentTask = {
+            id: openDeptTask.id,
+            title: openDeptTask.title,
+            priority: openDeptTask.priority,
+            dueDate: openDeptTask.dueDate,
+            department: openDeptTask.department,
+          };
+        }
       }
 
       return {
@@ -1046,7 +1244,7 @@ const getEmployeeWorkStatus = async (req, res) => {
         proofStatus,
         proofPhoto,
         proofNotes,
-        totalCompletedCount: completedTasks.length,
+        totalCompletedCount: completedTasks.length + completedNCs.length,
       };
     });
 
@@ -1128,6 +1326,66 @@ const findTask = async (id) => {
   }
   if (!task) {
     task = mockStore.getTaskById(id) || null;
+  }
+  // Check Complaint if not a regular task
+  if (!task) {
+    if (isMongoConnected()) {
+      try {
+        const query = { $or: [{ complaintId: id }] };
+        if (id && typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: id });
+        }
+        const c = await Complaint.findOne(query).lean();
+        if (c) {
+          const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
+          const isBusy = c.status === 'In Progress';
+          task = {
+            id: c.complaintId || c._id.toString(),
+            _id: c._id.toString(),
+            complaintId: c.complaintId,
+            title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+            department: c.department,
+            description: c.findingDescription || c.description,
+            priority: c.priority || c.riskSeverity || 'HIGH',
+            dueDate: c.deadlineTimestamp,
+            status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
+            workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
+            startedAt: c.startedAt || null,
+            startedBy: c.startedBy || null,
+            completedAt: c.actualCompletedAt || null,
+            proofPhoto: c.afterPhoto || null,
+            proofNotes: c.actionNotes || null,
+            assignedTo: c.assignedTo || {},
+            isNC: true,
+          };
+        }
+      } catch (e) {}
+    }
+    if (!task) {
+      const c = mockStore.findComplaintById(id);
+      if (c) {
+        const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
+        const isBusy = c.status === 'In Progress';
+        task = {
+          id: c.complaintId || c.id,
+          complaintId: c.complaintId,
+          title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+          department: c.department,
+          description: c.findingDescription || c.description,
+          priority: c.priority || c.riskSeverity || 'HIGH',
+          dueDate: c.deadlineTimestamp,
+          status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
+          workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
+          startedAt: c.startedAt || null,
+          startedBy: c.startedBy || null,
+          completedAt: c.actualCompletedAt || null,
+          proofPhoto: c.afterPhoto || null,
+          proofNotes: c.actionNotes || null,
+          assignedTo: c.assignedTo || {},
+          isNC: true,
+        };
+      }
+    }
   }
   return task ? enrichTaskWithMeta(task) : null;
 };

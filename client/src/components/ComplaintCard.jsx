@@ -255,19 +255,31 @@ export const ComplaintCard = ({
           <span>Inspect NC</span>
         </button>
 
-        {/* Action Button for Supervisor / Action Person */}
+        {/* Action Button for Supervisor: Start Work when Open/Assigned, Stop Work when In Progress */}
         {canActionPersonAct &&
-          ['Open', 'Rejected / Rework', 'In Progress', 'Assigned', 'Rejected / Sent Back'].includes(
+          ['Open', 'Assigned', 'Draft', 'Rejected / Rework', 'Rejected / Sent Back'].includes(
             complaint.status
           ) && (
             <button
-              onClick={() => onSubmitAction(complaint)}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+              onClick={() => (onStartProgress ? onStartProgress(complaint) : onSubmitAction(complaint))}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+              title="Start Work (Reflects to Live Work Operations as Busy in Progress)"
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>{complaint.capRequired ? 'Submit CAP & Proof' : 'Submit Proof'}</span>
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Start Work</span>
             </button>
           )}
+
+        {canActionPersonAct && complaint.status === 'In Progress' && (
+          <button
+            onClick={() => onSubmitAction(complaint)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm transition-all active:scale-95 animate-pulse cursor-pointer"
+            title="Stop Work (Submit Proof & Complete NC)"
+          >
+            <span className="w-2.5 h-2.5 bg-white rounded-xs" />
+            <span>Stop Work</span>
+          </button>
+        )}
 
         {/* Verification / Review Action for Auditor or Admin */}
         {(isAuditor || isAdmin) &&

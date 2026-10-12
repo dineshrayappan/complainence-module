@@ -63,6 +63,50 @@ export const ComplaintDetailModal = ({
 
   const canReassign = (isAuditor || isAdmin) && complaint?.status !== 'Closed';
 
+  // Live work operations state
+  const [startingWork, setStartingWork] = useState(false);
+  const [pausingWork, setPausingWork] = useState(false);
+  const [workFeedback, setWorkFeedback] = useState(null);
+
+  const handleStartWork = async () => {
+    try {
+      setStartingWork(true);
+      setError(null);
+      setWorkFeedback(null);
+      const targetId = complaint._id || complaint.id || complaint.complaintId;
+      const res = await complaintService.markInProgress(targetId);
+      if (res.data?.success) {
+        const updated = res.data.complaint || { ...complaint, status: 'In Progress' };
+        if (onUpdateComplaint) onUpdateComplaint(updated);
+        if (onStartProgress) onStartProgress(updated);
+        setWorkFeedback('⚡ Work initiated! Your status is now "Busy in Progress" on Live Work Operations.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to start floor containment.');
+    } finally {
+      setStartingWork(false);
+    }
+  };
+
+  const handlePauseWork = async () => {
+    try {
+      setPausingWork(true);
+      setError(null);
+      setWorkFeedback(null);
+      const targetId = complaint._id || complaint.id || complaint.complaintId;
+      const res = await complaintService.stopWork(targetId, 'Supervisor paused floor containment.');
+      if (res.data?.success) {
+        const updated = res.data.complaint || { ...complaint, status: 'Open', startedAt: null };
+        if (onUpdateComplaint) onUpdateComplaint(updated);
+        setWorkFeedback('Floor work paused. Your live work status has returned to "Available".');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to pause work.');
+    } finally {
+      setPausingWork(false);
+    }
+  };
+
   // Master Contact List of Supervisors from database
   const [supervisorsList, setSupervisorsList] = useState([]);
 
@@ -139,6 +183,15 @@ export const ComplaintDetailModal = ({
     : typeof complaint.assignedTo === 'string'
     ? (() => { try { return JSON.parse(complaint.assignedTo) || {}; } catch(e) { return {}; } })()
     : {};
+
+  const uEmp = (user?.employeeId || '').toUpperCase();
+  const uId = String(user?.id || user?._id || '');
+  const assignedEmp = (assignedToData?.employeeId || complaint.assignedTo?.employeeId || '').toUpperCase();
+  const assignedId = String(assignedToData?.userId || complaint.assignedTo?.userId || '');
+  const isDirectlyAssigned = (uEmp && assignedEmp === uEmp) || (uId && assignedId === uId);
+  const isSameDeptSupervisor = (user?.role === 'SUPERVISOR' || user?.role === 'ACTION_PERSON') &&
+    (user?.department || '').trim().toLowerCase() === (complaint?.department || '').trim().toLowerCase();
+  const canActOnNC = isAuditor || isAdmin || isDirectlyAssigned || isSameDeptSupervisor;
 
   // Handle direct timeline remark
   const handleAddComment = async (e) => {
@@ -904,30 +957,111 @@ export const ComplaintDetailModal = ({
             </div>
           )}
 
-          {/* Action Box for Submitting Resolution Proof / CAP */}
-          {['Open', 'Rejected / Rework', 'In Progress', 'Assigned', 'Rejected / Sent Back'].includes(complaint.status) && onSubmitAction && (
-            <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
-                  {complaint.capRequired ? 'Action Required: Submit CAP & Evidence' : 'Work Completed? Submit Rectification Proof'}
-                </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {complaint.capRequired
-                    ? 'Submit 8-step Root Cause, Corrective & Preventive action plan with photo evidence.'
-                    : 'Upload mandatory After Photo proof and action notes for Quality Audit verification.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onSubmitAction(complaint);
-                }}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-              >
-                <Camera className="w-4 h-4" />
-                <span>{complaint.capRequired ? 'Submit CAP & Evidence' : 'Submit Proof'}</span>
-              </button>
+          {/* Supervisor Live Non-Conformance Work Operation Box: Start Work & Stop Work */}
+          {canActOnNC && (
+            <div className="space-y-3">
+              {/* Feedback notice if just started / paused */}
+              {workFeedback && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{workFeedback}</span>
+                </div>
+              )}
+
+              {/* 1. START WORK: When complaint is Open, Assigned, Draft, or Rejected/Rework */}
+              {['Open', 'Assigned', 'Draft', 'Rejected / Rework', 'Rejected / Sent Back'].includes(complaint.status) && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50/90 via-teal-50/70 to-indigo-50/80 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-indigo-950/40 border-2 border-emerald-400 dark:border-emerald-600 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <h4 className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center gap-1.5">
+                        <Play className="w-4 h-4 text-emerald-600 dark:text-emerald-400 fill-current" />
+                        <span>Shop Floor Containment & Rectification</span>
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
+                        Ready to Start
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 max-w-xl">
+                      Assignable Person:{' '}
+                      <strong className="text-slate-900 dark:text-white">
+                        {complaint.assignedTo?.name || user?.name}
+                      </strong>{' '}
+                      ({complaint.assignedTo?.employeeId || user?.employeeId}). Click{' '}
+                      <strong className="text-emerald-700 dark:text-emerald-300">Start Work</strong> to begin containment. Your live status will immediately reflect as{' '}
+                      <strong className="text-amber-700 dark:text-amber-400">Busy in Progress</strong> on Live Work Operations.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleStartWork}
+                      disabled={startingWork}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/30 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>{startingWork ? 'Starting Floor Work...' : '▶ Start Work'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 2. STOP WORK: When complaint is In Progress */}
+              {complaint.status === 'In Progress' && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+                      <h4 className="font-extrabold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center gap-1.5">
+                        ⚡ Live Work Operation: Busy in Progress
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                        Floor Containment Active
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Shop floor work is in progress. When containment is done, click <strong className="text-rose-700 dark:text-rose-300">Stop Work</strong> to upload mandatory After Photo proof and complete this NC. Your live status will update back to Available.
+                    </p>
+                    <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-amber-800 dark:text-amber-300 flex-wrap pt-0.5">
+                      <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                      {complaint.startedAt ? (
+                        <span>
+                          Started at {new Date(complaint.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      ) : (
+                        <span>Work active on floor</span>
+                      )}
+                      {(complaint.startedBy?.name || complaint.assignedTo?.name) && (
+                        <span>by {complaint.startedBy?.name || complaint.assignedTo?.name}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handlePauseWork}
+                      disabled={pausingWork}
+                      title="Pause floor containment and return to Open status"
+                      className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer"
+                    >
+                      {pausingWork ? 'Pausing...' : 'Pause Work'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onSubmitAction) onSubmitAction(complaint);
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-rose-600/30 active:scale-95 transition-all cursor-pointer animate-pulse"
+                    >
+                      <span className="w-2.5 h-2.5 bg-white rounded-xs" />
+                      <span>⏹ Stop Work (Complete NC)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -186,6 +186,13 @@ export const App = () => {
               : c
           )
         );
+        if (
+          selectedComplaint &&
+          ((selectedComplaint._id || selectedComplaint.id) === (complaint._id || complaint.id) ||
+            selectedComplaint.complaintId === complaint.complaintId)
+        ) {
+          setSelectedComplaint(updatedTicket);
+        }
         loadData(false);
       }
     } catch (err) {

@@ -78,6 +78,8 @@ export const complaintService = {
     api.patch(`/complaints/${id}/reassign`, { assignedToUserId, notes }),
   markInProgress: (id, notes) =>
     api.patch(`/complaints/${id}/in-progress`, { notes }),
+  stopWork: (id, reason) =>
+    api.patch(`/complaints/${id}/stop-work`, { reason }),
   submitAction: (id, data) => {
     if (typeof FormData !== 'undefined' && data instanceof FormData) {
       return api.post(`/complaints/${id}/submit-action`, data, {

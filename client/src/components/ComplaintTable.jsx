@@ -179,20 +179,29 @@ export const ComplaintTable = ({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-end gap-2">
-                    {/* Action Button for Supervisor / Action Person */}
+                    {/* Action Button for Supervisor: Start when Open/Assigned, Stop when In Progress */}
                     {canAct &&
-                      ['Open', 'Rejected / Rework', 'Assigned', 'In Progress', 'Rejected / Sent Back'].includes(
-                        c.status
-                      ) && (
+                      ['Open', 'Assigned', 'Draft', 'Rejected / Rework', 'Rejected / Sent Back'].includes(c.status) && (
                         <button
-                          onClick={() => onSubmitAction(c)}
-                          className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1 shadow-xs"
-                          title="Submit CAP & Proof"
+                          onClick={() => (onStartProgress ? onStartProgress(c) : onSubmitAction(c))}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer"
+                          title="Start Work (Reflects to Live Work Operations as Busy in Progress)"
                         >
-                          <Camera className="w-3.5 h-3.5" />
-                          <span>{c.capRequired ? 'Submit CAP' : 'Submit Action'}</span>
+                          <Play className="w-3 h-3 fill-current" />
+                          <span>Start</span>
                         </button>
                       )}
+
+                    {canAct && c.status === 'In Progress' && (
+                      <button
+                        onClick={() => onSubmitAction(c)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1 shadow-xs animate-pulse transition-all active:scale-95 cursor-pointer"
+                        title="Stop Work (Submit Proof & Complete NC)"
+                      >
+                        <span className="w-2 h-2 bg-white rounded-xs" />
+                        <span>Stop</span>
+                      </button>
+                    )}
 
                     {/* Verification / Review Action for Auditor or Admin */}
                     {(isAuditor || isAdmin) &&

@@ -99,6 +99,14 @@ const complaintSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    startedAt: {
+      type: Date,
+      default: null,
+    },
+    startedBy: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     status: {
       type: String,
       default: 'Open',

@@ -787,6 +787,14 @@ const markInProgress = async (req, res) => {
     const paramId = req.params.id;
     const now = new Date();
 
+    const startedBy = {
+      name: req.user?.name || 'Line Supervisor',
+      role: req.user?.role || 'SUPERVISOR',
+      employeeId: req.user?.employeeId || '',
+      department: req.user?.department || '',
+      userId: req.user?._id ? req.user._id.toString() : (req.user?.id || ''),
+    };
+
     if (isMongoConnected()) {
       try {
         const query = { $or: [{ complaintId: paramId }] };
@@ -811,11 +819,16 @@ const markInProgress = async (req, res) => {
               role: req.user.role,
               employeeId: req.user.employeeId,
             },
-            notes: 'Supervisor initiated work and containment on the shop floor.',
+            notes: `Supervisor ${req.user.name} initiated live floor containment. Reflected as Busy in Progress on Live Work Operations.`,
             timestamp: now.toISOString(),
           });
 
           current.status = 'In Progress';
+          current.startedAt = now;
+          current.startedBy = startedBy;
+          if (!current.assignedTo?.name || !current.assignedTo?.employeeId) {
+            current.assignedTo = startedBy;
+          }
           current.description = setWorkflowStatusInDescription(current.description, 'In Progress');
           current.timeline = timeline;
           current.updatedAt = now;
@@ -824,7 +837,7 @@ const markInProgress = async (req, res) => {
           mockStore.updateComplaint(current._id.toString(), current.toObject());
           return res.status(200).json({
             success: true,
-            message: `Complaint ${updated.complaintId} marked in progress.`,
+            message: `Complaint ${updated.complaintId} marked In Progress. Reflected to Live Work Operations as Busy in Progress.`,
             complaint: formatComplaintOutput(updated.toObject()),
           });
         }
@@ -846,17 +859,20 @@ const markInProgress = async (req, res) => {
         role: req.user.role,
         employeeId: req.user.employeeId,
       },
-      notes: 'Supervisor initiated work and containment on the shop floor.',
+      notes: `Supervisor ${req.user.name} initiated live floor containment. Reflected as Busy in Progress on Live Work Operations.`,
       timestamp: now.toISOString(),
     });
     const updated = mockStore.updateComplaint(complaint.id, {
       status: 'In Progress',
+      startedAt: now.toISOString(),
+      startedBy,
+      assignedTo: (!complaint.assignedTo?.name || !complaint.assignedTo?.employeeId) ? startedBy : complaint.assignedTo,
       timeline,
       updatedAt: now.toISOString(),
     });
     return res.status(200).json({
       success: true,
-      message: `Complaint ${updated.complaintId} marked in progress.`,
+      message: `Complaint ${updated.complaintId} marked In Progress. Reflected to Live Work Operations as Busy in Progress.`,
       complaint: formatComplaintOutput(updated),
     });
   } catch (error) {
@@ -864,6 +880,98 @@ const markInProgress = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Server error marking complaint in progress.',
+    });
+  }
+};
+
+// @desc    Pause / Stop floor containment and return NC to Open status
+// @route   PATCH /api/complaints/:id/stop-work
+// @access  Private (Action Person, Supervisor, Auditor, Admin)
+const pauseProgress = async (req, res) => {
+  try {
+    const paramId = req.params.id;
+    const { reason } = req.body || {};
+    const now = new Date();
+
+    if (isMongoConnected()) {
+      try {
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
+        }
+        const current = await Complaint.findOne(query);
+
+        if (current) {
+          if (current.status === 'Closed') {
+            return res.status(400).json({
+              success: false,
+              message: 'Cannot modify a closed complaint.',
+            });
+          }
+
+          const timeline = parseTimeline(current.timeline);
+          timeline.push({
+            action: 'WORK_STOPPED',
+            performedBy: {
+              name: req.user.name,
+              role: req.user.role,
+              employeeId: req.user.employeeId,
+            },
+            notes: reason || `Supervisor ${req.user.name} paused floor containment. Work status reverted to Available.`,
+            timestamp: now.toISOString(),
+          });
+
+          current.status = 'Open';
+          current.startedAt = null;
+          current.description = setWorkflowStatusInDescription(current.description, 'Open');
+          current.timeline = timeline;
+          current.updatedAt = now;
+
+          const updated = await current.save();
+          mockStore.updateComplaint(current._id.toString(), current.toObject());
+          return res.status(200).json({
+            success: true,
+            message: `Complaint ${updated.complaintId} floor containment paused. Live work status reset to Available.`,
+            complaint: formatComplaintOutput(updated.toObject()),
+          });
+        }
+      } catch (dbErr) {
+        console.error('[ComplaintController:pauseProgress] MongoDB exception:', dbErr.message);
+      }
+    }
+
+    // Fallback to mockStore
+    const complaint = mockStore.findComplaintById(paramId);
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Complaint not found.' });
+    }
+    const timeline = parseTimeline(complaint.timeline);
+    timeline.push({
+      action: 'WORK_STOPPED',
+      performedBy: {
+        name: req.user.name,
+        role: req.user.role,
+        employeeId: req.user.employeeId,
+      },
+      notes: reason || `Supervisor ${req.user.name} paused floor containment. Work status reverted to Available.`,
+      timestamp: now.toISOString(),
+    });
+    const updated = mockStore.updateComplaint(complaint.id, {
+      status: 'Open',
+      startedAt: null,
+      timeline,
+      updatedAt: now.toISOString(),
+    });
+    return res.status(200).json({
+      success: true,
+      message: `Complaint ${updated.complaintId} floor containment paused. Live work status reset to Available.`,
+      complaint: formatComplaintOutput(updated),
+    });
+  } catch (error) {
+    console.error('[ComplaintController:pauseProgress] Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error pausing floor containment on complaint.',
     });
   }
 };
@@ -2400,6 +2508,7 @@ module.exports = {
   getComplaints,
   getComplaintById,
   markInProgress,
+  pauseProgress,
   submitAction,
   verifyComplaint,
   addTimelineComment,
