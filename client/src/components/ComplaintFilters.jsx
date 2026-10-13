@@ -1,5 +1,16 @@
 import React, { useRef } from 'react';
-import { Search, RefreshCw, X, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Search,
+  RefreshCw,
+  X,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  SlidersHorizontal,
+  Layers,
+  Users,
+  User,
+} from 'lucide-react';
 
 export const ComplaintFilters = ({
   activeTab,
@@ -19,6 +30,7 @@ export const ComplaintFilters = ({
   onRefresh,
   loading,
   counts,
+  onNavigateReport,
 }) => {
   const tabs = [
     { id: 'all', label: 'All NC/CAP', count: counts?.total },
@@ -260,6 +272,49 @@ export const ComplaintFilters = ({
               </option>
             ))}
           </select>
+        </div>
+      </div>
+
+      {/* 3. Advanced Filter Matrix & Specialized Reports Quick Launcher */}
+      <div className="pt-2 sm:pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+          <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+          <span>Advanced Filter Matrix &amp; Reports:</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigateReport && onNavigateReport('audit-register')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-950/60 dark:hover:text-cyan-300 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs hover:border-indigo-300"
+            title="Open Master NC Report in Advanced Filter Matrix"
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-500" />
+            <span>Master NC Report</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-cyan-300 font-mono font-bold">
+              {counts?.total ?? 0}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigateReport && onNavigateReport('members-report')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 hover:text-purple-600 dark:hover:bg-purple-950/60 dark:hover:text-purple-300 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs hover:border-purple-300"
+            title="Open Department Members Report in Advanced Filter Matrix"
+          >
+            <Users className="w-3.5 h-3.5 text-purple-500" />
+            <span>Department Members Report</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigateReport && onNavigateReport('member-detail')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer shadow-2xs hover:border-emerald-300"
+            title="Open Individual Member NC Details in Advanced Filter Matrix"
+          >
+            <User className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Individual Member NC Details</span>
+          </button>
         </div>
       </div>
     </div>

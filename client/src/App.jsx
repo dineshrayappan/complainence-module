@@ -95,6 +95,7 @@ export const App = () => {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [workOpsDept, setWorkOpsDept] = useState('ALL');
+  const [reportsInitialTab, setReportsInitialTab] = useState('audit-register');
 
   // Supervisor user check (department persona)
   const isSupervisorUser = user && (user.role === 'SUPERVISOR' || user.role === 'ACTION_PERSON' || (!isAdmin && !isAuditor));
@@ -647,6 +648,7 @@ export const App = () => {
           ) : effectiveNavSection === 'reports' ? (
             <ReportsView
               complaints={complaints}
+              initialTab={reportsInitialTab}
               onViewDetails={handleOpenDetailModal}
               onNavigateNC={(targetTab, filterVal) => {
                 if (filterVal) setSearchTerm(filterVal);
@@ -741,6 +743,10 @@ export const App = () => {
                 onRefresh={() => loadData(false, true)}
                 loading={isRefreshing}
                 counts={derivedCounts}
+                onNavigateReport={(targetTab) => {
+                  setReportsInitialTab(targetTab || 'audit-register');
+                  setCurrentNavSection('reports');
+                }}
               />
 
               {/* View Mode Bar */}

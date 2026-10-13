@@ -57,6 +57,7 @@ export const ReportsView = ({
   departmentData = null,
   onViewDetails = null,
   onNavigateNC = null,
+  initialTab = 'audit-register',
 }) => {
   const { user } = useAuth();
   const [downloadingCSV, setDownloadingCSV] = useState(false);
@@ -65,15 +66,21 @@ export const ReportsView = ({
   // ---------------------------------------------------------------------------
   // REPORT VIEW NAVIGATION MODES (Preserving Master Register & Adding 3 New Modes)
   // ---------------------------------------------------------------------------
-  // 'audit-register': Master Audit Register (KPI Scorecard, Filter Bar, Charts, Table)
+  // 'audit-register': Master NC Report (KPI Scorecard, Filter Bar, Charts, Table)
   // 'dept-report': Department-wise NC Report (Total NCs, Open/Closed/Pending, CAP Status, Drilldown)
   // 'members-report': Department Members Report (Roster, Assigned NCs, Open/Closed/Pending, CAP Status)
   // 'member-detail': Individual Member NC Details (NC ID, Finding, Requirement, CAP 5-Why, Photos, Verification)
-  const [activeReportTab, setActiveReportTab] = useState('audit-register');
+  const [activeReportTab, setActiveReportTab] = useState(initialTab || 'audit-register');
   const [selectedDeptDetail, setSelectedDeptDetail] = useState(null);
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveReportTab(initialTab);
+    }
+  }, [initialTab]);
 
   // ---------------------------------------------------------------------------
   // REAL DATABASE MASTER DATA (Users & Departments)
@@ -1630,93 +1637,35 @@ export const ReportsView = ({
         </div>
       </div>
 
-      {/* 2. Top-Level Mode Navigation Switcher (All 4 Core Report Types) */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
-        <button
-          type="button"
-          onClick={() => setActiveReportTab('audit-register')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'audit-register'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Master NC Register</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500">
-            {filteredComplaints.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedDeptDetail(null);
-            setActiveReportTab('dept-report');
-          }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'dept-report'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Building2 className="w-4 h-4" />
-          <span>Department-wise NC Report</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-300">
-            {departmentStatsList.length} Depts
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveReportTab('members-report')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'members-report'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Department Members Report</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300">
-            {memberStatsList.length} Members
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveReportTab('member-detail')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'member-detail'
-              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <User className="w-4 h-4" />
-          <span>Individual Member NC Details</span>
-          {activeMember && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300">
-              {activeMember.name.split(' ')[0]} ({activeMemberComplaints.length})
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* 3. Global Multi-Dimensional Dropdown Filter Bar */}
+      {/* 2. Advanced Filter Matrix with Integrated Reports Navigation */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-        <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="p-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-cyan-400">
+        {/* Advanced Filter Matrix Header */}
+        <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-slate-50/60 via-white to-indigo-50/30 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/20">
+          <div className="flex items-center gap-2.5">
+            <span className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-cyan-400 border border-indigo-200/60 dark:border-indigo-800/60 shadow-xs">
               <SlidersHorizontal className="w-4 h-4" />
             </span>
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              Advanced Filter Matrix
-            </span>
-            {hasActiveFilters && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white animate-pulse">
-                {activeFilterCount} Active
-              </span>
-            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  Advanced Filter Matrix
+                </span>
+                {hasActiveFilters && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white animate-pulse">
+                    {activeFilterCount} Active
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {activeReportTab === 'audit-register'
+                  ? 'Master NC Report • Full Non-Conformance & CAP Audit Registry'
+                  : activeReportTab === 'members-report'
+                  ? 'Department Members Report • Roster & Accountability Breakdown'
+                  : activeReportTab === 'member-detail'
+                  ? `Individual Member NC Details • ${activeMember ? activeMember.name : 'Member Dossier'}`
+                  : 'Department-wise NC Report • Department Risk & Closure Metrics'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1724,7 +1673,7 @@ export const ReportsView = ({
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer flex items-center gap-1"
+                className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
               >
                 <RotateCcw className="w-3 h-3" />
                 <span>Reset Filters</span>
@@ -1745,11 +1694,216 @@ export const ReportsView = ({
           </div>
         </div>
 
+        {/* Integrated Report Navigation Switcher directly inside Advanced Filter Matrix */}
+        <div className="p-2 sm:p-2.5 bg-slate-100/70 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* Master NC Report */}
+          <button
+            type="button"
+            id="matrix-btn-master-nc-report"
+            onClick={() => setActiveReportTab('audit-register')}
+            className={`flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeReportTab === 'audit-register'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs border border-indigo-200/60 dark:border-indigo-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-indigo-500" />
+            <span>Master NC Report</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono font-bold">
+              {filteredComplaints.length}
+            </span>
+          </button>
+
+          {/* Department Members Report */}
+          <button
+            type="button"
+            id="matrix-btn-dept-members-report"
+            onClick={() => setActiveReportTab('members-report')}
+            className={`flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeReportTab === 'members-report'
+                ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-xs border border-purple-200/60 dark:border-purple-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <Users className="w-4 h-4 text-purple-500" />
+            <span>Department Members Report</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 font-mono font-bold">
+              {memberStatsList.length} Members
+            </span>
+          </button>
+
+          {/* Individual Member NC Details */}
+          <button
+            type="button"
+            id="matrix-btn-member-nc-details"
+            onClick={() => setActiveReportTab('member-detail')}
+            className={`flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeReportTab === 'member-detail'
+                ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs border border-emerald-200/60 dark:border-emerald-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <User className="w-4 h-4 text-emerald-500" />
+            <span>Individual Member NC Details</span>
+            {activeMember && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300 font-mono font-bold">
+                {activeMember.name.split(' ')[0]} ({activeMemberComplaints.length})
+              </span>
+            )}
+          </button>
+
+          {/* Department-wise NC Report */}
+          <button
+            type="button"
+            id="matrix-btn-dept-report"
+            onClick={() => {
+              setSelectedDeptDetail(null);
+              setActiveReportTab('dept-report');
+            }}
+            className={`flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeReportTab === 'dept-report'
+                ? 'bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 shadow-xs border border-cyan-200/60 dark:border-cyan-800/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <Building2 className="w-4 h-4 text-cyan-500" />
+            <span>Department-wise NC Report</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-300 font-mono font-bold">
+              {departmentStatsList.length} Depts
+            </span>
+          </button>
+        </div>
+
         {showFiltersExpanded && (
           <div className="p-4 sm:p-5 space-y-4">
+            {/* Contextual Focus Banner for Active Report Mode */}
+            {activeReportTab === 'member-detail' && (
+              <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                    <User className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <div className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                      <span>Individual Member NC Details Focus:</span>
+                      <span className="underline decoration-emerald-500 font-extrabold">{activeMember?.name || 'No Member Selected'}</span>
+                      {activeMember?.department && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-100/80 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-200 font-semibold">
+                          {activeMember.department}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-emerald-700 dark:text-emerald-300/80 flex items-center gap-2 mt-0.5 font-mono">
+                      <span>Total NCs: {activeMember?.totalNC ?? 0}</span>
+                      <span>•</span>
+                      <span>Open: {activeMember?.openNC ?? 0}</span>
+                      <span>•</span>
+                      <span>Closed: {activeMember?.closedNC ?? 0}</span>
+                      <span>•</span>
+                      <span>CAP Rate: {activeMember?.capRate ?? 0}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Switch Member Dropdown inside Matrix */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 whitespace-nowrap">
+                    Switch Dossier Member:
+                  </label>
+                  <select
+                    value={activeMember?.id || ''}
+                    onChange={(e) => {
+                      setSelectedMemberId(e.target.value);
+                      setMemberFilter(e.target.value);
+                    }}
+                    className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded-lg font-medium cursor-pointer text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-emerald-500"
+                  >
+                    {memberStatsList.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.department} • {m.totalNC} NCs)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {activeReportTab === 'members-report' && (
+              <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
+                    <Users className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <div className="text-xs font-bold text-purple-900 dark:text-purple-200">
+                      Department Members Report Active: {memberStatsList.length} Factory Members
+                    </div>
+                    <p className="text-[11px] text-purple-700 dark:text-purple-300/80">
+                      {departmentFilter !== 'ALL'
+                        ? `Filtered by Department: "${departmentFilter}". Showing individual accountability & CAP closure for department team.`
+                        : 'Analyzing member rosters and individual CAP closure across all factory departments.'}
+                    </p>
+                  </div>
+                </div>
+                {departmentFilter !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => setDepartmentFilter('ALL')}
+                    className="text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:underline cursor-pointer shrink-0"
+                  >
+                    Show All Departments ({consolidatedMembersList.length} Members)
+                  </button>
+                )}
+              </div>
+            )}
+
+            {activeReportTab === 'audit-register' && (
+              <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                    <Layers className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <div className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                      Master NC Report Active: {filteredComplaints.length} Audit Non-Conformances Filtered
+                    </div>
+                    <p className="text-[11px] text-indigo-700 dark:text-cyan-300/80">
+                      Comprehensive multi-dimensional audit register with root cause analysis, CAP verification, risk severity, and SLA tracking.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Row 1: Dropdown Filters Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              {/* 1. Date Range Preset */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {/* 1. Report View Scope Filter */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <FileText className="w-3 h-3 text-indigo-500" />
+                    <span>Report Matrix View</span>
+                  </span>
+                  <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-bold">Active</span>
+                </label>
+                <select
+                  value={activeReportTab}
+                  onChange={(e) => {
+                    if (e.target.value === 'dept-report') setSelectedDeptDetail(null);
+                    setActiveReportTab(e.target.value);
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200 focus:ring-2 focus:ring-indigo-500 cursor-pointer font-bold transition-colors"
+                >
+                  <option value="audit-register">📋 Master NC Report ({filteredComplaints.length})</option>
+                  <option value="members-report">👥 Department Members Report ({memberStatsList.length} Members)</option>
+                  <option value="member-detail">
+                    👤 Individual Member NC Details ({activeMember ? `${activeMember.name.split(' ')[0]} - ${activeMemberComplaints.length} NCs` : 'Details'})
+                  </option>
+                  <option value="dept-report">🏢 Department-wise NC Report ({departmentStatsList.length} Depts)</option>
+                </select>
+              </div>
+
+              {/* 2. Date Range Preset */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
@@ -1778,7 +1932,7 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 2. Department Dropdown */}
+              {/* 3. Department Dropdown */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
@@ -1786,7 +1940,14 @@ export const ReportsView = ({
                     <span>Department</span>
                   </span>
                   {departmentFilter !== 'ALL' && (
-                    <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-bold">Active</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveReportTab('members-report')}
+                      className="text-[10px] text-indigo-600 dark:text-cyan-400 font-bold hover:underline cursor-pointer"
+                      title="View Department Members Report"
+                    >
+                      View Members ↗
+                    </button>
                   )}
                 </label>
                 <select
@@ -1807,7 +1968,7 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 3. Individual Member Filter Dropdown */}
+              {/* 4. Individual Member Filter Dropdown */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
@@ -1815,12 +1976,28 @@ export const ReportsView = ({
                     <span>Member / Supervisor</span>
                   </span>
                   {memberFilter !== 'ALL' && (
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold">Active</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMemberId(memberFilter);
+                        setActiveReportTab('member-detail');
+                      }}
+                      className="text-[10px] text-purple-600 dark:text-purple-400 font-bold hover:underline cursor-pointer"
+                      title="View Member NC Details"
+                    >
+                      View Details ↗
+                    </button>
                   )}
                 </label>
                 <select
                   value={memberFilter}
-                  onChange={(e) => setMemberFilter(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setMemberFilter(val);
+                    if (val !== 'ALL') {
+                      setSelectedMemberId(val);
+                    }
+                  }}
                   className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
                     memberFilter !== 'ALL'
                       ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200'
@@ -1839,7 +2016,7 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 4. NC Lifecycle Status Dropdown */}
+              {/* 5. NC Lifecycle Status Dropdown */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
@@ -1869,7 +2046,7 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 5. Risk / Severity Dropdown */}
+              {/* 6. Risk / Severity Dropdown */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
@@ -1897,7 +2074,7 @@ export const ReportsView = ({
                 </select>
               </div>
 
-              {/* 6. CAP Status Dropdown */}
+              {/* 7. CAP Status Dropdown */}
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
