@@ -50,7 +50,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
-import { userService, departmentService } from '../services/api';
+// Pure NC/CAP Report - no external mock collections
 
 export const ReportsView = ({
   complaints = [],
@@ -81,48 +81,6 @@ export const ReportsView = ({
       setActiveReportTab(initialTab);
     }
   }, [initialTab]);
-
-  // ---------------------------------------------------------------------------
-  // REAL DATABASE MASTER DATA (Users & Departments)
-  // ---------------------------------------------------------------------------
-  const [usersList, setUsersList] = useState([]);
-  const [dbDepartments, setDbDepartments] = useState([]);
-  const [loadingMasterData, setLoadingMasterData] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchMasterData = async () => {
-      setLoadingMasterData(true);
-      try {
-        const [uRes, dRes] = await Promise.allSettled([
-          userService.getAllUsers(),
-          departmentService.getDepartments(),
-        ]);
-        if (isMounted) {
-          if (uRes.status === 'fulfilled' && uRes.value?.data) {
-            const list = Array.isArray(uRes.value.data)
-              ? uRes.value.data
-              : uRes.value.data.users || [];
-            setUsersList(list);
-          }
-          if (dRes.status === 'fulfilled' && dRes.value?.data) {
-            const depts = Array.isArray(dRes.value.data)
-              ? dRes.value.data
-              : dRes.value.data.departments || [];
-            setDbDepartments(depts);
-          }
-        }
-      } catch (err) {
-        console.warn('Could not load master users/depts:', err);
-      } finally {
-        if (isMounted) setLoadingMasterData(false);
-      }
-    };
-    fetchMasterData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   // ---------------------------------------------------------------------------
   // FILTER STATES (Fulfilling all user requirements + dropdown filters)
@@ -181,7 +139,7 @@ export const ReportsView = ({
       c.findingDescription ||
       c.description ||
       c.title ||
-      'No defect description logged.'
+      '—'
     );
   };
 
@@ -218,7 +176,7 @@ export const ReportsView = ({
       c.cap?.immediateCorrection ||
       c.cap?.immediateContainment ||
       c.actionNotes ||
-      'Pending immediate containment action from supervisor.'
+      'Pending'
     );
   };
 
@@ -227,7 +185,7 @@ export const ReportsView = ({
       c.cap?.rootCause ||
       c.feedbackRemarks ||
       c.actionNotes ||
-      'Pending 5-Why root cause analysis.'
+      'Pending'
     );
   };
 
@@ -235,14 +193,14 @@ export const ReportsView = ({
     return (
       c.cap?.correctiveAction ||
       c.actionNotes ||
-      'Pending corrective action execution.'
+      'Pending'
     );
   };
 
   const getPreventiveActionText = (c) => {
     return (
       c.cap?.preventiveAction ||
-      'Pending systemic recurrence prevention procedure.'
+      'Pending'
     );
   };
 
@@ -262,7 +220,7 @@ export const ReportsView = ({
     ) {
       return c.cap.responsiblePerson.trim();
     }
-    return c.assignedTo?.name || 'Assigned Line In-Charge';
+    return c.assignedTo?.name || 'Unassigned';
   };
 
   const getResponsiblePerson = (c) => {
@@ -270,14 +228,14 @@ export const ReportsView = ({
   };
 
   const getAuditorName = (c) => {
-    return c.createdBy?.name || 'Quality Team Auditor';
+    return c.createdBy?.name || '—';
   };
 
   const getCapTargetDate = (c) => {
     if (c.cap?.targetDate) return new Date(c.cap.targetDate).toLocaleDateString();
     if (c.deadlineTimestamp)
       return new Date(c.deadlineTimestamp).toLocaleDateString();
-    return 'Not Specified';
+    return '—';
   };
 
   const getTicketAgeHours = (c) => {
@@ -297,35 +255,21 @@ export const ReportsView = ({
   };
 
   // ---------------------------------------------------------------------------
-  // CONSOLIDATED MASTER DATASETS (Exact DB mappings without duplication)
+  // LIVE NC / CAP MASTER DATASETS (Extracted Strictly from Complaints Dataset)
   // ---------------------------------------------------------------------------
-  // 1. Consolidated Departments List (DB + distinct in complaints)
+  // 1. Departments extracted strictly from actual NC / CAP complaints
   const consolidatedDepartmentsList = useMemo(() => {
     const deptMap = new Map();
 
-    // From DB departments collection
-    (dbDepartments || []).forEach((d) => {
-      if (d.name && d.name.trim()) {
-        const key = norm(d.name);
-        deptMap.set(key, {
-          name: d.name.trim(),
-          code: d.code || '',
-          manager: d.manager || '',
-          headcount: d.headcount || 0,
-        });
-      }
-    });
-
-    // From distinct complaints department field
     (complaints || []).forEach((c) => {
-      if (c.department && c.department.trim()) {
-        const key = norm(c.department);
+      const deptName = (c.department || '').trim();
+      if (deptName) {
+        const key = norm(deptName);
         if (!deptMap.has(key)) {
           deptMap.set(key, {
-            name: c.department.trim(),
-            code: '',
-            manager: '',
-            headcount: 0,
+            name: deptName,
+            code: c.departmentCode || '',
+            manager: c.departmentHead || c.manager || '',
           });
         }
       }
@@ -334,73 +278,66 @@ export const ReportsView = ({
     return Array.from(deptMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  }, [dbDepartments, complaints]);
+  }, [complaints]);
 
-  // 2. Consolidated Members List (Users collection + assigned supervisors in complaints)
+  // 2. Members/Resolvers extracted strictly from actual NC / CAP complaints
   const consolidatedMembersList = useMemo(() => {
     const memberMap = new Map();
 
-    // From DB users collection
-    (usersList || []).forEach((u) => {
-      const idKey = String(u.id || u._id || u.employeeId || u.name);
-      const nameKey = norm(u.name);
-      const empKey = norm(u.employeeId);
-
-      const memObj = {
-        id: idKey,
-        employeeId: u.employeeId || '',
-        name: u.name || 'Unnamed Staff',
-        department: u.department || 'Production',
-        designation: u.designation || 'Supervisor',
-        role: u.role || 'ACTION_PERSON',
-        mobileNumber: u.mobileNumber || '',
-        email: u.email || '',
-        isActive: u.isActive !== false,
-      };
-
-      memberMap.set(idKey, memObj);
-      if (nameKey) memberMap.set(`name:${nameKey}`, memObj);
-      if (empKey) memberMap.set(`emp:${empKey}`, memObj);
-    });
-
-    // From complaints.assignedTo to ensure anyone assigned an NC is included
     (complaints || []).forEach((c) => {
+      // Check assignedTo
       const a = c.assignedTo;
-      if (a && a.name && a.name !== 'Unassigned') {
-        const nameKey = norm(a.name);
-        const empKey = a.employeeId ? norm(a.employeeId) : null;
-        if (!memberMap.has(`name:${nameKey}`) && (!empKey || !memberMap.has(`emp:${empKey}`))) {
-          const customId = a.userId || a.employeeId || `mem-${a.name}`;
-          const customObj = {
-            id: String(customId),
-            employeeId: a.employeeId || '',
-            name: a.name,
-            department: a.department || c.department || 'Production',
-            designation: a.designation || 'Production Supervisor',
-            role: 'ACTION_PERSON',
-            mobileNumber: a.mobileNumber || '',
-            email: '',
-            isActive: true,
-          };
-          memberMap.set(String(customId), customObj);
-          memberMap.set(`name:${nameKey}`, customObj);
-          if (empKey) memberMap.set(`emp:${empKey}`, customObj);
+      if (a) {
+        const name = typeof a === 'object' ? (a.name || '').trim() : String(a).trim();
+        if (name && name.toLowerCase() !== 'unassigned') {
+          const key = norm(name);
+          if (!memberMap.has(key)) {
+            memberMap.set(key, {
+              id: (typeof a === 'object' && (a.userId || a.employeeId || a._id || a.id)) || `mem-${name}`,
+              employeeId: typeof a === 'object' ? a.employeeId || '' : '',
+              name: name,
+              department: (typeof a === 'object' && a.department) || c.department || '',
+              designation: typeof a === 'object' ? a.designation || '' : '',
+              role: typeof a === 'object' ? a.role || '' : '',
+              mobileNumber: typeof a === 'object' ? a.mobileNumber || '' : '',
+              email: typeof a === 'object' ? a.email || '' : '',
+            });
+          } else {
+            const existing = memberMap.get(key);
+            if (!existing.employeeId && typeof a === 'object' && a.employeeId) existing.employeeId = a.employeeId;
+            if (!existing.department && typeof a === 'object' && a.department) existing.department = a.department;
+            if (!existing.designation && typeof a === 'object' && a.designation) existing.designation = a.designation;
+            if (!existing.mobileNumber && typeof a === 'object' && a.mobileNumber) existing.mobileNumber = a.mobileNumber;
+          }
+        }
+      }
+
+      // Check cap.responsiblePerson
+      if (c.cap?.responsiblePerson) {
+        const rp = c.cap.responsiblePerson;
+        const rpName = typeof rp === 'object' ? (rp.name || '').trim() : String(rp).trim();
+        if (rpName && rpName.toLowerCase() !== 'unassigned') {
+          const key = norm(rpName);
+          if (!memberMap.has(key)) {
+            memberMap.set(key, {
+              id: (typeof rp === 'object' && (rp.userId || rp.employeeId || rp._id || rp.id)) || `mem-${rpName}`,
+              employeeId: typeof rp === 'object' ? rp.employeeId || '' : '',
+              name: rpName,
+              department: (typeof rp === 'object' && rp.department) || c.department || '',
+              designation: typeof rp === 'object' ? rp.designation || '' : '',
+              role: typeof rp === 'object' ? rp.role || '' : '',
+              mobileNumber: typeof rp === 'object' ? rp.mobileNumber || '' : '',
+              email: typeof rp === 'object' ? rp.email || '' : '',
+            });
+          }
         }
       }
     });
 
-    // Extract unique array
-    const unique = [];
-    const seen = new Set();
-    memberMap.forEach((m) => {
-      if (!seen.has(m.id)) {
-        seen.add(m.id);
-        unique.push(m);
-      }
-    });
-
-    return unique.sort((a, b) => a.name.localeCompare(b.name));
-  }, [usersList, complaints]);
+    return Array.from(memberMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+  }, [complaints]);
 
   // Helper: Match complaint to member
   const isComplaintAssignedToMember = (c, member) => {
@@ -409,19 +346,17 @@ export const ReportsView = ({
     const mEmp = member.employeeId ? norm(member.employeeId) : '';
     const mName = member.name ? norm(member.name) : '';
 
-    // Direct assignedTo object
     if (c.assignedTo) {
       const cUid = String(c.assignedTo.userId || c.assignedTo.id || c.assignedTo._id || '');
       if (mId && cUid && cUid === mId) return true;
       if (mEmp && c.assignedTo.employeeId && norm(c.assignedTo.employeeId) === mEmp) return true;
       if (mName && c.assignedTo.name && norm(c.assignedTo.name) === mName) return true;
+      if (typeof c.assignedTo === 'string' && mName && norm(c.assignedTo) === mName) return true;
     }
 
-    // Normalized assigned name
     const resolvedName = norm(getAssignedToName(c));
     if (mName && resolvedName === mName) return true;
 
-    // CAP responsiblePerson
     if (c.cap?.responsiblePerson) {
       if (typeof c.cap.responsiblePerson === 'object') {
         const capUid = String(
@@ -457,7 +392,7 @@ export const ReportsView = ({
     const set = new Set();
     (complaints || []).forEach((c) => {
       const name = getAssignedToName(c);
-      if (name && name !== 'Unassigned' && name !== 'Assigned Line In-Charge') {
+      if (name && name !== 'Unassigned') {
         set.add(name);
       }
     });
@@ -740,11 +675,11 @@ export const ReportsView = ({
   const slaRate =
     filteredCount > 0
       ? Math.round(((filteredCount - overdueCount) / filteredCount) * 100)
-      : 100;
+      : 0;
   const overallCapRate =
     filteredCount > 0
       ? Math.round((closedCount / filteredCount) * 100)
-      : 100;
+      : 0;
 
   // ---------------------------------------------------------------------------
   // 1. DEPARTMENT-WISE NC METRICS (Requirement 1)
@@ -776,7 +711,7 @@ export const ReportsView = ({
         (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
       ).length;
 
-      const dCapRate = dTotal > 0 ? Math.round((dClosed / dTotal) * 100) : 100;
+      const dCapRate = dTotal > 0 ? Math.round((dClosed / dTotal) * 100) : 0;
 
       let dCapStatusLabel = 'No NCs Logged';
       let dCapStatusBadge = 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
@@ -849,7 +784,7 @@ export const ReportsView = ({
         (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
       ).length;
 
-      const mCapRate = mTotal > 0 ? Math.round((mClosed / mTotal) * 100) : 100;
+      const mCapRate = mTotal > 0 ? Math.round((mClosed / mTotal) * 100) : 0;
 
       let mCapStatusLabel = 'Clear (0 NCs)';
       let mCapStatusBadge = 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
@@ -993,7 +928,7 @@ export const ReportsView = ({
       if (activeReportTab === 'dept-report') {
         const deptRows = departmentStatsList.map((d) => [
           d.department,
-          d.manager || 'Line Head',
+          d.manager || '—',
           d.totalNC,
           d.openNC,
           d.closedNC,
@@ -1080,7 +1015,7 @@ export const ReportsView = ({
           m.name,
           m.employeeId || 'N/A',
           m.department,
-          m.designation || 'Supervisor',
+          m.designation || '—',
           m.totalNC,
           m.openNC,
           m.closedNC,
@@ -1145,7 +1080,7 @@ export const ReportsView = ({
         doc.setFontSize(8);
         doc.setTextColor(...brandMuted);
         doc.text(
-          `Dept: ${targetMem?.department || 'Production'}   •   Designation: ${targetMem?.designation || 'Supervisor'}   •   Contact: ${targetMem?.mobileNumber || 'N/A'}`,
+          `Dept: ${targetMem?.department || '—'}   •   Designation: ${targetMem?.designation || '—'}   •   Contact: ${targetMem?.mobileNumber || '—'}`,
           margin + 10,
           startY + 30
         );
@@ -1185,16 +1120,16 @@ export const ReportsView = ({
               [
                 { content: `NC RECORD #${idx + 1}: ${c.complaintId || 'NC-N/A'} • Status: ${c.status} • Risk: ${cRisk}`, colSpan: 2, styles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' } }
               ],
-              ['Department & Location:', `${c.department || 'Production'} • ${c.location || 'Floor Station'}`],
+              ['Department & Location:', `${c.department || '—'} • ${c.location || '—'}`],
               ['Defect Finding Description:', `${getFindingText(c)}`],
-              ['Quality Requirement / Standard:', `${c.requirement || 'AQL 1.5 Workmanship Standard'}`],
+              ['Quality Requirement / Standard:', `${c.requirement || '—'}`],
               ['Creation Date & Auditor:', `Created: ${createdDateStr} by ${getAuditorName(c)}`],
               ['5-Why Root Cause:', `${getRootCauseText(c)}`],
               ['Immediate Containment Action:', `${getImmediateCorrectionText(c)}`],
               ['Permanent Corrective Action:', `${getCorrectiveActionText(c)}`],
               ['Preventive Recurrence Plan:', `${getPreventiveActionText(c)}`],
-              ['Verification Method & Condition:', `${c.verificationMethod || 'Physical Re-inspection'} • Condition: ${isOverdue ? 'Overdue SLA Breach' : 'Within SLA Window'}`],
-              ['Auditor Notes & Closure Date:', `Closure: ${closedDateStr} • Verification Readiness: ${c.cap?.verificationReadinessNotes || 'Normal QMS Procedure'}`],
+              ['Verification Method & Condition:', `${c.verificationMethod || '—'} • Condition: ${isOverdue ? 'Overdue SLA Breach' : 'Within SLA Window'}`],
+              ['Auditor Notes & Closure Date:', `Closure: ${closedDateStr} • Verification Readiness: ${c.cap?.verificationReadinessNotes || '—'}`],
               ['Before & After Photo Proof:', `Before Photo: ${c.beforePhoto ? 'Captured' : 'No Photo'} | After Photo: ${c.afterPhoto ? 'Verified Proof Attached' : 'Pending After Proof'}`]
             ];
 
@@ -1269,7 +1204,7 @@ export const ReportsView = ({
 
           return [
             c.complaintId || 'NC-N/A',
-            c.department || 'Floor',
+            c.department || '—',
             cRisk,
             c.status,
             findingSummary,
@@ -1386,7 +1321,7 @@ export const ReportsView = ({
           `"${m.name}"`,
           `"${m.employeeId || ''}"`,
           `"${m.department}"`,
-          `"${m.designation || 'Supervisor'}"`,
+          `"${m.designation || '—'}"`,
           `"${m.role || 'ACTION_PERSON'}"`,
           `"${m.mobileNumber || ''}"`,
           `"${m.email || ''}"`,
@@ -1433,7 +1368,7 @@ export const ReportsView = ({
           `"${c.priority || c.riskSeverity || 'Medium'}"`,
           `"${c.status || 'Open'}"`,
           `"${getFindingText(c).replace(/"/g, '""')}"`,
-          `"${(c.requirement || 'AQL 1.5 Standard').replace(/"/g, '""')}"`,
+          `"${(c.requirement || '—').replace(/"/g, '""')}"`,
           `"${c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}"`,
           `"${getAuditorName(c).replace(/"/g, '""')}"`,
           `"${getRootCauseText(c).replace(/"/g, '""')}"`,
@@ -1441,7 +1376,7 @@ export const ReportsView = ({
           `"${getCorrectiveActionText(c).replace(/"/g, '""')}"`,
           `"${getPreventiveActionText(c).replace(/"/g, '""')}"`,
           `"${getCapTargetDate(c)}"`,
-          `"${c.verificationMethod || 'Physical Re-inspection'}"`,
+          `"${c.verificationMethod || '—'}"`,
           `"${(c.cap?.verificationReadinessNotes || '').replace(/"/g, '""')}"`,
           `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure'}"`,
           `"${c.beforePhoto ? 'Yes (Photo Attached)' : 'No'}"`,
@@ -1455,7 +1390,7 @@ export const ReportsView = ({
           'Lifecycle Status',
           'Risk Severity / Priority',
           'Department',
-          'Plant Location & Line Station',
+          'Plant Location / Station',
           'Defect Category',
           'Creation Timestamp',
           'Auditor Name',
@@ -1500,7 +1435,7 @@ export const ReportsView = ({
             `"${getAuditorName(c).replace(/"/g, '""')}"`,
             `"${c.createdBy?.employeeId || ''}"`,
             `"${getFindingText(c).replace(/"/g, '""')}"`,
-            `"${(c.requirement || 'AQL 1.5 Standard').replace(/"/g, '""')}"`,
+            `"${(c.requirement || '—').replace(/"/g, '""')}"`,
             `"${getIssueFrequency(c)}"`,
             `"${getTicketAgeLabel(c)}"`,
             `"${c.beforePhoto ? 'Yes (Photo Captured)' : 'No Photo'}"`,
@@ -2153,10 +2088,10 @@ export const ReportsView = ({
                           {/* 4. Department & Line */}
                           <td className="py-3 px-3 align-top whitespace-nowrap">
                             <div className="font-semibold text-slate-900 dark:text-white">
-                              {c.department || 'Production'}
+                              {c.department || '—'}
                             </div>
                             <div className="text-[10px] text-slate-400 font-mono">
-                              {c.location || 'Line Station'}
+                              {c.location || '—'}
                             </div>
                           </td>
 
@@ -2167,7 +2102,7 @@ export const ReportsView = ({
                             </p>
                             <div className="mt-1 flex items-center gap-1.5">
                               <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                {c.category || 'Quality Audit'}
+                                {c.category || '—'}
                               </span>
                             </div>
                           </td>
@@ -2178,7 +2113,7 @@ export const ReportsView = ({
                               {assignedName}
                             </div>
                             <div className="text-[10px] text-slate-400">
-                              {c.assignedTo?.designation || 'Supervisor'}
+                              {c.assignedTo?.designation || '—'}
                             </div>
                             {c.assignedTo?.mobileNumber && (
                               <div className="text-[10px] font-mono text-slate-400">
@@ -2197,7 +2132,7 @@ export const ReportsView = ({
                           {/* 8. CAP Corrective Action */}
                           <td className="py-3 px-3 align-top max-w-xs">
                             <p className="text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug">
-                              {c.cap?.correctiveAction || c.actionNotes || 'Pending CAP execution'}
+                              {c.cap?.correctiveAction || c.actionNotes || 'Pending'}
                             </p>
                           </td>
 
@@ -2380,7 +2315,7 @@ export const ReportsView = ({
                                   {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
                                 </td>
                                 <td className="py-3 px-3 align-top whitespace-nowrap text-slate-700 dark:text-slate-300">
-                                  {c.location || 'Line Station'}
+                                  {c.location || '—'}
                                 </td>
                                 <td className="py-3 px-3 align-top max-w-xs">
                                   <p className="text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
@@ -2395,7 +2330,7 @@ export const ReportsView = ({
                                 </td>
                                 <td className="py-3 px-3 align-top max-w-xs text-slate-700 dark:text-slate-300">
                                   <p className="line-clamp-2 leading-snug">
-                                    {c.cap?.correctiveAction || c.actionNotes || 'Pending CAP'}
+                                    {c.cap?.correctiveAction || c.actionNotes || 'Pending'}
                                   </p>
                                 </td>
                                 <td className="py-3 px-3 align-top whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-400">
@@ -2537,7 +2472,7 @@ export const ReportsView = ({
                           </td>
 
                           <td className="py-3 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {d.manager || 'Production Head'}
+                            {d.manager || '—'}
                           </td>
 
                           <td className="py-3 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
@@ -2726,7 +2661,7 @@ export const ReportsView = ({
                           </td>
 
                           <td className="py-3 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {m.employeeId || 'ID: N/A'}
+                            {m.employeeId || '—'}
                           </td>
 
                           <td className="py-3 px-3 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
@@ -2734,7 +2669,7 @@ export const ReportsView = ({
                           </td>
 
                           <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
-                            {m.designation || 'Supervisor'}
+                            {m.designation || '—'}
                           </td>
 
                           <td className="py-3 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
@@ -2827,7 +2762,7 @@ export const ReportsView = ({
                   )}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  {activeMember?.department} • {activeMember?.designation || 'Supervisor'} • {activeMember?.mobileNumber || 'No Phone'}
+                  {activeMember?.department || '—'} • {activeMember?.designation || '—'} • {activeMember?.mobileNumber || '—'}
                 </p>
               </div>
             </div>
@@ -2922,7 +2857,7 @@ export const ReportsView = ({
                         </td>
 
                         <td className="py-3 px-3 align-top whitespace-nowrap text-slate-700 dark:text-slate-300">
-                          {c.location || 'Line Station'}
+                          {c.location || '—'}
                         </td>
 
                         <td className="py-3 px-3 align-top max-w-xs">
@@ -2930,7 +2865,7 @@ export const ReportsView = ({
                             {getFindingText(c)}
                           </p>
                           <span className="text-[10px] text-slate-400 block mt-0.5">
-                            Standard: {c.requirement || 'AQL 1.5'}
+                            Standard: {c.requirement || '—'}
                           </span>
                         </td>
 
@@ -3139,7 +3074,7 @@ export const ReportsView = ({
                   <span>Occurred {getIssueFrequency(drilldownComplaint)} time(s)</span>
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  Standard: {drilldownComplaint.requirement || 'AQL 1.5 Workmanship Standard'}
+                  Standard: {drilldownComplaint.requirement || '—'}
                 </div>
               </div>
 
@@ -3166,10 +3101,10 @@ export const ReportsView = ({
                   {getAssignedToName(drilldownComplaint)}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
-                  Designation: {drilldownComplaint.assignedTo?.designation || 'Supervisor'}
+                  Designation: {drilldownComplaint.assignedTo?.designation || '—'}
                 </div>
                 <div className="text-[11px] font-mono text-slate-500">
-                  Mobile: {drilldownComplaint.assignedTo?.mobileNumber || 'N/A'}
+                  Mobile: {drilldownComplaint.assignedTo?.mobileNumber || '—'}
                 </div>
               </div>
 
