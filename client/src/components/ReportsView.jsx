@@ -1543,9 +1543,9 @@ export const ReportsView = ({
   // RENDER INTERACTION
   // ---------------------------------------------------------------------------
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
-      {/* 1. Header Banner */}
-      <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="space-y-4 animate-in fade-in duration-200">
+      {/* 1. Top Header Banner */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400">
@@ -1555,13 +1555,13 @@ export const ReportsView = ({
               Compliance Audit &amp; CAP Analytical Reports
             </h1>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
-            Multi-dimensional audit reporting, department defect summaries, member-wise NC accountability, CAP root causes, and verification closure. Filter by date range, department, member, risk, and CAP status.
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
+            Detailed Non-Conformance Registers, Department Quality Summaries &amp; Member Accountability Records in structured high-density table format.
           </p>
         </div>
 
-        {/* Download Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+        {/* Download Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
           {hasActiveFilters && (
             <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-[11px] font-semibold">
               <button
@@ -1572,7 +1572,6 @@ export const ReportsView = ({
                     ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
                 }`}
-                title="Export only the filtered dataset"
               >
                 Filtered ({filteredCount})
               </button>
@@ -1584,7 +1583,6 @@ export const ReportsView = ({
                     ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
                 }`}
-                title="Export all database records"
               >
                 All ({totalNC})
               </button>
@@ -1596,10 +1594,10 @@ export const ReportsView = ({
             id="btn-download-pdf-top"
             onClick={handleExportPDF}
             disabled={downloadingPDF}
-            className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            title="Download PDF Audit Dossier"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            title="Download PDF Audit Report"
           >
-            <FileText className="w-4 h-4" />
+            <FileText className="w-3.5 h-3.5" />
             <span>
               {downloadingPDF
                 ? 'Compiling PDF...'
@@ -1608,7 +1606,7 @@ export const ReportsView = ({
                 : activeReportTab === 'members-report'
                 ? `Export Members PDF (${memberStatsList.length})`
                 : activeReportTab === 'member-detail'
-                ? `Export Member Dossier (${activeMemberComplaints.length})`
+                ? `Export Dossier PDF (${activeMemberComplaints.length})`
                 : `Export PDF (${datasetToExport.length})`}
             </span>
           </button>
@@ -1618,10 +1616,10 @@ export const ReportsView = ({
             id="btn-download-csv-top"
             onClick={handleExportCSV}
             disabled={downloadingCSV}
-            className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            title="Download CSV Master Register"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            title="Download CSV Report"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>
               {downloadingCSV
                 ? 'Exporting CSV...'
@@ -1650,7 +1648,7 @@ export const ReportsView = ({
         >
           <Layers className="w-4 h-4" />
           <span>Master NC Report</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500">
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-500">
             {filteredComplaints.length}
           </span>
         </button>
@@ -1669,7 +1667,7 @@ export const ReportsView = ({
         >
           <Building2 className="w-4 h-4" />
           <span>Department-wise NC Report</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-300">
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-300">
             {departmentStatsList.length} Depts
           </span>
         </button>
@@ -1685,7 +1683,7 @@ export const ReportsView = ({
         >
           <Users className="w-4 h-4" />
           <span>Department Members Report</span>
-          <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300">
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300">
             {memberStatsList.length} Members
           </span>
         </button>
@@ -1702,638 +1700,245 @@ export const ReportsView = ({
           <User className="w-4 h-4" />
           <span>Individual Member NC Details</span>
           {activeMember && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300">
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-300">
               {activeMember.name.split(' ')[0]} ({activeMemberComplaints.length})
             </span>
           )}
         </button>
       </div>
 
-      {/* 3. Global Multi-Dimensional Dropdown Filter Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-        <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="p-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-cyan-400">
-              <SlidersHorizontal className="w-4 h-4" />
-            </span>
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              Advanced Filter Matrix
-            </span>
-            {hasActiveFilters && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white animate-pulse">
-                {activeFilterCount} Active
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {hasActiveFilters && (
+      {/* 3. Streamlined Clean Filter Toolbar */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs p-3.5 sm:p-4 space-y-3">
+        {/* Primary Filter Row */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search NC ID, finding, resolver, department..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            />
+            {searchTerm && (
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer flex items-center gap-1"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset Filters</span>
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
+          </div>
+
+          {/* Department Filter */}
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              departmentFilter !== 'ALL'
+                ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="ALL">All Departments ({consolidatedDepartmentsList.length})</option>
+            {consolidatedDepartmentsList.map((d) => (
+              <option key={d.name} value={d.name}>
+                {d.name} ({departmentCounts[d.name] || 0} NCs)
+              </option>
+            ))}
+          </select>
+
+          {/* Member Filter */}
+          <select
+            value={memberFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              setMemberFilter(val);
+              if (val !== 'ALL') setSelectedMemberId(val);
+            }}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              memberFilter !== 'ALL'
+                ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="ALL">All Members ({consolidatedMembersList.length})</option>
+            {consolidatedMembersList.map((m) => {
+              const count = complaints.filter((c) => isComplaintAssignedToMember(c, m)).length;
+              return (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({count} NCs)
+                </option>
+              );
+            })}
+          </select>
+
+          {/* Status Filter */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              statusFilter !== 'ALL'
+                ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="OPEN">Open Actions</option>
+            <option value="CAP_SUBMITTED">CAP Submitted</option>
+            <option value="UNDER_REVIEW">Under Review</option>
+            <option value="REWORK">Rejected / Rework</option>
+            <option value="CLOSED">Verified &amp; Closed</option>
+            <option value="OVERDUE">Overdue SLA Breaches</option>
+          </select>
+
+          {/* Risk Severity */}
+          <select
+            value={riskFilter}
+            onChange={(e) => setRiskFilter(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              riskFilter !== 'ALL'
+                ? 'bg-amber-50/70 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="ALL">All Risks</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="HIGH">High</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+
+          {/* Date Preset */}
+          <select
+            value={datePreset}
+            onChange={(e) => setDatePreset(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              datePreset !== 'ALL'
+                ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <option value="ALL">All Time</option>
+            <option value="TODAY">Today</option>
+            <option value="7D">Past 7 Days</option>
+            <option value="30D">Past 30 Days</option>
+            <option value="THIS_MONTH">This Month</option>
+            <option value="CUSTOM">Custom Range...</option>
+          </select>
+
+          {/* More Filters Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowFiltersExpanded(!showFiltersExpanded)}
+            className={`px-2.5 py-1.5 text-xs rounded-xl border font-medium flex items-center gap-1 transition-colors cursor-pointer ${
+              showFiltersExpanded
+                ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            }`}
+            title="More filter parameters"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>More</span>
+          </button>
+
+          {/* Reset Filters */}
+          {hasActiveFilters && (
             <button
               type="button"
-              onClick={() => setShowFiltersExpanded(!showFiltersExpanded)}
-              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title={showFiltersExpanded ? 'Collapse Filters' : 'Expand Filters'}
+              onClick={handleResetFilters}
+              className="px-2.5 py-1.5 text-xs rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              title="Reset all active filters"
             >
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${
-                  showFiltersExpanded ? 'rotate-180' : ''
-                }`}
-              />
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset ({activeFilterCount})</span>
             </button>
-          </div>
+          )}
         </div>
 
-        {showFiltersExpanded && (
-          <div className="p-4 sm:p-5 space-y-4">
-            {/* Contextual Focus Banner for Active Report Mode */}
-            {activeReportTab === 'member-detail' && (
-              <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
-                    <User className="w-4 h-4" />
-                  </span>
-                  <div>
-                    <div className="text-xs font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
-                      <span>Individual Member NC Details Focus:</span>
-                      <span className="underline decoration-emerald-500 font-extrabold">{activeMember?.name || 'No Member Selected'}</span>
-                      {activeMember?.department && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-100/80 dark:bg-emerald-900/80 text-emerald-800 dark:text-emerald-200 font-semibold">
-                          {activeMember.department}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-emerald-700 dark:text-emerald-300/80 flex items-center gap-2 mt-0.5 font-mono">
-                      <span>Total NCs: {activeMember?.totalNC ?? 0}</span>
-                      <span>•</span>
-                      <span>Open: {activeMember?.openNC ?? 0}</span>
-                      <span>•</span>
-                      <span>Closed: {activeMember?.closedNC ?? 0}</span>
-                      <span>•</span>
-                      <span>CAP Rate: {activeMember?.capRate ?? 0}%</span>
-                    </div>
-                  </div>
-                </div>
+        {/* Secondary Row for More Filters (Expanded or Custom Date) */}
+        {(showFiltersExpanded || datePreset === 'CUSTOM') && (
+          <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2.5">
+            {/* CAP Status */}
+            <select
+              value={capStatusFilter}
+              onChange={(e) => setCapStatusFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              <option value="ALL">All CAP Statuses</option>
+              <option value="CAP_COMPLETED">CAP Completed &amp; Verified</option>
+              <option value="CAP_PENDING">CAP Under Review</option>
+              <option value="CAP_REQUIRED_OPEN">Mandatory CAP Pending</option>
+              <option value="NO_CAP_DIRECT">Direct Correction</option>
+            </select>
 
-                {/* Switch Member Dropdown inside Matrix */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <label className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 whitespace-nowrap">
-                    Switch Dossier Member:
-                  </label>
-                  <select
-                    value={activeMember?.id || ''}
-                    onChange={(e) => {
-                      setSelectedMemberId(e.target.value);
-                      setMemberFilter(e.target.value);
-                    }}
-                    className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded-lg font-medium cursor-pointer text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-emerald-500"
-                  >
-                    {memberStatsList.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.department} • {m.totalNC} NCs)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+            {/* Responsible Resolver */}
+            <select
+              value={responsibleFilter}
+              onChange={(e) => setResponsibleFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              <option value="ALL">All Resolvers ({responsibleList.length})</option>
+              {responsibleList.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
 
-            {activeReportTab === 'members-report' && (
-              <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300">
-                    <Users className="w-4 h-4" />
-                  </span>
-                  <div>
-                    <div className="text-xs font-bold text-purple-900 dark:text-purple-200">
-                      Department Members Report Active: {memberStatsList.length} Factory Members
-                    </div>
-                    <p className="text-[11px] text-purple-700 dark:text-purple-300/80">
-                      {departmentFilter !== 'ALL'
-                        ? `Filtered by Department: "${departmentFilter}". Showing individual accountability & CAP closure for department team.`
-                        : 'Analyzing member rosters and individual CAP closure across all factory departments.'}
-                    </p>
-                  </div>
-                </div>
-                {departmentFilter !== 'ALL' && (
-                  <button
-                    type="button"
-                    onClick={() => setDepartmentFilter('ALL')}
-                    className="text-[11px] font-bold text-purple-700 dark:text-purple-300 hover:underline cursor-pointer shrink-0"
-                  >
-                    Show All Departments ({consolidatedMembersList.length} Members)
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Auditor */}
+            <select
+              value={auditorFilter}
+              onChange={(e) => setAuditorFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              <option value="ALL">All Auditors ({auditorList.length})</option>
+              {auditorList.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
 
-            {activeReportTab === 'audit-register' && (
-              <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
-                    <Layers className="w-4 h-4" />
-                  </span>
-                  <div>
-                    <div className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
-                      Master NC Report Active: {filteredComplaints.length} Audit Non-Conformances Filtered
-                    </div>
-                    <p className="text-[11px] text-indigo-700 dark:text-cyan-300/80">
-                      Comprehensive multi-dimensional audit register with root cause analysis, CAP verification, risk severity, and SLA tracking.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Aging */}
+            <select
+              value={agingFilter}
+              onChange={(e) => setAgingFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              <option value="ALL">All Aging</option>
+              <option value="FRESH">Fresh (&lt; 24h)</option>
+              <option value="MODERATE">Moderate (1–3d)</option>
+              <option value="HIGH">High (3–7d)</option>
+              <option value="SEVERE">Severe (&gt; 7d)</option>
+            </select>
 
-            {/* Row 1: Dropdown Filters Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {/* 1. Report View Scope Filter */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <FileText className="w-3 h-3 text-indigo-500" />
-                    <span>Report Matrix View</span>
-                  </span>
-                  <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-bold">Active</span>
-                </label>
-                <select
-                  value={activeReportTab}
-                  onChange={(e) => {
-                    if (e.target.value === 'dept-report') setSelectedDeptDetail(null);
-                    setActiveReportTab(e.target.value);
-                  }}
-                  className="w-full px-3 py-2 text-xs rounded-xl border bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200 focus:ring-2 focus:ring-indigo-500 cursor-pointer font-bold transition-colors"
-                >
-                  <option value="audit-register">📋 Master NC Report ({filteredComplaints.length})</option>
-                  <option value="members-report">👥 Department Members Report ({memberStatsList.length} Members)</option>
-                  <option value="member-detail">
-                    👤 Individual Member NC Details ({activeMember ? `${activeMember.name.split(' ')[0]} - ${activeMemberComplaints.length} NCs` : 'Details'})
-                  </option>
-                  <option value="dept-report">🏢 Department-wise NC Report ({departmentStatsList.length} Depts)</option>
-                </select>
-              </div>
+            {/* Recurrence */}
+            <select
+              value={repeatFilter}
+              onChange={(e) => setRepeatFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded-xl border bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              <option value="ALL">All Recurrence</option>
+              <option value="REPEAT">Repeat NCs (≥ 2)</option>
+              <option value="SINGLE">Single Defect</option>
+            </select>
 
-              {/* 2. Date Range Preset */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-indigo-500" />
-                    <span>Date Range</span>
-                  </span>
-                  {datePreset !== 'ALL' && (
-                    <span className="text-[10px] text-indigo-600 dark:text-cyan-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={datePreset}
-                  onChange={(e) => setDatePreset(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    datePreset !== 'ALL'
-                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Time (Full History)</option>
-                  <option value="TODAY">Today (Logged Today)</option>
-                  <option value="7D">Past 7 Days</option>
-                  <option value="30D">Past 30 Days</option>
-                  <option value="THIS_MONTH">This Calendar Month</option>
-                  <option value="CUSTOM">Custom Date Window...</option>
-                </select>
-              </div>
-
-              {/* 3. Department Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Building2 className="w-3 h-3 text-indigo-500" />
-                    <span>Department</span>
-                  </span>
-                  {departmentFilter !== 'ALL' && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveReportTab('members-report')}
-                      className="text-[10px] text-indigo-600 dark:text-cyan-400 font-bold hover:underline cursor-pointer"
-                      title="View Department Members Report"
-                    >
-                      View Members ↗
-                    </button>
-                  )}
-                </label>
-                <select
-                  value={departmentFilter}
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    departmentFilter !== 'ALL'
-                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Departments ({consolidatedDepartmentsList.length} Depts)</option>
-                  {consolidatedDepartmentsList.map((dept) => (
-                    <option key={dept.name} value={dept.name}>
-                      {dept.name} ({departmentCounts[dept.name] || 0} NCs)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 4. Individual Member Filter Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <User className="w-3 h-3 text-purple-500" />
-                    <span>Member / Supervisor</span>
-                  </span>
-                  {memberFilter !== 'ALL' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedMemberId(memberFilter);
-                        setActiveReportTab('member-detail');
-                      }}
-                      className="text-[10px] text-purple-600 dark:text-purple-400 font-bold hover:underline cursor-pointer"
-                      title="View Member NC Details"
-                    >
-                      View Details ↗
-                    </button>
-                  )}
-                </label>
-                <select
-                  value={memberFilter}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setMemberFilter(val);
-                    if (val !== 'ALL') {
-                      setSelectedMemberId(val);
-                    }
-                  }}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    memberFilter !== 'ALL'
-                      ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Factory Members ({consolidatedMembersList.length})</option>
-                  {consolidatedMembersList.map((m) => {
-                    const count = complaints.filter((c) => isComplaintAssignedToMember(c, m)).length;
-                    return (
-                      <option key={m.id} value={m.id}>
-                        {m.name} ({m.department} • {count} NCs)
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              {/* 5. NC Lifecycle Status Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                    <span>NC Status</span>
-                  </span>
-                  {statusFilter !== 'ALL' && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    statusFilter !== 'ALL'
-                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Lifecycle Statuses</option>
-                  <option value="OPEN">Open / Assigned / In Progress</option>
-                  <option value="CAP_SUBMITTED">CAP Submitted</option>
-                  <option value="UNDER_REVIEW">Under Review / Verification</option>
-                  <option value="REWORK">Rejected / Rework</option>
-                  <option value="CLOSED">Verified &amp; Closed Effective</option>
-                  <option value="OVERDUE">🚨 Overdue SLA Breaches</option>
-                </select>
-              </div>
-
-              {/* 6. Risk / Severity Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3 text-amber-500" />
-                    <span>Risk / Severity</span>
-                  </span>
-                  {riskFilter !== 'ALL' && (
-                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={riskFilter}
-                  onChange={(e) => setRiskFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    riskFilter !== 'ALL'
-                      ? 'bg-amber-50/70 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Risk Levels</option>
-                  <option value="CRITICAL">🔥 CRITICAL (Shipment Risk / Line Stop)</option>
-                  <option value="HIGH">⚠️ HIGH (AQL Failure Risk)</option>
-                  <option value="MEDIUM">🔷 MEDIUM (Standard Rework)</option>
-                  <option value="LOW">◽ LOW (Minor Observation)</option>
-                </select>
-              </div>
-
-              {/* 7. CAP Status Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                    <span>CAP Status</span>
-                  </span>
-                  {capStatusFilter !== 'ALL' && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={capStatusFilter}
-                  onChange={(e) => setCapStatusFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    capStatusFilter !== 'ALL'
-                      ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All CAP Statuses</option>
-                  <option value="CAP_COMPLETED">✅ CAP Completed &amp; Verified</option>
-                  <option value="CAP_PENDING">⏳ CAP Submitted / Under Review</option>
-                  <option value="CAP_REQUIRED_OPEN">⚠️ Mandatory CAP Pending Submission</option>
-                  <option value="NO_CAP_DIRECT">◽ Direct Correction (No CAP Required)</option>
-                </select>
-              </div>
-
-              {/* 7. Responsible Person Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <UserCheck className="w-3 h-3 text-indigo-500" />
-                    <span>Responsible Person</span>
-                  </span>
-                  {responsibleFilter !== 'ALL' && (
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={responsibleFilter}
-                  onChange={(e) => setResponsibleFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    responsibleFilter !== 'ALL'
-                      ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Responsible Resolvers ({responsibleList.length})</option>
-                  {responsibleList.map((person) => (
-                    <option key={person} value={person}>
-                      {person}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 8. Auditor Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-purple-500" />
-                    <span>Auditor / Created By</span>
-                  </span>
-                  {auditorFilter !== 'ALL' && (
-                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={auditorFilter}
-                  onChange={(e) => setAuditorFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    auditorFilter !== 'ALL'
-                      ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Auditors ({auditorList.length})</option>
-                  {auditorList.map((auditor) => (
-                    <option key={auditor} value={auditor}>
-                      {auditor}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 9. Ticket Aging Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-blue-500" />
-                    <span>Ticket Aging</span>
-                  </span>
-                  {agingFilter !== 'ALL' && (
-                    <span className="text-[10px] text-cyan-600 dark:text-cyan-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={agingFilter}
-                  onChange={(e) => setAgingFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    agingFilter !== 'ALL'
-                      ? 'bg-cyan-50/70 border-cyan-300 text-cyan-900 dark:bg-cyan-950/60 dark:border-cyan-700 dark:text-cyan-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Aging Durations</option>
-                  <option value="FRESH">Fresh (&lt; 24 Hours)</option>
-                  <option value="MODERATE">Moderate Aging (1 – 3 Days)</option>
-                  <option value="HIGH">High Aging (3 – 7 Days)</option>
-                  <option value="SEVERE">🚨 Severe Aging (&gt; 7 Days)</option>
-                </select>
-              </div>
-
-              {/* 10. Defect Recurrence Dropdown */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-                  <span className="flex items-center gap-1">
-                    <Repeat className="w-3 h-3 text-purple-500" />
-                    <span>Defect Recurrence</span>
-                  </span>
-                  {repeatFilter !== 'ALL' && (
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono font-bold">Active</span>
-                  )}
-                </label>
-                <select
-                  value={repeatFilter}
-                  onChange={(e) => setRepeatFilter(e.target.value)}
-                  className={`w-full px-3 py-2 text-xs rounded-xl border focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium transition-colors ${
-                    repeatFilter !== 'ALL'
-                      ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
-                  }`}
-                >
-                  <option value="ALL">All Defect Types</option>
-                  <option value="REPEAT">🔁 Repeat NCs (Frequency ≥ 2)</option>
-                  <option value="SINGLE">◽ First-Time / Single Defect</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Custom Date Range Picker Row (shown if CUSTOM is active) */}
+            {/* Custom Dates if CUSTOM is active */}
             {datePreset === 'CUSTOM' && (
-              <div className="p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-800/80 flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 dark:text-indigo-200 shrink-0">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
-                  <span>Custom Date Window:</span>
-                </div>
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                      From:
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                      To:
-                    </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-                {(startDate || endDate) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStartDate('');
-                      setEndDate('');
-                    }}
-                    className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer shrink-0"
-                  >
-                    Clear Dates
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Active Filter Criteria Chips Strip */}
-            {hasActiveFilters && (
-              <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
-                  <Filter className="w-3 h-3" />
-                  <span>Active Filters:</span>
-                </span>
-
-                {searchTerm && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-cyan-300 border border-indigo-200 dark:border-indigo-800 text-[11px]">
-                    <span>Search: "{searchTerm}"</span>
-                    <button
-                      type="button"
-                      onClick={() => setSearchTerm('')}
-                      className="hover:text-indigo-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {departmentFilter !== 'ALL' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px]">
-                    <span>Dept: {departmentFilter}</span>
-                    <button
-                      type="button"
-                      onClick={() => setDepartmentFilter('ALL')}
-                      className="hover:text-blue-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {memberFilter !== 'ALL' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[11px]">
-                    <span>
-                      Member: {consolidatedMembersList.find((m) => m.id === memberFilter)?.name || memberFilter}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setMemberFilter('ALL')}
-                      className="hover:text-purple-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {statusFilter !== 'ALL' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px]">
-                    <span>Status: {statusFilter}</span>
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter('ALL')}
-                      className="hover:text-emerald-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {riskFilter !== 'ALL' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[11px]">
-                    <span>Risk: {riskFilter}</span>
-                    <button
-                      type="button"
-                      onClick={() => setRiskFilter('ALL')}
-                      className="hover:text-amber-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {capStatusFilter !== 'ALL' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11px]">
-                    <span>CAP: {capStatusFilter}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCapStatusFilter('ALL')}
-                      className="hover:text-emerald-900 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer ml-1"
-                >
-                  Clear All
-                </button>
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-slate-500 font-medium">From:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-2 py-1 text-xs rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200"
+                />
+                <span className="text-slate-500 font-medium">To:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-2 py-1 text-xs rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200"
+                />
               </div>
             )}
           </div>
@@ -2341,214 +1946,128 @@ export const ReportsView = ({
       </div>
 
       {/* =======================================================================
-          VIEW 1: MASTER AUDIT REGISTER (100% Preserved Existing Features)
+          VIEW 1: MASTER AUDIT REGISTER (Clean Detailed Table Format)
           ======================================================================= */}
       {activeReportTab === 'audit-register' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Interactive KPI Overview Cards with Drill-Down Clicks */}
-          <div>
-            <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                Audit Scorecard &amp; 1-Click Drill-Down
-              </span>
-              <span className="text-[11px] font-mono text-slate-400">
-                Click any metric to filter records
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
-              {/* CARD 1: Total NCs */}
-              <div
-                onClick={handleResetFilters}
-                className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-indigo-400 dark:hover:border-indigo-600 transition-all cursor-pointer group flex flex-col justify-between"
-                title="Click to view all records (reset filters)"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Total NCs</span>
-                  <Layers className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                </div>
-                <div className="text-xl font-black text-slate-900 dark:text-white font-mono my-1">
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {/* Quick Metrics KPI Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div
+              onClick={handleResetFilters}
+              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-indigo-400 cursor-pointer transition-all flex items-center justify-between"
+              title="Click to reset filters and view all records"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Total NCs</span>
+                <span className="text-base font-black text-slate-900 dark:text-white font-mono">
                   {filteredCount}
                   {hasActiveFilters && (
-                    <span className="text-[10px] text-slate-400 font-normal ml-1">
-                      /{totalNC}
-                    </span>
+                    <span className="text-[10px] text-slate-400 font-normal ml-1">/{totalNC}</span>
                   )}
-                </div>
-                <div className="text-[10px] text-indigo-600 dark:text-cyan-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>View All</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
+                </span>
               </div>
+              <Layers className="w-4 h-4 text-indigo-500 opacity-80" />
+            </div>
 
-              {/* CARD 2: Open / In Progress */}
-              <div
-                onClick={() => setStatusFilter('OPEN')}
-                className={`p-3 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-amber-400 dark:hover:border-amber-600 transition-all cursor-pointer group flex flex-col justify-between ${
-                  statusFilter === 'OPEN'
-                    ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/20 dark:bg-amber-950/20'
-                    : 'border-slate-200/90 dark:border-slate-800'
-                }`}
-                title="Drill down to Open and In Progress NCs"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Open Actions</span>
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <div className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono my-1">
+            <div
+              onClick={() => setStatusFilter('OPEN')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-amber-400 cursor-pointer transition-all flex items-center justify-between ${
+                statusFilter === 'OPEN' ? 'border-amber-500 ring-1 ring-amber-500/30 bg-amber-50/20' : 'border-slate-200/90 dark:border-slate-800'
+              }`}
+              title="Filter by Open NCs"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Open Actions</span>
+                <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">
                   {openCount}
-                </div>
-                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>Needs Fix</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
+                </span>
               </div>
+              <AlertCircle className="w-4 h-4 text-amber-500 opacity-80" />
+            </div>
 
-              {/* CARD 3: Under Review / Verification */}
-              <div
-                onClick={() => setStatusFilter('UNDER_REVIEW')}
-                className={`p-3 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-purple-400 dark:hover:border-purple-600 transition-all cursor-pointer group flex flex-col justify-between ${
-                  statusFilter === 'UNDER_REVIEW'
-                    ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/20 dark:bg-purple-950/20'
-                    : 'border-slate-200/90 dark:border-slate-800'
-                }`}
-                title="Drill down to CAPs submitted and awaiting Auditor verification"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Under Review</span>
-                  <Clock className="w-3.5 h-3.5 text-purple-500" />
-                </div>
-                <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono my-1">
+            <div
+              onClick={() => setStatusFilter('UNDER_REVIEW')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-purple-400 cursor-pointer transition-all flex items-center justify-between ${
+                statusFilter === 'UNDER_REVIEW' ? 'border-purple-500 ring-1 ring-purple-500/30 bg-purple-50/20' : 'border-slate-200/90 dark:border-slate-800'
+              }`}
+              title="Filter by Under Review NCs"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Under Review</span>
+                <span className="text-base font-black text-purple-600 dark:text-purple-400 font-mono">
                   {pendingCount}
-                </div>
-                <div className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>Verify CAP</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
+                </span>
               </div>
+              <Clock className="w-4 h-4 text-purple-500 opacity-80" />
+            </div>
 
-              {/* CARD 4: Overdue Breaches */}
-              <div
-                onClick={() => setStatusFilter('OVERDUE')}
-                className={`p-3 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-rose-400 dark:hover:border-rose-600 transition-all cursor-pointer group flex flex-col justify-between ${
-                  statusFilter === 'OVERDUE'
-                    ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50/20 dark:bg-rose-950/20'
-                    : 'border-slate-200/90 dark:border-slate-800'
-                }`}
-                title="Drill down to NCs past SLA deadline"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Overdue SLA</span>
-                  <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-                </div>
-                <div className="text-xl font-black text-rose-600 dark:text-rose-400 font-mono my-1">
-                  {overdueCount}
-                </div>
-                <div className="text-[10px] text-rose-600 dark:text-rose-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>Urgent Risk</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
-              </div>
-
-              {/* CARD 5: Critical Risk */}
-              <div
-                onClick={() => setRiskFilter('CRITICAL')}
-                className={`p-3 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-red-400 dark:hover:border-red-600 transition-all cursor-pointer group flex flex-col justify-between ${
-                  riskFilter === 'CRITICAL'
-                    ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/20 dark:bg-red-950/20'
-                    : 'border-slate-200/90 dark:border-slate-800'
-                }`}
-                title="Drill down to Critical Severity Defect Findings"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Critical Risk</span>
-                  <Flame className="w-3.5 h-3.5 text-red-500" />
-                </div>
-                <div className="text-xl font-black text-red-600 dark:text-red-400 font-mono my-1">
-                  {criticalCount}
-                </div>
-                <div className="text-[10px] text-red-600 dark:text-red-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>Stop Line</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
-              </div>
-
-              {/* CARD 6: Repeat Defect Recurrences */}
-              <div
-                onClick={() => setRepeatFilter('REPEAT')}
-                className={`p-3 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-purple-400 dark:hover:border-purple-600 transition-all cursor-pointer group flex flex-col justify-between ${
-                  repeatFilter === 'REPEAT'
-                    ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/20 dark:bg-purple-950/20'
-                    : 'border-slate-200/90 dark:border-slate-800'
-                }`}
-                title="Drill down to Repeat Defects occurring more than once"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Repeat NCs</span>
-                  <Repeat className="w-3.5 h-3.5 text-purple-500" />
-                </div>
-                <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono my-1">
-                  {repeatCount}
-                </div>
-                <div className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>Recurrence</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
-              </div>
-
-              {/* CARD 7: Closed Effective */}
-              <div
-                onClick={() => setStatusFilter('CLOSED')}
-                className={`p-3 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-emerald-400 dark:hover:border-emerald-600 transition-all cursor-pointer group flex flex-col justify-between ${
-                  statusFilter === 'CLOSED'
-                    ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/20 dark:bg-emerald-950/20'
-                    : 'border-slate-200/90 dark:border-slate-800'
-                }`}
-                title="Drill down to fully Verified & Closed NCs"
-              >
-                <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Closed &amp; Verified</span>
-                  <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
-                </div>
-                <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono my-1">
+            <div
+              onClick={() => setStatusFilter('CLOSED')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-emerald-400 cursor-pointer transition-all flex items-center justify-between ${
+                statusFilter === 'CLOSED' ? 'border-emerald-500 ring-1 ring-emerald-500/30 bg-emerald-50/20' : 'border-slate-200/90 dark:border-slate-800'
+              }`}
+              title="Filter by Closed & Verified NCs"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Closed &amp; Verified</span>
+                <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
                   {closedCount}
-                </div>
-                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                  <span>100% Solved</span>
-                  <ChevronRight className="w-2.5 h-2.5" />
-                </div>
+                </span>
               </div>
+              <CheckCheck className="w-4 h-4 text-emerald-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setStatusFilter('OVERDUE')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-rose-400 cursor-pointer transition-all flex items-center justify-between ${
+                statusFilter === 'OVERDUE' ? 'border-rose-500 ring-1 ring-rose-500/30 bg-rose-50/20' : 'border-slate-200/90 dark:border-slate-800'
+              }`}
+              title="Filter by Overdue SLA NCs"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Overdue SLA</span>
+                <span className="text-base font-black text-rose-600 dark:text-rose-400 font-mono">
+                  {overdueCount}
+                </span>
+              </div>
+              <AlertTriangle className="w-4 h-4 text-rose-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setRiskFilter('CRITICAL')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-red-400 cursor-pointer transition-all flex items-center justify-between ${
+                riskFilter === 'CRITICAL' ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20' : 'border-slate-200/90 dark:border-slate-800'
+              }`}
+              title="Filter by Critical Risk NCs"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Critical Risk</span>
+                <span className="text-base font-black text-red-600 dark:text-red-400 font-mono">
+                  {criticalCount}
+                </span>
+              </div>
+              <Flame className="w-4 h-4 text-red-500 opacity-80" />
             </div>
           </div>
 
-          {/* Interactive A-to-Z Preview Table */}
+          {/* Master Non-Conformance Detailed Table */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <span>Interactive Audit Records &amp; Drill-Down</span>
+                  <span>Master Non-Conformance Register</span>
                   <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                    {filteredComplaints.length} of {complaints.length} Records
+                    {filteredComplaints.length} Records
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Click any record or "Inspect Lifecycle" to drill down into the 4-stage audit trail, root causes, and photos.
+                  Comprehensive audit trail with root causes, CAP execution, SLAs, and resolution statuses.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search NC ID, department, finding..."
-                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 w-52 sm:w-64"
-                  />
-                </div>
-              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                Click "Inspect" for photos &amp; lifecycle trail
+              </span>
             </div>
 
             <div className="overflow-x-auto">
@@ -2558,10 +2077,10 @@ export const ReportsView = ({
                     <Search className="w-5 h-5" />
                   </div>
                   <p className="font-semibold text-slate-700 dark:text-slate-300">
-                    No matching NC records found
+                    No matching non-conformance records found
                   </p>
                   <p className="text-slate-400 max-w-sm mx-auto">
-                    No tickets match your active combination of filters.
+                    Try adjusting or resetting your filter criteria to view records.
                   </p>
                   <button
                     type="button"
@@ -2575,18 +2094,23 @@ export const ReportsView = ({
               ) : (
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                      <th className="py-3 px-4">NC ID &amp; Location</th>
-                      <th className="py-3 px-4">Issue Finding &amp; Recurrence</th>
-                      <th className="py-3 px-4">Assigned Resolver</th>
-                      <th className="py-3 px-4">Root Cause &amp; CAP Fix</th>
-                      <th className="py-3 px-4">Timeline &amp; Aging</th>
-                      <th className="py-3 px-4 text-center">Status &amp; Risk</th>
-                      <th className="py-3 px-4 text-center">Drill-Down</th>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      <th className="py-2.5 px-3 text-center w-10">#</th>
+                      <th className="py-2.5 px-3">NC ID</th>
+                      <th className="py-2.5 px-3">Date Logged</th>
+                      <th className="py-2.5 px-3">Department &amp; Line</th>
+                      <th className="py-2.5 px-3">Finding &amp; Category</th>
+                      <th className="py-2.5 px-3">Assigned Resolver</th>
+                      <th className="py-2.5 px-3">5-Why Root Cause</th>
+                      <th className="py-2.5 px-3">CAP Corrective Action</th>
+                      <th className="py-2.5 px-3">Target Due &amp; SLA</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3 text-center">Risk</th>
+                      <th className="py-2.5 px-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {filteredComplaints.map((c) => {
+                    {filteredComplaints.map((c, idx) => {
                       const isOverdue =
                         c.status !== 'Closed' &&
                         c.status !== 'Verified' &&
@@ -2600,101 +2124,103 @@ export const ReportsView = ({
 
                       return (
                         <tr
-                          key={c._id || c.id || c.complaintId}
+                          key={c._id || c.id || c.complaintId || idx}
                           className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group"
                         >
-                          {/* 1. NC ID & Location */}
-                          <td className="py-3.5 px-4 align-top">
-                            <div className="font-mono font-bold text-indigo-600 dark:text-cyan-400 flex items-center gap-1">
-                              <span>{c.complaintId || 'NC-N/A'}</span>
-                              {cRisk === 'CRITICAL' && (
-                                <span className="text-[10px] text-rose-500" title="Critical Risk">
-                                  🔥
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] font-semibold text-slate-900 dark:text-white mt-0.5">
-                              {c.department}
+                          {/* 1. # */}
+                          <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
+                            {idx + 1}
+                          </td>
+
+                          {/* 2. NC ID */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap">
+                            <span className="font-mono font-bold text-indigo-600 dark:text-cyan-400 block">
+                              {c.complaintId || 'NC-N/A'}
+                            </span>
+                            {freq > 1 && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+                                <Repeat className="w-2.5 h-2.5" />
+                                <span>Repeat ({freq}x)</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 3. Date Logged */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
+                            {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                          </td>
+
+                          {/* 4. Department & Line */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap">
+                            <div className="font-semibold text-slate-900 dark:text-white">
+                              {c.department || 'Production'}
                             </div>
                             <div className="text-[10px] text-slate-400 font-mono">
-                              {c.location || 'Floor Station'}
+                              {c.location || 'Line Station'}
                             </div>
                           </td>
 
-                          {/* 2. Issue Finding & Recurrence */}
-                          <td className="py-3.5 px-4 align-top max-w-xs">
-                            <p className="text-[11px] text-slate-700 dark:text-slate-300 line-clamp-2">
+                          {/* 5. Finding & Category */}
+                          <td className="py-3 px-3 align-top max-w-xs">
+                            <p className="text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
                               {getFindingText(c)}
                             </p>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                                  freq > 1
-                                    ? 'bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                                }`}
-                              >
-                                <Repeat className="w-3 h-3" />
-                                <span>Occurred: {freq} time{freq > 1 ? 's' : ''}</span>
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                {c.category || 'Quality Audit'}
                               </span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-1">
-                              Auditor: {getAuditorName(c)}
                             </div>
                           </td>
 
-                          {/* 3. Assigned Resolver */}
-                          <td className="py-3.5 px-4 align-top whitespace-nowrap">
-                            <div className="font-bold text-slate-900 dark:text-slate-200">
+                          {/* 6. Assigned Resolver */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap">
+                            <div className="font-bold text-slate-900 dark:text-white">
                               {assignedName}
                             </div>
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                            <div className="text-[10px] text-slate-400">
                               {c.assignedTo?.designation || 'Supervisor'}
                             </div>
-                            <div className="text-[10px] font-mono text-slate-400">
-                              {c.assignedTo?.mobileNumber || c.assignedTo?.employeeId || ''}
-                            </div>
+                            {c.assignedTo?.mobileNumber && (
+                              <div className="text-[10px] font-mono text-slate-400">
+                                {c.assignedTo.mobileNumber}
+                              </div>
+                            )}
                           </td>
 
-                          {/* 4. Root Cause & CAP Fix */}
-                          <td className="py-3.5 px-4 align-top max-w-sm">
-                            <div className="p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 text-[11px] mb-1">
-                              <span className="font-bold text-amber-800 dark:text-amber-300 block text-[10px] uppercase tracking-wider">
-                                5-Why Root Cause:
-                              </span>
-                              <span className="text-slate-700 dark:text-slate-300 line-clamp-2">
-                                {rootCause}
-                              </span>
-                            </div>
-                            <div className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-1">
-                              <strong className="text-indigo-600 dark:text-cyan-400">Fix: </strong>
+                          {/* 7. 5-Why Root Cause */}
+                          <td className="py-3 px-3 align-top max-w-xs">
+                            <p className="text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug">
+                              {rootCause}
+                            </p>
+                          </td>
+
+                          {/* 8. CAP Corrective Action */}
+                          <td className="py-3 px-3 align-top max-w-xs">
+                            <p className="text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug">
                               {c.cap?.correctiveAction || c.actionNotes || 'Pending CAP execution'}
-                            </div>
+                            </p>
                           </td>
 
-                          {/* 5. Timeline & Aging */}
-                          <td className="py-3.5 px-4 align-top whitespace-nowrap text-[11px]">
-                            <div className="text-slate-500">
-                              Logged: {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                          {/* 9. Target Due & SLA */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap">
+                            <div className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">
+                              {c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A'}
                             </div>
-                            <div className="text-slate-500 mt-0.5">
-                              Target: {c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A'}
-                            </div>
-                            <div className="mt-1 font-mono text-[10px]">
+                            <div className="mt-0.5">
                               {isOverdue ? (
-                                <span className="text-rose-600 dark:text-rose-400 font-bold">
-                                  🚨 Overdue Breach
+                                <span className="inline-block px-1.5 py-0.2 rounded-md text-[9px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                  Overdue
                                 </span>
                               ) : (
-                                <span className="text-emerald-600 dark:text-emerald-400">
+                                <span className="inline-block px-1.5 py-0.2 rounded-md text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                                   Within SLA
                                 </span>
                               )}
                             </div>
                           </td>
 
-                          {/* 6. Status & Risk */}
-                          <td className="py-3.5 px-4 align-top text-center whitespace-nowrap">
+                          {/* 10. Status */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap">
                             <span
                               className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                                 c.status === 'Closed' || c.status === 'Verified'
@@ -2706,18 +2232,30 @@ export const ReportsView = ({
                             >
                               {c.status}
                             </span>
-                            <div className="mt-1 text-[10px] font-bold text-slate-500">
-                              Risk: {cRisk}
-                            </div>
                           </td>
 
-                          {/* 7. Action: Drill Down */}
-                          <td className="py-3.5 px-4 align-top text-center">
+                          {/* 11. Risk */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                cRisk === 'CRITICAL'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                                  : cRisk === 'HIGH'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              }`}
+                            >
+                              {cRisk}
+                            </span>
+                          </td>
+
+                          {/* 12. Actions */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => setDrilldownComplaint(c)}
                               className="px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-cyan-400 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
-                              title="Inspect Full Defect & CAP Audit Trail"
+                              title="Inspect Defect &amp; CAP Audit Trail"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               <span>Inspect</span>
@@ -2730,498 +2268,163 @@ export const ReportsView = ({
                 </table>
               )}
             </div>
+
+            {/* Table Footer Count Info */}
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+              <span>Showing {filteredComplaints.length} of {complaints.length} total non-conformances</span>
+              <span className="font-mono text-[11px]">Factory Quality Audit Register</span>
+            </div>
           </div>
         </div>
       )}
 
       {/* =======================================================================
-          VIEW 2: DEPARTMENT-WISE NC REPORT (Requirement 1)
+          VIEW 2: DEPARTMENT-WISE NC REPORT (Clean Detailed Table Format)
           ======================================================================= */}
       {activeReportTab === 'dept-report' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Breadcrumb / Top Bar if a department is selected */}
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {/* Breadcrumb if a specific department is inspected */}
           {selectedDeptDetail ? (
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDeptDetail(null)}
-                  className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>All Departments</span>
-                </button>
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-indigo-600" />
-                    <span>{selectedDeptDetail} Detailed Audit Report</span>
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Comprehensive Non-Conformance breakdown, members roster, and root cause registry.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDepartmentFilter(selectedDeptDetail);
-                    setActiveReportTab('members-report');
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 font-bold text-xs hover:bg-indigo-100 transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>View Department Members ({departmentStatsList.find(d => d.department === selectedDeptDetail)?.members.length || 0})</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Plant Department Summary Scorecard */
-            <div>
-              <div className="flex items-center justify-between mb-2 px-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-                  Factory Departments Quality Overview
-                </span>
-                <span className="text-[11px] font-mono text-slate-400">
-                  {consolidatedDepartmentsList.length} Monitored Production Units
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-500 block">Total Depts</span>
-                  <div className="text-xl font-black text-slate-900 dark:text-white font-mono my-1">
-                    {consolidatedDepartmentsList.length}
-                  </div>
-                  <span className="text-[10px] text-slate-400">Plant Divisions</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-500 block">Total NCs Raised</span>
-                  <div className="text-xl font-black text-indigo-600 dark:text-cyan-400 font-mono my-1">
-                    {filteredCount}
-                  </div>
-                  <span className="text-[10px] text-slate-400">In Current Filter</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-500 block">Open NCs</span>
-                  <div className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono my-1">
-                    {openCount}
-                  </div>
-                  <span className="text-[10px] text-amber-500 font-semibold">Under Containment</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-500 block">Closed NCs</span>
-                  <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono my-1">
-                    {closedCount}
-                  </div>
-                  <span className="text-[10px] text-emerald-500 font-semibold">Verified Effective</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-500 block">Pending Review</span>
-                  <div className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono my-1">
-                    {pendingCount}
-                  </div>
-                  <span className="text-[10px] text-purple-500 font-semibold">Awaiting Verification</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-500 block">Factory CAP Rate</span>
-                  <div className="text-xl font-black text-indigo-600 dark:text-cyan-400 font-mono my-1">
-                    {overallCapRate}%
-                  </div>
-                  <span className="text-[10px] text-slate-400">Target: ≥ 90%</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* If NOT drilled down: Department Matrix Grid & Table */}
-          {!selectedDeptDetail ? (
-            <div className="space-y-4">
-              {/* Department Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {departmentStatsList.map((d) => (
-                  <div
-                    key={d.department}
-                    onClick={() => handleInspectDepartment(d.department)}
-                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDeptDetail(null)}
+                    className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    <div>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 group-hover:scale-105 transition-transform">
-                            <Building2 className="w-4 h-4" />
-                          </span>
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-colors">
-                              {d.department}
-                            </h4>
-                            <p className="text-[11px] text-slate-400 font-mono">
-                              {d.manager ? `Head: ${d.manager}` : d.code ? `Code: ${d.code}` : 'Production Unit'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${d.capStatusBadge}`}>
-                          {d.capStatusLabel}
-                        </span>
-                      </div>
-
-                      {/* Metrics bar */}
-                      <div className="grid grid-cols-4 gap-1.5 my-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800 text-center">
-                        <div>
-                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Total NCs</span>
-                          <span className="text-sm font-black text-slate-900 dark:text-white font-mono">
-                            {d.totalNC}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase font-bold text-amber-500 block">Open</span>
-                          <span className="text-sm font-black text-amber-600 dark:text-amber-400 font-mono">
-                            {d.openNC}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase font-bold text-emerald-500 block">Closed</span>
-                          <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                            {d.closedNC}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase font-bold text-purple-500 block">Pending</span>
-                          <span className="text-sm font-black text-purple-600 dark:text-purple-400 font-mono">
-                            {d.pendingNC}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* CAP Completion progress bar */}
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] mb-1">
-                          <span className="text-slate-500 font-semibold">CAP Completion Adherence:</span>
-                          <span className="font-mono font-bold text-indigo-600 dark:text-cyan-400">{d.capRate}%</span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                          <div
-                            className={`h-full transition-all duration-500 ${
-                              d.capRate === 100
-                                ? 'bg-emerald-500'
-                                : d.capRate >= 60
-                                ? 'bg-indigo-500'
-                                : 'bg-amber-500'
-                            }`}
-                            style={{ width: `${d.capRate}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 text-[11px]">
-                        {d.members.length} Registered Member{d.members.length === 1 ? '' : 's'}
-                      </span>
-                      <span className="text-indigo-600 dark:text-cyan-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                        <span>Detailed Report</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>All Departments</span>
+                  </button>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-indigo-600" />
+                      <span>{selectedDeptDetail} Detailed Audit Register</span>
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      All non-conformances, root cause findings, and CAP records logged for this department.
+                    </p>
                   </div>
-                ))}
-              </div>
-
-              {/* Department Full Summary Table */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-indigo-500" />
-                    <span>Department-wise Quality &amp; CAP Completion Matrix</span>
-                  </h3>
-                  <span className="text-xs text-slate-400 font-mono">
-                    Click any department row to view detailed report
-                  </span>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                        <th className="py-3 px-4">Department Name</th>
-                        <th className="py-3 px-4">Head / Manager</th>
-                        <th className="py-3 px-4 text-center">Total NCs</th>
-                        <th className="py-3 px-4 text-center">Open NCs</th>
-                        <th className="py-3 px-4 text-center">Closed NCs</th>
-                        <th className="py-3 px-4 text-center">Pending NCs</th>
-                        <th className="py-3 px-4 text-center">Overdue</th>
-                        <th className="py-3 px-4 text-center">CAP Rate</th>
-                        <th className="py-3 px-4">CAP Status</th>
-                        <th className="py-3 px-4 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                      {departmentStatsList.map((d) => (
-                        <tr
-                          key={d.department}
-                          onClick={() => handleInspectDepartment(d.department)}
-                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
-                        >
-                          <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                              <span className="group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-colors">
-                                {d.department}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
-                            {d.manager || 'Production Line Head'}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-900 dark:text-white">
-                            {d.totalNC}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
-                            {d.openNC}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                            {d.closedNC}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
-                            {d.pendingNC}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
-                            {d.overdueNC > 0 ? d.overdueNC : '—'}
-                          </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-indigo-600 dark:text-cyan-400">
-                            {d.capRate}%
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${d.capStatusBadge}`}>
-                              {d.capStatusLabel}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleInspectDepartment(d.department);
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-cyan-400 font-bold text-[11px] transition-colors cursor-pointer"
-                            >
-                              View Report
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDepartmentFilter(selectedDeptDetail);
+                      setActiveReportTab('members-report');
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 font-bold text-xs hover:bg-purple-100 transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>View Department Members</span>
+                  </button>
                 </div>
               </div>
-            </div>
-          ) : (
-            /* DRILLED DOWN DEPARTMENT VIEW */
-            (() => {
-              const currentDept = departmentStatsList.find((d) => d.department === selectedDeptDetail);
-              if (!currentDept) return null;
 
-              return (
-                <div className="space-y-5 animate-in fade-in duration-200">
-                  {/* Department Overview Banner */}
-                  <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total NCs</span>
-                        <span className="text-xl font-black text-slate-900 dark:text-white font-mono">
-                          {currentDept.totalNC}
-                        </span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-amber-500 block">Open NCs</span>
-                        <span className="text-xl font-black text-amber-600 dark:text-amber-400 font-mono">
-                          {currentDept.openNC}
-                        </span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-emerald-500 block">Closed NCs</span>
-                        <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-                          {currentDept.closedNC}
-                        </span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-purple-500 block">Pending Review</span>
-                        <span className="text-xl font-black text-purple-600 dark:text-purple-400 font-mono">
-                          {currentDept.pendingNC}
-                        </span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-rose-500 block">Overdue Breaches</span>
-                        <span className="text-xl font-black text-rose-600 dark:text-rose-400 font-mono">
-                          {currentDept.overdueNC}
-                        </span>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-indigo-500 block">CAP Rate</span>
-                        <span className="text-xl font-black text-indigo-600 dark:text-cyan-400 font-mono">
-                          {currentDept.capRate}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              {/* Department Specific Non-Conformance Table */}
+              {(() => {
+                const currentDept = departmentStatsList.find((d) => d.department === selectedDeptDetail);
+                const deptComplaints = currentDept ? currentDept.complaints : [];
 
-                  {/* Section: Department Members Belonging to this Department */}
+                return (
                   <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                          <Users className="w-4 h-4 text-purple-500" />
-                          <span>{selectedDeptDetail} Members Roster &amp; Assigned NCs</span>
-                        </h3>
-                        <p className="text-xs text-slate-400">
-                          Inspect individual line in-charges and their active defect resolution metrics.
-                        </p>
-                      </div>
-                    </div>
-
-                    {currentDept.members.length === 0 ? (
-                      <div className="p-8 text-center text-xs text-slate-500">
-                        No members currently registered specifically under this department division.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
-                        {currentDept.members.map((m) => {
-                          const mStat = memberStatsList.find((x) => x.id === m.id) || m;
-                          return (
-                            <div
-                              key={m.id}
-                              onClick={() => handleInspectMember(m)}
-                              className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800 hover:border-indigo-400 transition-all cursor-pointer group flex flex-col justify-between"
-                            >
-                              <div>
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-300 font-bold text-xs flex items-center justify-center">
-                                      {m.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                      <h5 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">
-                                        {m.name}
-                                      </h5>
-                                      <span className="text-[10px] text-slate-400 font-mono">
-                                        {m.employeeId || 'ID: N/A'} • {m.designation || 'Supervisor'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${mStat.capStatusBadge}`}>
-                                    {mStat.capRate}%
-                                  </span>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-1 my-2 text-center text-[10px] py-1.5 px-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 font-mono">
-                                  <div>
-                                    <span className="text-slate-400 block text-[9px]">Total NC</span>
-                                    <span className="font-bold text-slate-900 dark:text-white">{mStat.totalNC}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-amber-500 block text-[9px]">Open</span>
-                                    <span className="font-bold text-amber-600 dark:text-amber-400">{mStat.openNC}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-emerald-500 block text-[9px]">Closed</span>
-                                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{mStat.closedNC}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-[11px]">
-                                <span className="text-slate-400">{mStat.pendingNC} In Review</span>
-                                <span className="text-indigo-600 dark:text-cyan-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                                  <span>Inspect NCs</span>
-                                  <ChevronRight className="w-3 h-3" />
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Section: Non-Conformance Register for this Department */}
-                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                       <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <FileCheck className="w-4 h-4 text-emerald-500" />
-                        <span>{selectedDeptDetail} Active Defect Register ({currentDept.complaints.length} Records)</span>
+                        <span>{selectedDeptDetail} Non-Conformance Records</span>
+                        <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                          {deptComplaints.length} Records
+                        </span>
                       </h3>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedDeptDetail(null)}
-                        className="text-xs text-indigo-600 hover:underline cursor-pointer"
-                      >
-                        Back to All Departments
-                      </button>
+                      <span className="text-xs text-slate-400 font-mono">
+                        CAP Completion Rate: {currentDept ? currentDept.capRate : 0}%
+                      </span>
                     </div>
 
                     <div className="overflow-x-auto">
-                      {currentDept.complaints.length === 0 ? (
-                        <div className="p-8 text-center text-xs text-slate-500">
-                          No non-conformances matching current filters logged for {selectedDeptDetail}.
+                      {deptComplaints.length === 0 ? (
+                        <div className="p-12 text-center text-slate-500 text-xs">
+                          No non-conformance records found for this department.
                         </div>
                       ) : (
                         <table className="w-full text-left border-collapse text-xs">
                           <thead>
-                            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                              <th className="py-3 px-4">NC ID</th>
-                              <th className="py-3 px-4">Defect Finding &amp; Requirement</th>
-                              <th className="py-3 px-4">Assigned Member</th>
-                              <th className="py-3 px-4">Severity</th>
-                              <th className="py-3 px-4">Status</th>
-                              <th className="py-3 px-4">Target Date</th>
-                              <th className="py-3 px-4 text-center">Inspect</th>
+                            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                              <th className="py-2.5 px-3 text-center w-10">#</th>
+                              <th className="py-2.5 px-3">NC ID</th>
+                              <th className="py-2.5 px-3">Date Logged</th>
+                              <th className="py-2.5 px-3">Station / Line</th>
+                              <th className="py-2.5 px-3">Finding Description</th>
+                              <th className="py-2.5 px-3">Assigned Resolver</th>
+                              <th className="py-2.5 px-3">5-Why Root Cause</th>
+                              <th className="py-2.5 px-3">Corrective Action (CAP)</th>
+                              <th className="py-2.5 px-3">Target Due</th>
+                              <th className="py-2.5 px-3 text-center">Status</th>
+                              <th className="py-2.5 px-3 text-center">Risk</th>
+                              <th className="py-2.5 px-3 text-center">Action</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                            {currentDept.complaints.map((c) => (
-                              <tr key={c._id || c.id || c.complaintId} className="hover:bg-slate-50/70 transition-colors">
-                                <td className="py-3 px-4 font-mono font-bold text-indigo-600 dark:text-cyan-400">
-                                  {c.complaintId}
+                            {deptComplaints.map((c, idx) => (
+                              <tr
+                                key={c._id || c.id || c.complaintId || idx}
+                                className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                              >
+                                <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
+                                  {idx + 1}
                                 </td>
-                                <td className="py-3 px-4 max-w-sm">
-                                  <div className="font-semibold text-slate-900 dark:text-white">
+                                <td className="py-3 px-3 align-top font-mono font-bold text-indigo-600 dark:text-cyan-400 whitespace-nowrap">
+                                  {c.complaintId || 'NC-N/A'}
+                                </td>
+                                <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
+                                  {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td className="py-3 px-3 align-top whitespace-nowrap text-slate-700 dark:text-slate-300">
+                                  {c.location || 'Line Station'}
+                                </td>
+                                <td className="py-3 px-3 align-top max-w-xs">
+                                  <p className="text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
                                     {getFindingText(c)}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 mt-0.5">
-                                    Standard: {c.requirement || 'AQL 1.5 Workmanship Standard'}
-                                  </div>
+                                  </p>
                                 </td>
-                                <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-300">
+                                <td className="py-3 px-3 align-top whitespace-nowrap font-medium text-slate-900 dark:text-white">
                                   {getAssignedToName(c)}
                                 </td>
-                                <td className="py-3 px-4">
-                                  <span className="font-bold text-slate-700 dark:text-slate-300">
-                                    {(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}
-                                  </span>
+                                <td className="py-3 px-3 align-top max-w-xs text-slate-700 dark:text-slate-300">
+                                  <p className="line-clamp-2 leading-snug">{getRootCauseText(c)}</p>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                <td className="py-3 px-3 align-top max-w-xs text-slate-700 dark:text-slate-300">
+                                  <p className="line-clamp-2 leading-snug">
+                                    {c.cap?.correctiveAction || c.actionNotes || 'Pending CAP'}
+                                  </p>
+                                </td>
+                                <td className="py-3 px-3 align-top whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                                  {c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A'}
+                                </td>
+                                <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                                  <span
+                                    className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                      c.status === 'Closed' || c.status === 'Verified'
+                                        ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                        : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                    }`}
+                                  >
                                     {c.status}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 text-slate-500">
-                                  {getCapTargetDate(c)}
+                                <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                                  <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                    {(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}
+                                  </span>
                                 </td>
-                                <td className="py-3 px-4 text-center">
+                                <td className="py-3 px-3 align-top text-center whitespace-nowrap">
                                   <button
                                     type="button"
                                     onClick={() => setDrilldownComplaint(c)}
-                                    className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 font-bold text-[11px] hover:bg-indigo-100 cursor-pointer"
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-cyan-400 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1"
                                   >
-                                    Inspect
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Inspect</span>
                                   </button>
                                 </td>
                               </tr>
@@ -3231,272 +2434,391 @@ export const ReportsView = ({
                       )}
                     </div>
                   </div>
+                );
+              })()}
+            </div>
+          ) : (
+            /* All Factory Departments Overview Table */
+            <div className="space-y-3">
+              {/* Plant Department Summary Strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Total Depts</span>
+                  <div className="text-base font-black text-slate-900 dark:text-white font-mono">
+                    {consolidatedDepartmentsList.length}
+                  </div>
                 </div>
-              );
-            })()
+
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Total NCs Raised</span>
+                  <div className="text-base font-black text-indigo-600 dark:text-cyan-400 font-mono">
+                    {filteredCount}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Open Actions</span>
+                  <div className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">
+                    {openCount}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Closed Effective</span>
+                  <div className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                    {closedCount}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Under Review</span>
+                  <div className="text-base font-black text-purple-600 dark:text-purple-400 font-mono">
+                    {pendingCount}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block">Plant CAP Adherence</span>
+                  <div className="text-base font-black text-indigo-600 dark:text-cyan-400 font-mono">
+                    {overallCapRate}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Department Table */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+                <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-indigo-500" />
+                    <span>Department-wise Quality &amp; CAP Performance Matrix</span>
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {departmentStatsList.length} Operating Departments
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        <th className="py-2.5 px-3 text-center w-10">#</th>
+                        <th className="py-2.5 px-3">Department Name</th>
+                        <th className="py-2.5 px-3">Head / In-Charge</th>
+                        <th className="py-2.5 px-3 text-center">Total NCs</th>
+                        <th className="py-2.5 px-3 text-center">Open</th>
+                        <th className="py-2.5 px-3 text-center">Review</th>
+                        <th className="py-2.5 px-3 text-center">Closed</th>
+                        <th className="py-2.5 px-3 text-center">Overdue</th>
+                        <th className="py-2.5 px-3 text-center w-36">CAP Adherence</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-center">Members</th>
+                        <th className="py-2.5 px-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {departmentStatsList.map((d, idx) => (
+                        <tr
+                          key={d.department}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group"
+                        >
+                          <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px]">
+                            {idx + 1}
+                          </td>
+
+                          <td className="py-3 px-3 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                            <span className="group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-colors">
+                              {d.department}
+                            </span>
+                            {d.code && (
+                              <span className="text-[10px] text-slate-400 font-mono ml-1.5 font-normal">
+                                ({d.code})
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            {d.manager || 'Production Head'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
+                            {d.totalNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
+                            {d.openNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
+                            {d.pendingNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {d.closedNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {d.overdueNC > 0 ? d.overdueNC : '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-between text-[11px] font-mono mb-1">
+                              <span className="font-bold text-indigo-600 dark:text-cyan-400">{d.capRate}%</span>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  d.capRate === 100
+                                    ? 'bg-emerald-500'
+                                    : d.capRate >= 60
+                                    ? 'bg-indigo-500'
+                                    : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${d.capRate}%` }}
+                              />
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${d.capStatusBadge}`}>
+                              {d.capStatusLabel}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-bold">
+                              {d.members.length} Staff
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleInspectDepartment(d.department)}
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-cyan-400 font-bold text-[11px] transition-colors cursor-pointer"
+                                title="View this department's detailed NCs"
+                              >
+                                View NCs
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDepartmentFilter(d.department);
+                                  setActiveReportTab('members-report');
+                                }}
+                                className="px-2 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-600 dark:text-purple-400 font-bold text-[11px] transition-colors cursor-pointer"
+                                title="View department members"
+                              >
+                                Members
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+                  <span>Factory Department Quality Summary</span>
+                  <span className="font-mono text-[11px]">Total Monitored Units: {departmentStatsList.length}</span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
 
       {/* =======================================================================
-          VIEW 3: DEPARTMENT MEMBERS REPORT (Requirement 2)
+          VIEW 3: DEPARTMENT MEMBERS REPORT (Clean Detailed Table Format)
           ======================================================================= */}
       {activeReportTab === 'members-report' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Members Filter & Search Header */}
-          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-600" />
-                <span>Department Members NC Accountability Report</span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                Displaying all members across factory departments with their individual assigned NCs, resolution rates, and CAP progress.
-              </p>
-            </div>
+        <div className="space-y-3 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+            {/* Header Toolbar */}
+            <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-purple-600" />
+                  <span>Department Members NC Accountability Report</span>
+                  <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                    {memberStatsList.length} Members
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Individual resolver accountability, open non-conformances, and CAP adherence rates.
+                </p>
+              </div>
 
-            <div className="flex items-center gap-2.5">
-              <div className="relative">
+              {/* Member Search Box */}
+              <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                 <input
                   type="text"
                   value={memberSearchQuery}
                   onChange={(e) => setMemberSearchQuery(e.target.value)}
-                  placeholder="Filter member name or ID..."
-                  className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 w-48 sm:w-60"
+                  placeholder="Filter member name, ID, department..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 />
               </div>
             </div>
-          </div>
 
-          {/* Members Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {memberStatsList
-              .filter((m) => {
-                if (!memberSearchQuery.trim()) return true;
-                const q = memberSearchQuery.toLowerCase().trim();
+            {/* Members Accountability Table */}
+            <div className="overflow-x-auto">
+              {(() => {
+                const filteredMembers = memberStatsList.filter((m) => {
+                  if (!memberSearchQuery.trim()) return true;
+                  const q = memberSearchQuery.toLowerCase().trim();
+                  return (
+                    m.name.toLowerCase().includes(q) ||
+                    (m.employeeId || '').toLowerCase().includes(q) ||
+                    m.department.toLowerCase().includes(q) ||
+                    (m.designation || '').toLowerCase().includes(q)
+                  );
+                });
+
+                if (filteredMembers.length === 0) {
+                  return (
+                    <div className="p-12 text-center text-slate-500 text-xs">
+                      No members match the query "{memberSearchQuery}".
+                    </div>
+                  );
+                }
+
                 return (
-                  m.name.toLowerCase().includes(q) ||
-                  (m.employeeId || '').toLowerCase().includes(q) ||
-                  m.department.toLowerCase().includes(q) ||
-                  (m.designation || '').toLowerCase().includes(q)
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        <th className="py-2.5 px-3 text-center w-10">#</th>
+                        <th className="py-2.5 px-3">Member Name</th>
+                        <th className="py-2.5 px-3">Employee ID</th>
+                        <th className="py-2.5 px-3">Department</th>
+                        <th className="py-2.5 px-3">Designation</th>
+                        <th className="py-2.5 px-3 text-center">Assigned NCs</th>
+                        <th className="py-2.5 px-3 text-center">Open</th>
+                        <th className="py-2.5 px-3 text-center">Review</th>
+                        <th className="py-2.5 px-3 text-center">Closed</th>
+                        <th className="py-2.5 px-3 text-center">Overdue</th>
+                        <th className="py-2.5 px-3 text-center w-36">CAP Adherence</th>
+                        <th className="py-2.5 px-3">Contact</th>
+                        <th className="py-2.5 px-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {filteredMembers.map((m, idx) => (
+                        <tr
+                          key={m.id || idx}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group"
+                        >
+                          <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px]">
+                            {idx + 1}
+                          </td>
+
+                          <td className="py-3 px-3 align-middle whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center justify-center shrink-0">
+                                {m.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                                {m.name}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            {m.employeeId || 'ID: N/A'}
+                          </td>
+
+                          <td className="py-3 px-3 font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                            {m.department}
+                          </td>
+
+                          <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
+                            {m.designation || 'Supervisor'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
+                            {m.totalNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
+                            {m.openNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
+                            {m.pendingNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {m.closedNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {m.overdueNC > 0 ? m.overdueNC : '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-between text-[11px] font-mono mb-1">
+                              <span className="font-bold text-purple-600 dark:text-purple-400">{m.capRate}%</span>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  m.capRate === 100
+                                    ? 'bg-emerald-500'
+                                    : m.capRate >= 60
+                                    ? 'bg-purple-500'
+                                    : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${m.capRate}%` }}
+                              />
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                            {m.mobileNumber || m.email || '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleInspectMember(m)}
+                              className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-600 dark:text-purple-300 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 mx-auto"
+                              title="View this member's detailed NC dossier"
+                            >
+                              <span>View Dossier</span>
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 );
-              })
-              .map((m) => (
-                <div
-                  key={m.id}
-                  onClick={() => handleInspectMember(m)}
-                  className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-purple-500 dark:hover:border-purple-500 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-                >
-                  <div>
-                    {/* Member Header */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-300 font-bold text-sm flex items-center justify-center shrink-0">
-                          {m.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 transition-colors">
-                            {m.name}
-                          </h4>
-                          <span className="text-[11px] text-slate-500 font-mono block">
-                            {m.employeeId || 'ID: N/A'} • {m.department}
-                          </span>
-                        </div>
-                      </div>
-
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${m.capStatusBadge}`}>
-                        {m.capStatusLabel}
-                      </span>
-                    </div>
-
-                    {/* Member Meta */}
-                    <div className="text-[11px] text-slate-600 dark:text-slate-400 mb-3 flex items-center justify-between">
-                      <span className="flex items-center gap-1">
-                        <Briefcase className="w-3 h-3 text-slate-400" />
-                        <span>{m.designation || 'Production Supervisor'}</span>
-                      </span>
-                      {m.mobileNumber && (
-                        <span className="font-mono text-slate-400 text-[10px]">
-                          {m.mobileNumber}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* KPI Metrics Box */}
-                    <div className="grid grid-cols-4 gap-1.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800 text-center font-mono">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Total NC</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">
-                          {m.totalNC}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-amber-500 block">Open</span>
-                        <span className="text-sm font-black text-amber-600 dark:text-amber-400">
-                          {m.openNC}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-emerald-500 block">Closed</span>
-                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                          {m.closedNC}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-purple-500 block">Pending</span>
-                        <span className="text-sm font-black text-purple-600 dark:text-purple-400">
-                          {m.pendingNC}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-[11px] mb-1">
-                        <span className="text-slate-500 font-semibold">CAP Completion Rate:</span>
-                        <span className="font-mono font-bold text-purple-600 dark:text-purple-400">{m.capRate}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                        <div
-                          className={`h-full transition-all duration-500 ${
-                            m.capRate === 100
-                              ? 'bg-emerald-500'
-                              : m.capRate >= 60
-                              ? 'bg-purple-500'
-                              : 'bg-amber-500'
-                          }`}
-                          style={{ width: `${m.capRate}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-400 text-[11px]">
-                      {m.overdueNC > 0 ? (
-                        <span className="text-rose-500 font-bold">🚨 {m.overdueNC} Overdue</span>
-                      ) : (
-                        <span className="text-emerald-600 font-medium">SLA Compliant</span>
-                      )}
-                    </span>
-                    <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                      <span>Inspect NCs &amp; Photos</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          {/* Members Table View */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-500" />
-                <span>Department Members Accountability Register</span>
-              </h3>
-              <span className="text-xs text-slate-400 font-mono">
-                Click any row to drill down into member's individual NC dossier
-              </span>
+              })()}
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 text-[11px] font-bold text-slate-600 dark:text-slate-400">
-                    <th className="py-3 px-4">Member Name</th>
-                    <th className="py-3 px-4">Employee ID</th>
-                    <th className="py-3 px-4">Department</th>
-                    <th className="py-3 px-4">Designation</th>
-                    <th className="py-3 px-4 text-center">Total NCs</th>
-                    <th className="py-3 px-4 text-center">Open NCs</th>
-                    <th className="py-3 px-4 text-center">Closed NCs</th>
-                    <th className="py-3 px-4 text-center">Pending NCs</th>
-                    <th className="py-3 px-4 text-center">CAP Rate</th>
-                    <th className="py-3 px-4">Accountability Status</th>
-                    <th className="py-3 px-4 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {memberStatsList.map((m) => (
-                    <tr
-                      key={m.id}
-                      onClick={() => handleInspectMember(m)}
-                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer group"
-                    >
-                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-purple-500" />
-                          <span className="group-hover:text-purple-600 transition-colors">
-                            {m.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-500">
-                        {m.employeeId || 'N/A'}
-                      </td>
-                      <td className="py-3 px-4 font-medium text-slate-700 dark:text-slate-300">
-                        {m.department}
-                      </td>
-                      <td className="py-3 px-4 text-slate-500">
-                        {m.designation || 'Supervisor'}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-slate-900 dark:text-white">
-                        {m.totalNC}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
-                        {m.openNC}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                        {m.closedNC}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
-                        {m.pendingNC}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
-                        {m.capRate}%
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${m.capStatusBadge}`}>
-                          {m.capStatusLabel}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleInspectMember(m);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-600 dark:text-purple-300 font-bold text-[11px] transition-colors cursor-pointer"
-                        >
-                          Inspect NCs
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+              <span>Member Quality Accountability Register</span>
+              <span className="font-mono text-[11px]">{memberStatsList.length} Team Members Tracked</span>
             </div>
           </div>
         </div>
       )}
 
       {/* =======================================================================
-          VIEW 4: INDIVIDUAL MEMBER NC DETAILS (Requirement 3)
+          VIEW 4: INDIVIDUAL MEMBER NC DETAILS (Clean Detailed Table Format)
           ======================================================================= */}
       {activeReportTab === 'member-detail' && (
-        <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Top Member Selector & Profile Banner */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-3 animate-in fade-in duration-200">
+          {/* Member Profile Compact Strip */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-cyan-300 font-bold text-base flex items-center justify-center shrink-0">
+                {activeMember ? activeMember.name.charAt(0).toUpperCase() : 'M'}
+              </div>
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
-                  Individual Member NC Audit Dossier
-                </span>
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <User className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <span>{activeMember ? activeMember.name : 'Select Member'}</span>
                   {activeMember?.employeeId && (
                     <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
@@ -3504,17 +2826,32 @@ export const ReportsView = ({
                     </span>
                   )}
                 </h2>
+                <p className="text-xs text-slate-500">
+                  {activeMember?.department} • {activeMember?.designation || 'Supervisor'} • {activeMember?.mobileNumber || 'No Phone'}
+                </p>
               </div>
+            </div>
 
-              {/* Member Selector Dropdown */}
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-                  Switch Member:
-                </label>
+            {/* Member Switcher Dropdown & Inline Stats */}
+            <div className="flex flex-wrap items-center gap-3">
+              {activeMember && (
+                <div className="flex items-center gap-2 font-mono text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <span>Total: <strong>{activeMember.totalNC}</strong></span>
+                  <span>•</span>
+                  <span className="text-amber-600">Open: <strong>{activeMember.openNC}</strong></span>
+                  <span>•</span>
+                  <span className="text-emerald-600">Closed: <strong>{activeMember.closedNC}</strong></span>
+                  <span>•</span>
+                  <span className="text-indigo-600">CAP: <strong>{activeMember.capRate}%</strong></span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-400 font-medium">Switch:</span>
                 <select
                   value={activeMember?.id || ''}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-medium cursor-pointer text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500"
+                  className="px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-medium cursor-pointer text-slate-800 dark:text-slate-200"
                 >
                   {memberStatsList.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -3524,354 +2861,181 @@ export const ReportsView = ({
                 </select>
               </div>
             </div>
-
-            {/* Member Profile KPI Strip */}
-            {activeMember && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800 text-center font-mono">
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Department</span>
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate block">
-                    {activeMember.department}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[9px] uppercase font-bold text-slate-400 block">Total Assigned NCs</span>
-                  <span className="text-lg font-black text-slate-900 dark:text-white">
-                    {activeMember.totalNC}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[9px] uppercase font-bold text-amber-500 block">Open NCs</span>
-                  <span className="text-lg font-black text-amber-600 dark:text-amber-400">
-                    {activeMember.openNC}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[9px] uppercase font-bold text-emerald-500 block">Closed NCs</span>
-                  <span className="text-lg font-black text-emerald-600 dark:text-emerald-400">
-                    {activeMember.closedNC}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[9px] uppercase font-bold text-purple-500 block">Pending Review</span>
-                  <span className="text-lg font-black text-purple-600 dark:text-purple-400">
-                    {activeMember.pendingNC}
-                  </span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                  <span className="text-[9px] uppercase font-bold text-indigo-500 block">CAP Completion Rate</span>
-                  <span className="text-lg font-black text-indigo-600 dark:text-cyan-400">
-                    {activeMember.capRate}%
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* NC Cards List for Selected Member */}
-          {activeMemberComplaints.length === 0 ? (
-            <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-2">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-                <CheckCircle className="w-6 h-6" />
-              </div>
-              <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">
-                Clean Quality Record
-              </h4>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                No non-conformances are currently associated with or assigned to {activeMember?.name}.
-              </p>
+          {/* Member Associated Non-Conformance Detailed Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-500" />
+                <span>Associated Non-Conformances ({activeMemberComplaints.length} Records)</span>
+              </h3>
+              <span className="text-xs text-slate-400 font-mono">
+                Assigned to {activeMember?.name || 'Member'}
+              </span>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-indigo-500" />
-                  <span>Associated Non-Conformances ({activeMemberComplaints.length} Records)</span>
-                </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  Displaying full finding, CAP, corrective actions, and photo evidence
-                </span>
-              </div>
 
-              {activeMemberComplaints.map((c, idx) => {
-                const isOverdue =
-                  c.status !== 'Closed' &&
-                  c.status !== 'Verified' &&
-                  c.deadlineTimestamp &&
-                  Date.now() > new Date(c.deadlineTimestamp).getTime();
-
-                const cRisk = (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase();
-                const rootCause = getRootCauseText(c);
-                const immediateAction = getImmediateCorrectionText(c);
-                const correctiveAction = getCorrectiveActionText(c);
-                const preventiveAction = getPreventiveActionText(c);
-                const createdDateStr = c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A';
-                const closureDateStr = c.actualCompletedAt
-                  ? new Date(c.actualCompletedAt).toLocaleString()
-                  : (c.status === 'Closed' ? 'Verified Effective' : 'Pending Closure');
-
-                return (
-                  <div
-                    key={c._id || c.id || c.complaintId}
-                    className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-4 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all"
-                  >
-                    {/* Header Ribbon of NC */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-                      <div className="flex items-center gap-2.5">
-                        <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 font-mono font-black text-xs text-indigo-600 dark:text-cyan-400">
-                          {c.complaintId || `NC-#${idx + 1}`}
-                        </span>
-                        <div>
-                          <span className="text-xs font-bold text-slate-900 dark:text-white">
-                            {c.department} • {c.location || 'Floor Station'}
-                          </span>
-                          <span className="text-[11px] text-slate-400 font-mono block">
-                            Logged: {createdDateStr} by {getAuditorName(c)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            cRisk === 'CRITICAL'
-                              ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : cRisk === 'HIGH'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
-                          }`}
-                        >
-                          Risk: {cRisk}
-                        </span>
-
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            c.status === 'Closed' || c.status === 'Verified'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : c.status === 'CAP Submitted'
-                              ? 'bg-purple-50 text-purple-700 border-purple-200'
-                              : 'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}
-                        >
-                          {c.status}
-                        </span>
-
-                        {isOverdue && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
-                            Overdue
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stage 1: Defect Finding Description & Quality Requirement */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                          Defect Finding Description
-                        </span>
-                        <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                          {getFindingText(c)}
-                        </p>
-                      </div>
-
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                          Quality Requirement / Standard Clause
-                        </span>
-                        <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                          {c.requirement || 'AQL 1.5 Workmanship Standard & Factory Quality Protocol'}
-                        </p>
-                        <span className="text-[10px] text-slate-400 font-mono mt-1 block">
-                          Category: {c.category || 'Workmanship Non-Conformance'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Stage 2: CAP 5-Why Root Cause, Containment & Corrective Action */}
-                    <div className="p-3.5 rounded-xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          <span>CAP Submission Details &amp; Root Cause Analysis</span>
-                        </span>
-                        <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400">
-                          Target Date: {getCapTargetDate(c)}
-                        </span>
-                      </div>
-
-                      <div className="text-xs">
-                        <strong className="text-amber-900 dark:text-amber-300 block mb-0.5">
-                          5-Why Root Cause of Issue:
-                        </strong>
-                        <p className="text-slate-800 dark:text-slate-200 leading-relaxed">
-                          {rootCause}
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-200/40 dark:border-amber-800/40">
-                        <div className="text-xs">
-                          <strong className="text-slate-700 dark:text-slate-300 block mb-0.5">
-                            Immediate Containment Action:
-                          </strong>
-                          <p className="text-slate-600 dark:text-slate-400">
-                            {immediateAction}
-                          </p>
-                        </div>
-                        <div className="text-xs">
-                          <strong className="text-slate-700 dark:text-slate-300 block mb-0.5">
-                            Permanent Corrective Action:
-                          </strong>
-                          <p className="text-slate-600 dark:text-slate-400">
-                            {correctiveAction}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-amber-200/40 dark:border-amber-800/40 text-xs">
-                        <strong className="text-slate-700 dark:text-slate-300 block mb-0.5">
-                          Preventive Action Recurrence Plan:
-                        </strong>
-                        <p className="text-slate-600 dark:text-slate-400">
-                          {preventiveAction}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Stage 3: Verification Details & Closure */}
-                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
-                          Verification Method
-                        </span>
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">
-                          {c.verificationMethod || 'Physical Floor Re-inspection'}
-                        </p>
-                      </div>
-
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
-                          Auditor Verification Notes
-                        </span>
-                        <p className="text-slate-600 dark:text-slate-400 truncate">
-                          {c.cap?.verificationReadinessNotes || c.feedbackRemarks || 'Standard QMS verification'}
-                        </p>
-                      </div>
-
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
-                          Closure Date
-                        </span>
-                        <p className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-                          {closureDateStr}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Stage 4: Before & After Photos Evidence with Lightbox Zoom */}
-                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                          <Camera className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Photo Verification Evidence (Before vs After)</span>
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          Click any photo to zoom &amp; inspect
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Before Photo */}
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1 flex items-center justify-between">
-                            <span>Before Photo (Defect Raised)</span>
-                            <span className="text-rose-500 font-mono">Auditor Proof</span>
-                          </span>
-                          {c.beforePhoto ? (
-                            <div
-                              onClick={() =>
-                                setLightboxPhoto({
-                                  url: c.beforePhoto,
-                                  title: `Before Photo: ${c.complaintId}`,
-                                  subtitle: `Captured Defect Finding: ${getFindingText(c)}`,
-                                })
-                              }
-                              className="relative group rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer h-40 bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
-                            >
-                              <img
-                                src={c.beforePhoto}
-                                alt="Before Defect"
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                                <ZoomIn className="w-4 h-4" />
-                                <span>Click to Enlarge</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="h-40 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-slate-400 text-xs">
-                              <Camera className="w-5 h-5 mb-1 opacity-50" />
-                              <span>No Before Photo Attached</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* After Photo */}
-                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1 flex items-center justify-between">
-                            <span>After Photo (CAP Rectification Proof)</span>
-                            <span className="text-emerald-500 font-mono">Supervisor Proof</span>
-                          </span>
-                          {c.afterPhoto ? (
-                            <div
-                              onClick={() =>
-                                setLightboxPhoto({
-                                  url: c.afterPhoto,
-                                  title: `After Photo: ${c.complaintId}`,
-                                  subtitle: `CAP Rectification Verification: ${c.status}`,
-                                })
-                              }
-                              className="relative group rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer h-40 bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
-                            >
-                              <img
-                                src={c.afterPhoto}
-                                alt="After CAP Rectification"
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
-                                <ZoomIn className="w-4 h-4" />
-                                <span>Click to Enlarge</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="h-40 rounded-lg border border-dashed border-amber-200 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/10 flex flex-col items-center justify-center text-amber-700 dark:text-amber-400 text-xs p-4 text-center">
-                              <Clock className="w-5 h-5 mb-1 opacity-70" />
-                              <span className="font-semibold">After Proof Pending</span>
-                              <span className="text-[10px] text-slate-400 mt-0.5">
-                                Supervisor has not yet uploaded corrective action photo.
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Drill-down Full Lifecycle Button */}
-                    <div className="flex items-center justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => setDrilldownComplaint(c)}
-                        className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-cyan-400 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            <div className="overflow-x-auto">
+              {activeMemberComplaints.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-xs space-y-1">
+                  <CheckCircle className="w-6 h-6 text-emerald-500 mx-auto mb-1" />
+                  <p className="font-bold text-slate-700 dark:text-slate-300">Clean Quality Record</p>
+                  <p className="text-slate-400">
+                    No non-conformances are currently assigned to {activeMember?.name}.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      <th className="py-2.5 px-3 text-center w-10">#</th>
+                      <th className="py-2.5 px-3">NC ID</th>
+                      <th className="py-2.5 px-3">Date Logged</th>
+                      <th className="py-2.5 px-3">Location / Station</th>
+                      <th className="py-2.5 px-3">Finding Description</th>
+                      <th className="py-2.5 px-3">Immediate Containment</th>
+                      <th className="py-2.5 px-3">5-Why Root Cause</th>
+                      <th className="py-2.5 px-3">Corrective Action (CAP)</th>
+                      <th className="py-2.5 px-3">Target Due</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3 text-center">Risk</th>
+                      <th className="py-2.5 px-3 text-center">Photos</th>
+                      <th className="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {activeMemberComplaints.map((c, idx) => (
+                      <tr
+                        key={c._id || c.id || c.complaintId || idx}
+                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
                       >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Inspect Full Audit Lifecycle Modal</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                        <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
+                          {idx + 1}
+                        </td>
+
+                        <td className="py-3 px-3 align-top font-mono font-bold text-indigo-600 dark:text-cyan-400 whitespace-nowrap">
+                          {c.complaintId || 'NC-N/A'}
+                        </td>
+
+                        <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                        </td>
+
+                        <td className="py-3 px-3 align-top whitespace-nowrap text-slate-700 dark:text-slate-300">
+                          {c.location || 'Line Station'}
+                        </td>
+
+                        <td className="py-3 px-3 align-top max-w-xs">
+                          <p className="text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
+                            {getFindingText(c)}
+                          </p>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Standard: {c.requirement || 'AQL 1.5'}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 align-top max-w-xs text-slate-700 dark:text-slate-300">
+                          <p className="line-clamp-2 leading-snug">
+                            {getImmediateCorrectionText(c)}
+                          </p>
+                        </td>
+
+                        <td className="py-3 px-3 align-top max-w-xs text-slate-700 dark:text-slate-300">
+                          <p className="line-clamp-2 leading-snug">
+                            {getRootCauseText(c)}
+                          </p>
+                        </td>
+
+                        <td className="py-3 px-3 align-top max-w-xs text-slate-700 dark:text-slate-300">
+                          <p className="line-clamp-2 leading-snug">
+                            {getCorrectiveActionText(c)}
+                          </p>
+                        </td>
+
+                        <td className="py-3 px-3 align-top whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                          {c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A'}
+                        </td>
+
+                        <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                              c.status === 'Closed' || c.status === 'Verified'
+                                ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                            }`}
+                          >
+                            {c.status}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1">
+                            {c.beforePhoto && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setLightboxPhoto({
+                                    url: c.beforePhoto,
+                                    title: `Before Photo: ${c.complaintId}`,
+                                    subtitle: getFindingText(c),
+                                  })
+                                }
+                                className="p-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 cursor-pointer"
+                                title="View Before Defect Photo"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {c.afterPhoto && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setLightboxPhoto({
+                                    url: c.afterPhoto,
+                                    title: `After Photo: ${c.complaintId}`,
+                                    subtitle: `Rectification: ${c.status}`,
+                                  })
+                                }
+                                className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400 cursor-pointer"
+                                title="View After Rectification Photo"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {!c.beforePhoto && !c.afterPhoto && (
+                              <span className="text-[10px] text-slate-400 font-mono">—</span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setDrilldownComplaint(c)}
+                            className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-cyan-400 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Inspect</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-          )}
+
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+              <span>Member Dossier Audit Register</span>
+              <span className="font-mono text-[11px]">{activeMemberComplaints.length} Records Assigned</span>
+            </div>
+          </div>
         </div>
       )}
 
