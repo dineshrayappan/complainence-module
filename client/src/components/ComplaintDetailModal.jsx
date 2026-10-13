@@ -192,9 +192,9 @@ export const ComplaintDetailModal = ({
   const isSameDeptSupervisor = (user?.role === 'SUPERVISOR' || user?.role === 'ACTION_PERSON') &&
     (user?.department || '').trim().toLowerCase() === (complaint?.department || '').trim().toLowerCase();
   // Live Work Floor Operations (Start / Stop work) are strictly for floor supervisors / assignees.
-  // Never show Start / Stop work buttons to Auditors on auditor views or in modal.
-  const isAuditorUser = user?.role === 'AUDITOR';
-  const canActOnNC = !isAuditorUser && (isDirectlyAssigned || isSameDeptSupervisor);
+  // Never show Start / Stop work buttons to Admins or Auditors on admin/auditor views or in modal.
+  const isPrivilegedAuditorOrAdmin = isAuditor || isAdmin || user?.role === 'ADMIN' || user?.role === 'AUDITOR';
+  const canActOnNC = !isPrivilegedAuditorOrAdmin && (isDirectlyAssigned || isSameDeptSupervisor);
 
   // Handle direct timeline remark
   const handleAddComment = async (e) => {

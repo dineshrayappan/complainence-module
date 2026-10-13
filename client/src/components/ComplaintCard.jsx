@@ -76,9 +76,9 @@ export const ComplaintCard = ({
   const userDept = (user?.department || '').trim().toLowerCase();
 
   // Strict assignment check: Only the specifically assigned supervisor can start/stop floor work.
-  // Auditors audit and verify; they do NOT have Start Work or Stop Work buttons.
-  const isAuditorUser = user?.role === 'AUDITOR';
-  const isAssignedSupervisor = !isAuditorUser && isActionPerson && (
+  // Admins and Auditors audit, oversee, and verify; they do NOT have Start Work or Stop Work buttons.
+  const isPrivilegedAuditorOrAdmin = isAuditor || isAdmin || user?.role === 'ADMIN' || user?.role === 'AUDITOR';
+  const isAssignedSupervisor = !isPrivilegedAuditorOrAdmin && isActionPerson && (
     (userEmpId && assignedEmpId && userEmpId === assignedEmpId) ||
     (currentUserId && assignedUserId && currentUserId === assignedUserId) ||
     (compDept && userDept && compDept === userDept)

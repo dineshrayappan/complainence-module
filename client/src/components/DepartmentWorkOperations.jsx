@@ -313,7 +313,9 @@ export const DepartmentWorkOperations = ({
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold uppercase tracking-wider bg-indigo-500/30 text-indigo-300 border border-indigo-500/40">
                 Floor Workstation
               </span>
-              <span className="text-xs text-slate-400 font-mono">• Live Start / Stop Controls</span>
+              {!(isAdmin || isAuditor || user?.role === 'ADMIN' || user?.role === 'AUDITOR') && (
+                <span className="text-xs text-slate-400 font-mono">• Live Start / Stop Controls</span>
+              )}
               {onBackToScorecard && (
                 <button
                   type="button"
@@ -329,7 +331,9 @@ export const DepartmentWorkOperations = ({
               <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Start Work on assigned department tasks, mark employee status as Busy, and submit mandatory floor photo proof before completing tasks.
+              {(isAdmin || isAuditor || user?.role === 'ADMIN' || user?.role === 'AUDITOR')
+                ? 'Monitor department assigned tasks, employee working status, and review mandatory floor completion photo proofs.'
+                : 'Start Work on assigned department tasks, mark employee status as Busy, and submit mandatory floor photo proof before completing tasks.'}
             </p>
           </div>
 
@@ -770,7 +774,9 @@ export const DepartmentWorkOperations = ({
                   No tasks found for {selectedDept === 'ALL' ? 'selected filter' : `${selectedDept} Department`}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Tasks assigned to this department will appear here with Start Work and Stop Work action buttons.
+                  {(isAdmin || isAuditor || user?.role === 'ADMIN' || user?.role === 'AUDITOR')
+                    ? 'Tasks assigned to this department will appear here for oversight and compliance monitoring.'
+                    : 'Tasks assigned to this department will appear here with Start Work and Stop Work action buttons.'}
                 </p>
               </div>
             ) : (
@@ -781,16 +787,15 @@ export const DepartmentWorkOperations = ({
                   const winner = task.completedBy || task.firstCompleter || task.assignedTo;
 
                   // Department permission check:
-                  // Elevated floor supervisors or matching department employee can interact with this task.
-                  // Auditors monitor and verify, but cannot execute floor containment.
-                  const isAuditorUser = user?.role === 'AUDITOR';
-                  const isElevatedUser = !isAuditorUser && (isAdmin || user?.isUniversal);
+                  // Only floor workers/supervisors of the matching department can start or stop work.
+                  // Admins and Auditors monitor and verify compliance, but do NOT execute floor containment (Start / Stop Work).
+                  const isPrivilegedAuditorOrAdmin = isAdmin || isAuditor || user?.role === 'ADMIN' || user?.role === 'AUDITOR';
                   const userDept = (user?.department || '').trim().toLowerCase();
                   const taskDept = (task.department || '').trim().toLowerCase();
                   const isDirectlyAssigned =
                     (task.assignedTo?.employeeId || '').toUpperCase() === uEmp ||
                     task.assignedTo?.userId === user?.id;
-                  const isEligibleWorker = !isAuditorUser && (isElevatedUser || isDirectlyAssigned || (userDept && taskDept && userDept === taskDept));
+                  const isEligibleWorker = !isPrivilegedAuditorOrAdmin && (isDirectlyAssigned || (userDept && taskDept && userDept === taskDept));
 
                   // Is this user already busy working on another task?
                   const isUserBusyOnOtherTask = Boolean(currentUserActiveTask && currentUserActiveTask.id !== task.id);
@@ -902,10 +907,17 @@ export const DepartmentWorkOperations = ({
 
                       {/* WORK ACTION BUTTONS ALONGSIDE THE TASK */}
                       <div className="flex items-center gap-2 self-end md:self-center shrink-0">
-                        {/* CASE 1: TASK IS PENDING / AVAILABLE -> START WORK BUTTON */}
+                        {/* CASE 1: TASK IS PENDING / AVAILABLE -> START WORK BUTTON (FLOOR WORKERS ONLY) */}
                         {!isDone && !isBusy && (
                           <>
-                            {!isEligibleWorker ? (
+                            {isPrivilegedAuditorOrAdmin ? (
+                              <span
+                                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-mono font-medium"
+                                title="Floor task available for assigned department personnel"
+                              >
+                                Pending Floor Action
+                              </span>
+                            ) : !isEligibleWorker ? (
                               <span
                                 className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-mono font-bold"
                                 title={`Only employees of the ${task.department} department can start work on this task.`}
@@ -937,8 +949,8 @@ export const DepartmentWorkOperations = ({
                           </>
                         )}
 
-                        {/* CASE 2: TASK IS IN PROGRESS / BUSY -> STOP WORK BUTTON (PROOF REQUIRED) */}
-                        {isBusy && (
+                        {/* CASE 2: TASK IS IN PROGRESS / BUSY -> STOP WORK BUTTON (PROOF REQUIRED FOR WORKER ONLY) */}
+                        {isBusy && !isPrivilegedAuditorOrAdmin && (
                           <button
                             type="button"
                             onClick={() => openProofModal(task)}
@@ -948,6 +960,15 @@ export const DepartmentWorkOperations = ({
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>Stop Work</span>
                           </button>
+                        )}
+                        {isBusy && isPrivilegedAuditorOrAdmin && (
+                          <span
+                            className="px-3 py-1.5 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold font-mono flex items-center gap-1.5"
+                            title="Shop floor containment currently active by assigned personnel"
+                          >
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                            <span>Floor In Progress</span>
+                          </span>
                         )}
 
                         {/* CASE 3: TASK IS COMPLETED -> VIEW PROOF BUTTON */}
