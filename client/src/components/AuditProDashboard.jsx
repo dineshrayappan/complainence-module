@@ -46,7 +46,6 @@ export const AuditProDashboard = ({
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
-  const [complianceData, setComplianceData] = useState(null);
 
   // Filter & Search states
   const [dateRangePreset, setDateRangePreset] = useState('ALL'); // 'ALL', 'THIS_MONTH', '30D', '7D'
@@ -55,26 +54,18 @@ export const AuditProDashboard = ({
   const [selectedInspectionItem, setSelectedInspectionItem] = useState(null);
   const [hoveredTrendMonth, setHoveredTrendMonth] = useState(null);
 
-  // Load live data from database/APIs
+  // Load live data from database/APIs (100% driven by complaints)
   const loadDashboardData = async (showSpinner = false) => {
     try {
       if (showSpinner) setLoading(true);
       else setIsRefreshing(true);
 
-      const [complaintsRes, complianceRes] = await Promise.allSettled([
-        complaintService.getComplaints(),
-        complaintService.getDepartmentCompliance(),
-      ]);
-
-      if (complaintsRes.status === 'fulfilled' && complaintsRes.value?.data) {
-        const list = Array.isArray(complaintsRes.value.data)
-          ? complaintsRes.value.data
-          : complaintsRes.value.data.complaints || [];
+      const complaintsRes = await complaintService.getComplaints();
+      if (complaintsRes?.data) {
+        const list = Array.isArray(complaintsRes.data)
+          ? complaintsRes.data
+          : complaintsRes.data.complaints || [];
         setComplaints(list);
-      }
-
-      if (complianceRes.status === 'fulfilled' && complianceRes.value?.data?.success) {
-        setComplianceData(complianceRes.value.data);
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -161,7 +152,7 @@ export const AuditProDashboard = ({
     const closedNCs = filteredComplaints.filter((c) =>
       ['Closed', 'Verified'].includes(c.status)
     ).length;
-    const resolutionRate = totalNCs > 0 ? Math.round((closedNCs / totalNCs) * 100) : 100;
+    const resolutionRate = totalNCs > 0 ? Math.round((closedNCs / totalNCs) * 100) : 0;
 
     const today = new Date();
     const overdueNCs = filteredComplaints.filter((c) => {
@@ -206,7 +197,7 @@ export const AuditProDashboard = ({
 
       const raised = monthComplaints.length;
       const resolved = monthClosedComplaints.length;
-      const resolutionRate = raised > 0 ? Math.round((resolved / raised) * 100) : 100;
+      const resolutionRate = raised > 0 ? Math.round((resolved / raised) * 100) : 0;
 
       months.push({
         month: monthName,
@@ -294,7 +285,7 @@ export const AuditProDashboard = ({
   }, [filteredComplaints]);
 
   // ---------------------------------------------------------------------------
-  // 5. DEPARTMENT PERFORMANCE LIST (Dynamic from live complaints)
+  // 5. DEPARTMENT NC & CAP MATRIX (100% Dynamic from live complaints)
   // ---------------------------------------------------------------------------
   const departmentPerformanceList = useMemo(() => {
     const deptIcons = {
@@ -309,39 +300,31 @@ export const AuditProDashboard = ({
       Finishing: '👔',
       Safety: '🦺',
       HR: '👥',
+      EHS: '🌱',
+      Stores: '📦',
+      EDP: '💻',
     };
 
-    const knownDepts = new Set([
-      'Production',
-      'Quality',
-      'Maintenance',
-      'Warehouse',
-      'Packing',
-      'Logistics',
-    ]);
-
-    if (complianceData?.departments && Array.isArray(complianceData.departments)) {
-      complianceData.departments.forEach((d) => {
-        if (d.department) knownDepts.add(d.department);
-      });
-    }
-
-    complaints.forEach((c) => {
-      if (c.department) knownDepts.add(c.department);
+    // Extract ONLY departments that exist in actual complaints
+    const activeDepts = new Set();
+    filteredComplaints.forEach((c) => {
+      if (c.department && c.department.trim()) {
+        activeDepts.add(c.department.trim());
+      }
     });
 
-    const list = Array.from(knownDepts).map((deptName) => {
-      const compRecord = complianceData?.departments?.find(
-        (d) => d.department?.toLowerCase() === deptName.toLowerCase()
-      );
-
-      const deptComplaints = complaints.filter(
-        (c) => c.department && c.department.toLowerCase() === deptName.toLowerCase()
+    const today = new Date();
+    const list = Array.from(activeDepts).map((deptName) => {
+      const deptComplaints = filteredComplaints.filter(
+        (c) => c.department && c.department.trim().toLowerCase() === deptName.toLowerCase()
       );
 
       const totalNC = deptComplaints.length;
       const openNC = deptComplaints.filter((c) =>
-        ['Open', 'Assigned', 'In Progress'].includes(c.status)
+        ['Open', 'Assigned'].includes(c.status)
+      ).length;
+      const inProgressNC = deptComplaints.filter((c) =>
+        ['In Progress', 'Under Review', 'Under Verification'].includes(c.status)
       ).length;
       const closedNC = deptComplaints.filter((c) =>
         ['Closed', 'Verified'].includes(c.status)
@@ -350,34 +333,33 @@ export const AuditProDashboard = ({
         ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework'].includes(c.status) ||
         (Boolean(c.capRequired) && !['Closed', 'Verified'].includes(c.status))
       ).length;
+      const overdueNC = deptComplaints.filter((c) => {
+        if (['Closed', 'Verified'].includes(c.status)) return false;
+        const d = c.deadlineTimestamp ? new Date(c.deadlineTimestamp) : c.dueDate ? new Date(c.dueDate) : null;
+        return d && d < today;
+      }).length;
 
-      const resolutionRate = totalNC > 0 ? Math.round((closedNC / totalNC) * 100) : 100;
-
-      let score = 100;
-      if (compRecord && typeof compRecord.score === 'number') {
-        score = Math.round(compRecord.score);
-      } else if (totalNC > 0) {
-        score = Math.max(0, Math.min(100, Math.round(100 - (openNC / totalNC) * 35 - (pendingCAP / totalNC) * 25)));
-      }
+      const resolutionRate = totalNC > 0 ? Math.round((closedNC / totalNC) * 100) : 0;
 
       return {
         name: deptName,
         icon: deptIcons[deptName] || '🏢',
-        score,
         totalNC,
         openNC,
+        inProgressNC,
         closedNC,
         pendingCAP,
+        overdueNC,
         resolutionRate,
       };
     });
 
-    list.sort((a, b) => b.totalNC - a.totalNC || a.name.localeCompare(b.name));
+    list.sort((a, b) => b.totalNC - a.totalNC || b.openNC - a.openNC || a.name.localeCompare(b.name));
 
     if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
     return list.filter((d) => d.name.toLowerCase().includes(q));
-  }, [complianceData, complaints, searchQuery]);
+  }, [filteredComplaints, searchQuery]);
 
   // ---------------------------------------------------------------------------
   // 6. OVERDUE & PENDING WORK TABLE (Dynamic from NCs and CAPs)
@@ -446,8 +428,10 @@ export const AuditProDashboard = ({
   const departmentNCBars = useMemo(() => {
     const countsByDept = {};
     filteredComplaints.forEach((c) => {
-      const dept = c.department || 'General';
-      countsByDept[dept] = (countsByDept[dept] || 0) + 1;
+      const dept = (c.department || '').trim();
+      if (dept) {
+        countsByDept[dept] = (countsByDept[dept] || 0) + 1;
+      }
     });
 
     const colors = [
@@ -460,9 +444,7 @@ export const AuditProDashboard = ({
     ];
 
     const sortedDepts = Object.keys(countsByDept).sort((a, b) => countsByDept[b] - countsByDept[a]);
-    const deptsToDisplay = sortedDepts.length > 0
-      ? sortedDepts.slice(0, 6)
-      : ['Production', 'Quality', 'Maintenance', 'Warehouse', 'Packing', 'Logistics'];
+    const deptsToDisplay = sortedDepts.slice(0, 6);
 
     return deptsToDisplay.map((name, idx) => ({
       name,
@@ -623,15 +605,27 @@ export const AuditProDashboard = ({
     }
 
     // 4. Resolution rate
-    insights.push({
-      id: 'ins-4',
-      title: `${metrics.resolutionRate}% Defect Resolution Rate`,
-      desc: `${metrics.closedNCs} of ${metrics.totalNCs} non-conformances successfully resolved.`,
-      icon: TrendingUp,
-      iconColor: 'text-purple-600 dark:text-purple-400',
-      cardBg: 'hover:bg-purple-50/50 dark:hover:bg-purple-950/20 border-purple-100 dark:border-purple-900/40',
-      targetSec: 'reports',
-    });
+    if (metrics.totalNCs > 0) {
+      insights.push({
+        id: 'ins-4',
+        title: `${metrics.resolutionRate}% Defect Resolution Rate`,
+        desc: `${metrics.closedNCs} of ${metrics.totalNCs} non-conformances successfully resolved.`,
+        icon: TrendingUp,
+        iconColor: 'text-purple-600 dark:text-purple-400',
+        cardBg: 'hover:bg-purple-50/50 dark:hover:bg-purple-950/20 border-purple-100 dark:border-purple-900/40',
+        targetSec: 'reports',
+      });
+    } else {
+      insights.push({
+        id: 'ins-4',
+        title: 'Zero NC Defects Logged',
+        desc: 'Plant defect registry is clear with no open non-conformances.',
+        icon: ShieldCheck,
+        iconColor: 'text-emerald-600 dark:text-emerald-400',
+        cardBg: 'hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40',
+        targetSec: 'nc-cap',
+      });
+    }
 
     return insights;
   }, [metrics, complaints]);
@@ -955,7 +949,7 @@ export const AuditProDashboard = ({
               {metrics.resolutionRate}%
             </div>
             <div className="text-[10px] text-slate-400 font-medium truncate">
-              <span className="text-purple-600 dark:text-purple-400 font-bold">Target ≥ 95%</span> SLA
+              <span className="text-purple-600 dark:text-purple-400 font-bold">{metrics.closedNCs} of {metrics.totalNCs}</span> resolved
             </div>
           </div>
           <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-purple-600 dark:text-purple-400 font-bold group-hover:translate-x-0.5 transition-transform">
@@ -1473,18 +1467,19 @@ export const AuditProDashboard = ({
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 text-[11px] font-bold text-slate-500">
                     <th className="py-2.5 px-4">Department</th>
-                    <th className="py-2.5 px-4">Score</th>
                     <th className="py-2.5 px-3 text-center">Total NCs</th>
                     <th className="py-2.5 px-3 text-center text-rose-600">Open NCs</th>
+                    <th className="py-2.5 px-3 text-center text-indigo-600">In Progress</th>
                     <th className="py-2.5 px-3 text-center text-emerald-600">Closed NCs</th>
-                    <th className="py-2.5 px-3 text-center">Pending CAPs</th>
-                    <th className="py-2.5 px-3 text-center text-indigo-600">Resolution %</th>
+                    <th className="py-2.5 px-3 text-center text-amber-600">Pending CAPs</th>
+                    <th className="py-2.5 px-3 text-center text-red-600">Overdue</th>
+                    <th className="py-2.5 px-4 text-center">Resolution %</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                   {departmentPerformanceList.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="py-8 text-center text-slate-400">
+                      <td colSpan="8" className="py-8 text-center text-slate-400">
                         <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
                         <p className="font-bold text-slate-700 dark:text-slate-300">No departments match your filter</p>
                         <p className="text-xs text-slate-400">Try clearing the search query or changing filters.</p>
@@ -1501,24 +1496,14 @@ export const AuditProDashboard = ({
                           <span>{d.icon}</span>
                           <span className="group-hover:text-blue-600 transition-colors">{d.name}</span>
                         </td>
-                        <td className="py-2.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200 w-8">
-                              {d.score}%
-                            </span>
-                            <div className="w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                              <div
-                                className="h-full bg-emerald-500 rounded-full"
-                                style={{ width: `${d.score}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-700 dark:text-slate-300">
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-800 dark:text-slate-200">
                           {d.totalNC}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono font-bold text-rose-600">
                           {d.openNC}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-600">
+                          {d.inProgressNC}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono font-bold text-emerald-600">
                           {d.closedNC}
@@ -1526,8 +1511,21 @@ export const AuditProDashboard = ({
                         <td className="py-2.5 px-3 text-center font-mono font-bold text-amber-600">
                           {d.pendingCAP}
                         </td>
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-indigo-600">
-                          {d.resolutionRate}%
+                        <td className="py-2.5 px-3 text-center font-mono font-bold text-red-600">
+                          {d.overdueNC}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200 w-8 text-right">
+                              {d.resolutionRate}%
+                            </span>
+                            <div className="w-16 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 rounded-full"
+                                style={{ width: `${d.resolutionRate}%` }}
+                              />
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1676,26 +1674,32 @@ export const AuditProDashboard = ({
             </div>
 
             <div className="space-y-3 pt-2">
-              {(() => {
-                const maxNC = Math.max(1, ...departmentNCBars.map((d) => d.count));
-                return departmentNCBars.map((d) => {
-                  const pct = Math.round((d.count / maxNC) * 100);
-                  return (
-                    <div key={d.name} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-slate-700 dark:text-slate-300">{d.name}</span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-white">{d.count} NCs</span>
+              {departmentNCBars.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No department NC defects recorded.
+                </div>
+              ) : (
+                (() => {
+                  const maxNC = Math.max(1, ...departmentNCBars.map((d) => d.count));
+                  return departmentNCBars.map((d) => {
+                    const pct = Math.round((d.count / maxNC) * 100);
+                    return (
+                      <div key={d.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{d.name}</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white">{d.count} NCs</span>
+                        </div>
+                        <div className={`h-2 rounded-full overflow-hidden ${d.barBg}`}>
+                          <div
+                            className={`h-full rounded-full ${d.color} transition-all duration-500`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className={`h-2 rounded-full overflow-hidden ${d.barBg}`}>
-                        <div
-                          className={`h-full rounded-full ${d.color} transition-all duration-500`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
+                    );
+                  });
+                })()
+              )}
             </div>
           </div>
         </div>

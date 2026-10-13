@@ -320,7 +320,7 @@ export const DepartmentWorkOperations = ({
                   onClick={onBackToScorecard}
                   className="ml-2 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
                 >
-                  ← Department Scorecard
+                  ← Factory Dashboard
                 </button>
               )}
             </div>

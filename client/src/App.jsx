@@ -636,7 +636,7 @@ export const App = () => {
           ) : effectiveNavSection === 'work-operations' ? (
             <DepartmentWorkOperations
               initialDepartment={workOpsDept}
-              onBackToScorecard={isAdmin || isAuditor ? () => setCurrentNavSection('departments') : undefined}
+              onBackToScorecard={isAdmin || isAuditor ? () => setCurrentNavSection('dashboard') : undefined}
             />
           ) : effectiveNavSection === 'requirements' && (isAdmin || isAuditor) ? (
             <RequirementsComplianceView
