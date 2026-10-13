@@ -743,10 +743,6 @@ export const App = () => {
                 onRefresh={() => loadData(false, true)}
                 loading={isRefreshing}
                 counts={derivedCounts}
-                onNavigateReport={(targetTab) => {
-                  setReportsInitialTab(targetTab || 'audit-register');
-                  setCurrentNavSection('reports');
-                }}
               />
 
               {/* View Mode Bar */}
