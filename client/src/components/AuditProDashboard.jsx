@@ -79,16 +79,7 @@ export const AuditProDashboard = ({
     loadDashboardData(true);
   }, []);
 
-  // Time of day greeting
-  const greetingText = useMemo(() => {
-    const hour = new Date().getHours();
-    let timeGreeting = 'Good Morning';
-    if (hour >= 12 && hour < 17) timeGreeting = 'Good Afternoon';
-    else if (hour >= 17) timeGreeting = 'Good Evening';
 
-    const roleName = isAdmin ? 'Admin' : isAuditor ? 'Auditor' : user?.name || 'Admin';
-    return `${timeGreeting}, ${roleName} 👋`;
-  }, [user, isAdmin, isAuditor]);
 
   // Date range label
   const dateRangeLabel = useMemo(() => {
@@ -633,16 +624,13 @@ export const AuditProDashboard = ({
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
       {/* -----------------------------------------------------------------------
-          TOP HEADER: GREETING & CONTROLS
+          TOP HEADER: DASHBOARD TITLE & CONTROLS
           ----------------------------------------------------------------------- */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-1">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            <span>{greetingText}</span>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            NC &amp; CAP Dashboard
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Here's your Non-Conformance (NC) and CAP compliance overview for today.
-          </p>
         </div>
 
         {/* Header Right Controls: Date Range Dropdown, Search Input */}
