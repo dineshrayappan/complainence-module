@@ -50,6 +50,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import { drawNCWithPhotos, generateSingleNCPdf } from '../utils/ncPdfGenerator';
 // Pure NC/CAP Report - no external mock collections
 
 export const ReportsView = ({
@@ -849,7 +850,7 @@ export const ReportsView = ({
   // ---------------------------------------------------------------------------
   // DYNAMIC PDF & CSV EXPORTS (Dispatched based on Active Report Mode)
   // ---------------------------------------------------------------------------
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     setDownloadingPDF(true);
     try {
       const doc = new jsPDF({
@@ -1002,6 +1003,13 @@ export const ReportsView = ({
               headStyles: { fillColor: [15, 23, 42], fontSize: 7.5 },
               styles: { fontSize: 7, cellPadding: 3 },
             });
+
+            // Detailed photographic evidence for department NCs
+            let deptPhotoY = doc.lastAutoTable.finalY + 16;
+            for (let idx = 0; idx < deptObj.complaints.length; idx++) {
+              const c = deptObj.complaints[idx];
+              deptPhotoY = await drawNCWithPhotos(doc, c, deptPhotoY, pageWidth, margin, contentWidth, idx);
+            }
           }
         }
 
@@ -1098,54 +1106,10 @@ export const ReportsView = ({
           doc.setTextColor(...brandMuted);
           doc.text('No Non-Conformances currently assigned to this member.', margin, currentY + 20);
         } else {
-          ncList.forEach((c, idx) => {
-            if (currentY > doc.internal.pageSize.getHeight() - 120) {
-              doc.addPage();
-              currentY = 40;
-            }
-
-            const isOverdue =
-              c.status !== 'Closed' &&
-              c.status !== 'Verified' &&
-              c.deadlineTimestamp &&
-              Date.now() > new Date(c.deadlineTimestamp).getTime();
-
-            const cRisk = (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase();
-            const createdDateStr = c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A';
-            const closedDateStr = c.actualCompletedAt
-              ? new Date(c.actualCompletedAt).toLocaleString()
-              : (c.status === 'Closed' ? 'Closed & Verified' : 'Pending Closure');
-
-            const ncTableData = [
-              [
-                { content: `NC RECORD #${idx + 1}: ${c.complaintId || 'NC-N/A'} • Status: ${c.status} • Risk: ${cRisk}`, colSpan: 2, styles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' } }
-              ],
-              ['Department & Location:', `${c.department || '—'} • ${c.location || '—'}`],
-              ['Defect Finding Description:', `${getFindingText(c)}`],
-              ['Quality Requirement / Standard:', `${c.requirement || '—'}`],
-              ['Creation Date & Auditor:', `Created: ${createdDateStr} by ${getAuditorName(c)}`],
-              ['5-Why Root Cause:', `${getRootCauseText(c)}`],
-              ['Immediate Containment Action:', `${getImmediateCorrectionText(c)}`],
-              ['Permanent Corrective Action:', `${getCorrectiveActionText(c)}`],
-              ['Preventive Recurrence Plan:', `${getPreventiveActionText(c)}`],
-              ['Verification Method & Condition:', `${c.verificationMethod || '—'} • Condition: ${isOverdue ? 'Overdue SLA Breach' : 'Within SLA Window'}`],
-              ['Auditor Notes & Closure Date:', `Closure: ${closedDateStr} • Verification Readiness: ${c.cap?.verificationReadinessNotes || '—'}`],
-              ['Before & After Photo Proof:', `Before Photo: ${c.beforePhoto ? 'Captured' : 'No Photo'} | After Photo: ${c.afterPhoto ? 'Verified Proof Attached' : 'Pending After Proof'}`]
-            ];
-
-            autoTable(doc, {
-              startY: currentY,
-              body: ncTableData,
-              theme: 'grid',
-              styles: { fontSize: 7, cellPadding: 2.5 },
-              columnStyles: {
-                0: { cellWidth: 140, fontStyle: 'bold', textColor: [51, 65, 85] },
-                1: { cellWidth: contentWidth - 140, textColor: [15, 23, 42] },
-              },
-            });
-
-            currentY = doc.lastAutoTable.finalY + 12;
-          });
+          for (let idx = 0; idx < ncList.length; idx++) {
+            const c = ncList[idx];
+            currentY = await drawNCWithPhotos(doc, c, currentY, pageWidth, margin, contentWidth, idx);
+          }
         }
 
         doc.save(`Garment_QMS_Member_${targetMem?.name || 'User'}_NC_Dossier_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -1249,6 +1213,28 @@ export const ReportsView = ({
             7: { cellWidth: 65 },
           },
         });
+
+        // -----------------------------------------------------------------------
+        // PHOTOGRAPHIC EVIDENCE & NC DOSSIER SECTION (Before & After Photos)
+        // -----------------------------------------------------------------------
+        if (datasetToExport.length > 0) {
+          doc.addPage();
+          let photoSectionY = margin + 15;
+
+          // Section Title Banner
+          doc.setFillColor(...brandPrimary);
+          doc.roundedRect(margin, photoSectionY, contentWidth, 24, 4, 4, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text('NC Defect Photographic Evidence & Corrective Verification (Before & After Photos)', margin + 10, photoSectionY + 16);
+          photoSectionY += 34;
+
+          for (let idx = 0; idx < datasetToExport.length; idx++) {
+            const c = datasetToExport[idx];
+            photoSectionY = await drawNCWithPhotos(doc, c, photoSectionY, pageWidth, margin, contentWidth, idx);
+          }
+        }
 
         doc.save(`Garment_QMS_NC_and_CAP_Audit_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
       }
@@ -3237,13 +3223,26 @@ export const ReportsView = ({
                 </button>
               ) : <div />}
 
-              <button
-                type="button"
-                onClick={() => setDrilldownComplaint(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => generateSingleNCPdf(drilldownComplaint, user?.name || 'Quality Directorate')}
+                  disabled={downloadingPDF}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                  title="Download Single NC PDF Report with Before & After Photos"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Export NC PDF Report</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDrilldownComplaint(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -23,11 +23,13 @@ import {
   ArrowRight,
   ShieldAlert,
   CheckCheck,
+  FileText,
 } from 'lucide-react';
 import CountdownBadge from './CountdownBadge';
 import { formatAbsoluteTime } from '../utils/timer';
 import { complaintService, userService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { generateSingleNCPdf } from '../utils/ncPdfGenerator';
 
 const FALLBACK_BEFORE_IMG =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23fee2e2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='bold' fill='%23b91c1c'%3EBefore Defect Photo%3C/text%3E%3C/svg%3E";
@@ -66,7 +68,21 @@ export const ComplaintDetailModal = ({
   // Live work operations state
   const [startingWork, setStartingWork] = useState(false);
   const [pausingWork, setPausingWork] = useState(false);
-  const [workFeedback, setWorkFeedback] = useState(null);
+  // PDF Export state
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!complaint) return;
+    setDownloadingPdf(true);
+    try {
+      await generateSingleNCPdf(complaint, user?.name || 'Quality Assurance');
+    } catch (err) {
+      console.error('Failed to export NC PDF:', err);
+      setError('Could not generate PDF report.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const handleStartWork = async () => {
     try {
@@ -348,6 +364,16 @@ export const ComplaintDetailModal = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Download Single NC PDF Report with Before & After Photos"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{downloadingPdf ? 'Exporting...' : 'PDF Report'}</span>
+            </button>
             <div className="hidden xs:block">
               <CountdownBadge
                 deadlineTimestamp={complaint.deadlineTimestamp}
