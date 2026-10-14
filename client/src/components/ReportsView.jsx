@@ -116,7 +116,10 @@ export const ReportsView = ({
   const [agingFilter, setAgingFilter] = useState('ALL'); // 'ALL' | 'FRESH' | 'MODERATE' | 'HIGH' | 'SEVERE'
   const [repeatFilter, setRepeatFilter] = useState('ALL'); // 'ALL' | 'REPEAT' | 'SINGLE'
 
-  // 10. Export Scope & Drill-Down Modal State
+  // 10. Reject & Rework Filter
+  const [reworkFilter, setReworkFilter] = useState('ALL'); // 'ALL' | 'REWORK_ONLY' | 'AWAITING_REWORK' | 'REWORK_IN_REVIEW' | 'REWORK_RESOLVED' | 'NO_REWORK'
+
+  // 11. Export Scope & Drill-Down Modal State
   const [exportScope, setExportScope] = useState('FILTERED'); // 'FILTERED' | 'ALL'
   const [drilldownComplaint, setDrilldownComplaint] = useState(null);
   const [showFiltersExpanded, setShowFiltersExpanded] = useState(true);
@@ -267,6 +270,27 @@ export const ReportsView = ({
     }
     return false;
   };
+
+  const reworkStats = useMemo(() => {
+    const totalRework = complaints.filter(isRejectRework).length;
+    const awaiting = complaints.filter((c) =>
+      ['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)
+    ).length;
+    const inReview = complaints.filter(
+      (c) =>
+        isRejectRework(c) &&
+        ['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)
+    ).length;
+    const resolved = complaints.filter(
+      (c) => isRejectRework(c) && ['Closed', 'Verified'].includes(c.status)
+    ).length;
+    return {
+      total: totalRework,
+      awaiting,
+      inReview,
+      resolved,
+    };
+  }, [complaints]);
 
   const getRejectionReasonText = (c) => {
     if (c.rejectionReason && c.rejectionReason.trim()) return c.rejectionReason.trim();
@@ -479,6 +503,11 @@ export const ReportsView = ({
         )
           return false;
         if (
+          statusFilter === 'REWORK' &&
+          !['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)
+        )
+          return false;
+        if (
           statusFilter === 'CLOSED' &&
           !['Closed', 'Verified'].includes(c.status)
         )
@@ -562,7 +591,34 @@ export const ReportsView = ({
         if (repeatFilter === 'SINGLE' && freq > 1) return false;
       }
 
-      // 10. Date Range Filter
+      // 10. Reject & Rework Filter
+      if (reworkFilter !== 'ALL') {
+        const isRework = isRejectRework(c);
+        if (reworkFilter === 'REWORK_ONLY' && !isRework) return false;
+        if (
+          reworkFilter === 'AWAITING_REWORK' &&
+          !['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)
+        )
+          return false;
+        if (
+          reworkFilter === 'REWORK_IN_REVIEW' &&
+          !(
+            isRework &&
+            ['CAP Submitted', 'Under Review', 'Under Verification'].includes(
+              c.status
+            )
+          )
+        )
+          return false;
+        if (
+          reworkFilter === 'REWORK_RESOLVED' &&
+          !(isRework && ['Closed', 'Verified'].includes(c.status))
+        )
+          return false;
+        if (reworkFilter === 'NO_REWORK' && isRework) return false;
+      }
+
+      // 11. Date Range Filter
       if (datePreset !== 'ALL' || startDate || endDate) {
         const created = new Date(
           c.createdAt || c.deadlineTimestamp || Date.now()
@@ -629,6 +685,7 @@ export const ReportsView = ({
     auditorFilter,
     agingFilter,
     repeatFilter,
+    reworkFilter,
     datePreset,
     startDate,
     endDate,
@@ -650,6 +707,7 @@ export const ReportsView = ({
     if (auditorFilter !== 'ALL') count++;
     if (agingFilter !== 'ALL') count++;
     if (repeatFilter !== 'ALL') count++;
+    if (reworkFilter !== 'ALL') count++;
     return count;
   }, [
     searchTerm,
@@ -665,6 +723,7 @@ export const ReportsView = ({
     auditorFilter,
     agingFilter,
     repeatFilter,
+    reworkFilter,
   ]);
 
   const hasActiveFilters = activeFilterCount > 0;
@@ -683,6 +742,7 @@ export const ReportsView = ({
     setAuditorFilter('ALL');
     setAgingFilter('ALL');
     setRepeatFilter('ALL');
+    setReworkFilter('ALL');
   };
 
   const datasetToExport =
@@ -1754,8 +1814,28 @@ export const ReportsView = ({
             <option value="OPEN">Open Actions</option>
             <option value="CAP_SUBMITTED">CAP Submitted</option>
             <option value="UNDER_REVIEW">Under Review</option>
+            <option value="REWORK">Rejected / Rework</option>
             <option value="CLOSED">Verified &amp; Closed</option>
             <option value="OVERDUE">Overdue SLA Breaches</option>
+          </select>
+
+          {/* Reject & Rework Dedicated Filter */}
+          <select
+            value={reworkFilter}
+            onChange={(e) => setReworkFilter(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              reworkFilter !== 'ALL'
+                ? 'bg-rose-50/90 border-rose-300 text-rose-900 dark:bg-rose-950/70 dark:border-rose-700 dark:text-rose-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+            title="Filter by Reject &amp; Rework Status"
+          >
+            <option value="ALL">Reject &amp; Rework: All</option>
+            <option value="REWORK_ONLY">Reject &amp; Rework ({reworkStats.total})</option>
+            <option value="AWAITING_REWORK">Awaiting Floor Rework ({reworkStats.awaiting})</option>
+            <option value="REWORK_IN_REVIEW">Rework Under Review ({reworkStats.inReview})</option>
+            <option value="REWORK_RESOLVED">Resolved Rework ({reworkStats.resolved})</option>
+            <option value="NO_REWORK">Standard NCs Only</option>
           </select>
 
           {/* Risk Severity */}
