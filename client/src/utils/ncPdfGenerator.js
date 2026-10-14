@@ -116,6 +116,24 @@ export const extractAuditorName = (c) => {
   return c.createdBy?.name || c.auditorName || 'Lead QA Auditor';
 };
 
+export const extractRejectionReason = (c) => {
+  if (!c) return '';
+  if (c.rejectionReason && c.rejectionReason.trim()) return c.rejectionReason.trim();
+  if (c.cap?.rejectionReason && c.cap.rejectionReason.trim()) return c.cap.rejectionReason.trim();
+  if (c.timeline && Array.isArray(c.timeline)) {
+    const rejEntry = [...c.timeline].reverse().find(
+      (t) => t.action === 'REJECTED' || (t.notes && t.notes.toLowerCase().includes('reject'))
+    );
+    if (rejEntry?.notes) {
+      return rejEntry.notes.replace(/^Audit rejected resolution and returned to line for rework\.\s*Reason:\s*/i, '');
+    }
+  }
+  if (['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)) {
+    return c.feedbackRemarks || 'Auditor rejected resolution and returned to line for rework.';
+  }
+  return '';
+};
+
 /**
  * Draws an NC record with side-by-side Before Photo and After Photo
  * and technical CAP details onto a jsPDF document.
@@ -230,9 +248,11 @@ export const drawNCWithPhotos = async (doc, c, startY, pageWidth, margin, conten
   const prevActionText = extractPreventiveAction(c);
   const assignedName = extractResponsiblePerson(c);
   const auditorName = extractAuditorName(c);
+  const rejReasonText = extractRejectionReason(c);
 
   const detailRows = [
     ['Defect Finding:', findingText],
+    ...(rejReasonText ? [['Rejection Directive:', `[AUDITOR REJECT / REWORK] ${rejReasonText}`]] : []),
     ['Root Cause (5-Why):', rootCauseText],
     ['Corrective Action:', corrActionText],
     ['Preventive Action:', prevActionText],

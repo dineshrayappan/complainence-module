@@ -65,17 +65,19 @@ export const ReportsView = ({
   const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   // ---------------------------------------------------------------------------
-  // REPORT VIEW NAVIGATION MODES (Preserving Master Register & Adding 3 New Modes)
+  // REPORT VIEW NAVIGATION MODES (Preserving Master Register & Adding Modes)
   // ---------------------------------------------------------------------------
   // 'audit-register': Master NC Report (KPI Scorecard, Filter Bar, Charts, Table)
   // 'dept-report': Department-wise NC Report (Total NCs, Open/Closed/Pending, CAP Status, Drilldown)
   // 'members-report': Department Members Report (Roster, Assigned NCs, Open/Closed/Pending, CAP Status)
   // 'member-detail': Individual Member NC Details (NC ID, Finding, Requirement, CAP 5-Why, Photos, Verification)
+  // 'rework-report': Defect Reject & Rework Report (Rejections Scorecard, Reason Breakdown, Register & Before/After Proof Photos)
   const [activeReportTab, setActiveReportTab] = useState(initialTab || 'audit-register');
   const [selectedDeptDetail, setSelectedDeptDetail] = useState(null);
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const [reworkSubFilter, setReworkSubFilter] = useState('ALL'); // 'ALL' | 'AWAITING' | 'IN_REVIEW' | 'RESOLVED'
 
   useEffect(() => {
     if (initialTab) {
@@ -253,6 +255,53 @@ export const ReportsView = ({
     if (hours < 24) return `${Math.round(hours)}h (Fresh)`;
     const days = Math.round(hours / 24);
     return `${days}d aged`;
+  };
+
+  // Rejection & Rework Data Helpers
+  const isRejectRework = (c) => {
+    if (!c) return false;
+    if (['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)) return true;
+    if (c.cap?.status === 'REJECTED') return true;
+    if (c.rejectionReason && c.rejectionReason.trim()) return true;
+    if (c.timeline && Array.isArray(c.timeline)) {
+      return c.timeline.some(
+        (t) => t.action === 'REJECTED' || (t.notes && t.notes.toLowerCase().includes('reject'))
+      );
+    }
+    return false;
+  };
+
+  const getRejectionReasonText = (c) => {
+    if (c.rejectionReason && c.rejectionReason.trim()) return c.rejectionReason.trim();
+    if (c.cap?.rejectionReason && c.cap.rejectionReason.trim()) return c.cap.rejectionReason.trim();
+    if (c.timeline && Array.isArray(c.timeline)) {
+      const rejEntry = [...c.timeline].reverse().find(
+        (t) => t.action === 'REJECTED' || (t.notes && t.notes.toLowerCase().includes('reject'))
+      );
+      if (rejEntry?.notes) {
+        return rejEntry.notes.replace(/^Audit rejected resolution and returned to line for rework\.\s*Reason:\s*/i, '');
+      }
+    }
+    if (['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)) {
+      return c.feedbackRemarks || 'Auditor rejected resolution and returned to floor for rework.';
+    }
+    return 'Auditor returned non-conformance for rework.';
+  };
+
+  const getRejectionAuditor = (c) => {
+    if (c.timeline && Array.isArray(c.timeline)) {
+      const rejEntry = [...c.timeline].reverse().find((t) => t.action === 'REJECTED');
+      if (rejEntry?.performedBy?.name) return rejEntry.performedBy.name;
+    }
+    return c.createdBy?.name || 'Quality Auditor';
+  };
+
+  const getRejectionTimestamp = (c) => {
+    if (c.timeline && Array.isArray(c.timeline)) {
+      const rejEntry = [...c.timeline].reverse().find((t) => t.action === 'REJECTED');
+      if (rejEntry?.timestamp) return new Date(rejEntry.timestamp).toLocaleDateString();
+    }
+    return c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : 'N/A';
   };
 
   // ---------------------------------------------------------------------------
@@ -711,6 +760,7 @@ export const ReportsView = ({
       const dCritical = deptComplaints.filter(
         (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
       ).length;
+      const dRework = deptComplaints.filter(isRejectRework).length;
 
       const dCapRate = dTotal > 0 ? Math.round((dClosed / dTotal) * 100) : 0;
 
@@ -745,6 +795,7 @@ export const ReportsView = ({
         pendingNC: dPending,
         overdueNC: dOverdue,
         criticalNC: dCritical,
+        reworkNC: dRework,
         capRate: dCapRate,
         capStatusLabel: dCapStatusLabel,
         capStatusBadge: dCapStatusBadge,
@@ -784,6 +835,7 @@ export const ReportsView = ({
       const mCritical = memberComplaints.filter(
         (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
       ).length;
+      const mRework = memberComplaints.filter(isRejectRework).length;
 
       const mCapRate = mTotal > 0 ? Math.round((mClosed / mTotal) * 100) : 0;
 
@@ -810,6 +862,7 @@ export const ReportsView = ({
         pendingNC: mPending,
         overdueNC: mOverdue,
         criticalNC: mCritical,
+        reworkNC: mRework,
         capRate: mCapRate,
         capStatusLabel: mCapStatusLabel,
         capStatusBadge: mCapStatusBadge,
@@ -835,6 +888,96 @@ export const ReportsView = ({
     if (!activeMember) return [];
     return activeMember.complaints || [];
   }, [activeMember]);
+
+  // ---------------------------------------------------------------------------
+  // 3. REJECT & REWORK NC REPORT METRICS & DATASETS
+  // ---------------------------------------------------------------------------
+  const reworkComplaints = useMemo(() => {
+    return filteredComplaints.filter(isRejectRework);
+  }, [filteredComplaints]);
+
+  const allReworkComplaints = useMemo(() => {
+    return complaints.filter(isRejectRework);
+  }, [complaints]);
+
+  const displayedReworkComplaints = useMemo(() => {
+    if (reworkSubFilter === 'AWAITING') {
+      return reworkComplaints.filter((c) =>
+        ['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)
+      );
+    }
+    if (reworkSubFilter === 'IN_REVIEW') {
+      return reworkComplaints.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)
+      );
+    }
+    if (reworkSubFilter === 'RESOLVED') {
+      return reworkComplaints.filter((c) =>
+        ['Closed', 'Verified'].includes(c.status)
+      );
+    }
+    return reworkComplaints;
+  }, [reworkComplaints, reworkSubFilter]);
+
+  const reworkAwaitingCount = useMemo(() => {
+    return reworkComplaints.filter((c) =>
+      ['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status)
+    ).length;
+  }, [reworkComplaints]);
+
+  const reworkInReviewCount = useMemo(() => {
+    return reworkComplaints.filter((c) =>
+      ['CAP Submitted', 'Under Review', 'Under Verification'].includes(c.status)
+    ).length;
+  }, [reworkComplaints]);
+
+  const reworkResolvedCount = useMemo(() => {
+    return reworkComplaints.filter((c) =>
+      ['Closed', 'Verified'].includes(c.status)
+    ).length;
+  }, [reworkComplaints]);
+
+  const reworkOverdueCount = useMemo(() => {
+    return reworkComplaints.filter((c) => {
+      if (['Closed', 'Verified'].includes(c.status)) return false;
+      return c.deadlineTimestamp && Date.now() > new Date(c.deadlineTimestamp).getTime();
+    }).length;
+  }, [reworkComplaints]);
+
+  const reworkCriticalCount = useMemo(() => {
+    return reworkComplaints.filter(
+      (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
+    ).length;
+  }, [reworkComplaints]);
+
+  const rejectionRate = useMemo(() => {
+    if (filteredComplaints.length === 0) return 0;
+    return Math.round((reworkComplaints.length / filteredComplaints.length) * 100);
+  }, [reworkComplaints, filteredComplaints]);
+
+  // Department Rework Distribution for Analytics
+  const reworkByDepartment = useMemo(() => {
+    const map = {};
+    reworkComplaints.forEach((c) => {
+      const d = c.department || 'General';
+      map[d] = (map[d] || 0) + 1;
+    });
+    return Object.entries(map)
+      .map(([dept, count]) => ({ dept, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [reworkComplaints]);
+
+  // Defect Categories in Rework for Analytics
+  const reworkByCategory = useMemo(() => {
+    const map = {};
+    reworkComplaints.forEach((c) => {
+      const cat = c.category || 'Quality Defect';
+      map[cat] = (map[cat] || 0) + 1;
+    });
+    return Object.entries(map)
+      .map(([cat, count]) => ({ cat, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [reworkComplaints]);
 
   // Navigation handlers
   const handleInspectDepartment = (deptName) => {
@@ -895,6 +1038,8 @@ export const ReportsView = ({
         reportTitle = 'Department Members NC & CAP Accountability Report';
       } else if (activeReportTab === 'member-detail') {
         reportTitle = `Member NC Audit Dossier: ${activeMember ? activeMember.name : 'Individual Member'}`;
+      } else if (activeReportTab === 'rework-report') {
+        reportTitle = 'Non-Conformance Defect Reject & Rework Quality Report';
       }
       doc.text(reportTitle, margin, 78);
 
@@ -934,6 +1079,7 @@ export const ReportsView = ({
           d.openNC,
           d.closedNC,
           d.pendingNC,
+          d.reworkNC || 0,
           d.overdueNC,
           `${d.capRate}%`,
           d.capStatusLabel,
@@ -948,6 +1094,7 @@ export const ReportsView = ({
             'Open',
             'Closed',
             'Pending',
+            'Rework',
             'Overdue',
             'CAP Rate',
             'CAP Status',
@@ -1028,6 +1175,7 @@ export const ReportsView = ({
           m.openNC,
           m.closedNC,
           m.pendingNC,
+          m.reworkNC || 0,
           `${m.capRate}%`,
           m.capStatusLabel,
         ]);
@@ -1043,6 +1191,7 @@ export const ReportsView = ({
             'Open',
             'Closed',
             'Pending',
+            'Rework',
             'CAP Rate',
             'Accountability Status',
           ]],
@@ -1113,6 +1262,128 @@ export const ReportsView = ({
         }
 
         doc.save(`Garment_QMS_Member_${targetMem?.name || 'User'}_NC_Dossier_${new Date().toISOString().slice(0, 10)}.pdf`);
+      }
+      // -----------------------------------------------------------------------
+      // TAB 5: NON-CONFORMANCE REJECT & REWORK REPORT PDF
+      // -----------------------------------------------------------------------
+      else if (activeReportTab === 'rework-report') {
+        const targetDataset = displayedReworkComplaints;
+
+        // Executive Rejection Scorecard Ribbon
+        doc.setFillColor(...bgLight);
+        doc.setDrawColor(...borderLine);
+        doc.roundedRect(margin, 122, contentWidth, 48, 6, 6, 'FD');
+
+        const reworkKpis = [
+          { label: 'Total Rejections', val: String(reworkComplaints.length), col: [234, 88, 12] },
+          { label: 'Awaiting Floor Action', val: String(reworkAwaitingCount), col: [217, 119, 6] },
+          { label: 'In Verification Review', val: String(reworkInReviewCount), col: [124, 58, 237] },
+          { label: 'Resolved Post-Rework', val: String(reworkResolvedCount), col: [16, 185, 129] },
+          { label: 'Overdue SLA', val: String(reworkOverdueCount), col: [225, 29, 72] },
+          { label: 'Rejection Rate', val: `${rejectionRate}%`, col: [37, 99, 235] },
+        ];
+
+        const colWidth = contentWidth / 6;
+        reworkKpis.forEach((kpi, idx) => {
+          const colX = margin + idx * colWidth;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(12);
+          doc.setTextColor(...kpi.col);
+          doc.text(kpi.val, colX + colWidth / 2, 142, { align: 'center' });
+
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7.5);
+          doc.setTextColor(...brandMuted);
+          doc.text(kpi.label, colX + colWidth / 2, 157, { align: 'center' });
+
+          if (idx < reworkKpis.length - 1) {
+            doc.setDrawColor(...borderLine);
+            doc.line(colX + colWidth, 130, colX + colWidth, 162);
+          }
+        });
+
+        const reworkTableRows = targetDataset.map((c) => {
+          const isOverdue =
+            c.status !== 'Closed' &&
+            c.status !== 'Verified' &&
+            c.deadlineTimestamp &&
+            Date.now() > new Date(c.deadlineTimestamp).getTime();
+
+          const cRisk = (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase();
+          const findingSummary = getFindingText(c).slice(0, 45);
+          const rejReason = getRejectionReasonText(c).slice(0, 50);
+
+          return [
+            c.complaintId || 'NC-N/A',
+            c.department || '—',
+            cRisk,
+            c.status,
+            findingSummary,
+            rejReason,
+            getAssignedToName(c),
+            getRejectionTimestamp(c),
+            isOverdue ? 'Overdue' : 'Active',
+          ];
+        });
+
+        autoTable(doc, {
+          startY: 182,
+          head: [[
+            'NC ID',
+            'Dept',
+            'Risk',
+            'Status',
+            'Defect Finding',
+            'Auditor Rejection Reason',
+            'Assigned Resolver',
+            'Rejected Date',
+            'SLA Condition',
+          ]],
+          body: reworkTableRows,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [234, 88, 12],
+            textColor: [255, 255, 255],
+            fontSize: 7.5,
+            fontStyle: 'bold',
+          },
+          styles: {
+            fontSize: 7,
+            cellPadding: 3,
+          },
+          columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 55 },
+            1: { cellWidth: 50 },
+            2: { cellWidth: 40 },
+            3: { cellWidth: 55 },
+            4: { cellWidth: 95 },
+            5: { cellWidth: 105, textColor: [194, 65, 12] },
+            6: { cellWidth: 65 },
+            7: { cellWidth: 45 },
+            8: { cellWidth: 45 },
+          },
+        });
+
+        // Photographic Evidence Dossier for all Reject & Rework NCs
+        if (targetDataset.length > 0) {
+          doc.addPage();
+          let photoSectionY = margin + 15;
+
+          doc.setFillColor(234, 88, 12);
+          doc.roundedRect(margin, photoSectionY, contentWidth, 24, 4, 4, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text('Rejected & Reworked NC Defect Photographic Evidence (Before & After Photos)', margin + 10, photoSectionY + 16);
+          photoSectionY += 34;
+
+          for (let idx = 0; idx < targetDataset.length; idx++) {
+            const c = targetDataset[idx];
+            photoSectionY = await drawNCWithPhotos(doc, c, photoSectionY, pageWidth, margin, contentWidth, idx);
+          }
+        }
+
+        doc.save(`Garment_QMS_Reject_and_Rework_NC_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
       }
       // -----------------------------------------------------------------------
       // TAB 1: MASTER AUDIT REGISTER PDF (Existing implementation intact)
@@ -1266,6 +1537,7 @@ export const ReportsView = ({
           'Open / In Progress NCs',
           'Verified & Closed NCs',
           'Pending CAP Review NCs',
+          'Rejected / Rework NCs',
           'Overdue SLA Breaches',
           'Critical Risk NCs',
           'CAP Completion Rate (%)',
@@ -1280,6 +1552,7 @@ export const ReportsView = ({
           `"${d.openNC}"`,
           `"${d.closedNC}"`,
           `"${d.pendingNC}"`,
+          `"${d.reworkNC || 0}"`,
           `"${d.overdueNC}"`,
           `"${d.criticalNC}"`,
           `"${d.capRate}%"`,
@@ -1299,6 +1572,7 @@ export const ReportsView = ({
           'Open / In Progress NCs',
           'Closed & Verified NCs',
           'Pending CAP Review NCs',
+          'Rejected / Rework NCs',
           'Overdue SLA NCs',
           'CAP Completion Rate (%)',
           'Accountability Status',
@@ -1315,6 +1589,7 @@ export const ReportsView = ({
           `"${m.openNC}"`,
           `"${m.closedNC}"`,
           `"${m.pendingNC}"`,
+          `"${m.reworkNC || 0}"`,
           `"${m.overdueNC}"`,
           `"${m.capRate}%"`,
           `"${m.capStatusLabel}"`,
@@ -1367,6 +1642,46 @@ export const ReportsView = ({
           `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure'}"`,
           `"${c.beforePhoto ? 'Yes (Photo Attached)' : 'No'}"`,
           `"${c.afterPhoto ? 'Yes (Proof Attached)' : 'Pending'}"`,
+        ]);
+      } else if (activeReportTab === 'rework-report') {
+        filename = `Garment_QMS_Reject_and_Rework_NC_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+        headers = [
+          'Non-Conformance ID',
+          'Lifecycle Status',
+          'Risk Severity',
+          'Department',
+          'Plant Location / Station',
+          'Defect Finding Description',
+          'Auditor Who Rejected',
+          'Auditor Rejection Reason / Directives',
+          'Rejection Date',
+          'Responsible Resolver (Assigned To)',
+          'Immediate Containment / Rework Action',
+          'Corrective Action Plan',
+          '5-Why Root Cause',
+          'Target Due Date',
+          'Before Photo Attached Status',
+          'After Rework Photo Attached Status',
+          'Approved Closure Date',
+        ];
+        rows = displayedReworkComplaints.map((c) => [
+          `"${c.complaintId || ''}"`,
+          `"${c.status || 'Open'}"`,
+          `"${c.priority || c.riskSeverity || 'Medium'}"`,
+          `"${c.department || ''}"`,
+          `"${c.location || ''}"`,
+          `"${getFindingText(c).replace(/"/g, '""')}"`,
+          `"${getRejectionAuditor(c).replace(/"/g, '""')}"`,
+          `"${getRejectionReasonText(c).replace(/"/g, '""')}"`,
+          `"${getRejectionTimestamp(c)}"`,
+          `"${getAssignedToName(c).replace(/"/g, '""')}"`,
+          `"${getImmediateCorrectionText(c).replace(/"/g, '""')}"`,
+          `"${getCorrectiveActionText(c).replace(/"/g, '""')}"`,
+          `"${getRootCauseText(c).replace(/"/g, '""')}"`,
+          `"${getCapTargetDate(c)}"`,
+          `"${c.beforePhoto ? 'Yes (Photo Captured)' : 'No Photo'}"`,
+          `"${c.afterPhoto ? 'Yes (Rework Proof Uploaded)' : 'Pending Rework Proof'}"`,
+          `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure'}"`,
         ]);
       } else {
         // Master Register CSV (all 33 columns intact)
@@ -1528,6 +1843,8 @@ export const ReportsView = ({
                 ? `Export Members PDF (${memberStatsList.length})`
                 : activeReportTab === 'member-detail'
                 ? `Export Dossier PDF (${activeMemberComplaints.length})`
+                : activeReportTab === 'rework-report'
+                ? `Export Rework PDF (${displayedReworkComplaints.length})`
                 : `Export PDF (${datasetToExport.length})`}
             </span>
           </button>
@@ -1550,6 +1867,8 @@ export const ReportsView = ({
                 ? 'Export Members CSV'
                 : activeReportTab === 'member-detail'
                 ? 'Export Member CSV'
+                : activeReportTab === 'rework-report'
+                ? 'Export Rework CSV'
                 : `Export CSV (${datasetToExport.length})`}
             </span>
           </button>
@@ -1625,6 +1944,22 @@ export const ReportsView = ({
               {activeMember.name.split(' ')[0]} ({activeMemberComplaints.length})
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('rework-report')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeReportTab === 'rework-report'
+              ? 'bg-white dark:bg-slate-900 text-orange-600 dark:text-orange-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4 text-orange-500" />
+          <span>Reject &amp; Rework NC Report</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-300">
+            {reworkComplaints.length}
+          </span>
         </button>
       </div>
 
@@ -1872,7 +2207,7 @@ export const ReportsView = ({
       {activeReportTab === 'audit-register' && (
         <div className="space-y-3 animate-in fade-in duration-200">
           {/* Quick Metrics KPI Strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
             <div
               onClick={handleResetFilters}
               className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs hover:border-indigo-400 cursor-pointer transition-all flex items-center justify-between"
@@ -1936,6 +2271,22 @@ export const ReportsView = ({
                 </span>
               </div>
               <CheckCheck className="w-4 h-4 text-emerald-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setStatusFilter('REWORK')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-orange-400 cursor-pointer transition-all flex items-center justify-between ${
+                statusFilter === 'REWORK' ? 'border-orange-500 ring-1 ring-orange-500/30 bg-orange-50/20' : 'border-slate-200/90 dark:border-slate-800'
+              }`}
+              title="Filter by Rejected / Floor Rework NCs"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Rejected / Rework</span>
+                <span className="text-base font-black text-orange-600 dark:text-orange-400 font-mono">
+                  {filteredComplaints.filter(isRejectRework).length}
+                </span>
+              </div>
+              <RotateCcw className="w-4 h-4 text-orange-500 opacity-80" />
             </div>
 
             <div
@@ -2429,6 +2780,7 @@ export const ReportsView = ({
                         <th className="py-2.5 px-3 text-center">Open</th>
                         <th className="py-2.5 px-3 text-center">Review</th>
                         <th className="py-2.5 px-3 text-center">Closed</th>
+                        <th className="py-2.5 px-3 text-center">Rework</th>
                         <th className="py-2.5 px-3 text-center">Overdue</th>
                         <th className="py-2.5 px-3 text-center w-36">CAP Adherence</th>
                         <th className="py-2.5 px-3 text-center">Status</th>
@@ -2475,6 +2827,16 @@ export const ReportsView = ({
 
                           <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             {d.closedNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-orange-600 dark:text-orange-400">
+                            {d.reworkNC > 0 ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                                {d.reworkNC}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
                           </td>
 
                           <td className="py-3 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
@@ -2619,6 +2981,7 @@ export const ReportsView = ({
                         <th className="py-2.5 px-3 text-center">Open</th>
                         <th className="py-2.5 px-3 text-center">Review</th>
                         <th className="py-2.5 px-3 text-center">Closed</th>
+                        <th className="py-2.5 px-3 text-center">Rework</th>
                         <th className="py-2.5 px-3 text-center">Overdue</th>
                         <th className="py-2.5 px-3 text-center w-36">CAP Adherence</th>
                         <th className="py-2.5 px-3">Contact</th>
@@ -2672,6 +3035,16 @@ export const ReportsView = ({
 
                           <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             {m.closedNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-orange-600 dark:text-orange-400">
+                            {m.reworkNC > 0 ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-orange-50 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                                {m.reworkNC}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
                           </td>
 
                           <td className="py-3 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
@@ -2961,6 +3334,418 @@ export const ReportsView = ({
       )}
 
       {/* =======================================================================
+          VIEW 5: NON-CONFORMANCE REJECT & REWORK REPORT
+          ======================================================================= */}
+      {activeReportTab === 'rework-report' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Rejection Executive KPIs Ribbon */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div
+              onClick={() => setReworkStatusSubFilter('ALL')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs cursor-pointer transition-all flex items-center justify-between ${
+                reworkStatusSubFilter === 'ALL'
+                  ? 'border-orange-500 ring-1 ring-orange-500/30 bg-orange-50/20'
+                  : 'border-slate-200/90 dark:border-slate-800 hover:border-orange-300'
+              }`}
+              title="View all rejected non-conformances"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Total Rejections</span>
+                <span className="text-base font-black text-orange-600 dark:text-orange-400 font-mono">
+                  {reworkComplaints.length}
+                </span>
+              </div>
+              <RotateCcw className="w-4 h-4 text-orange-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setReworkStatusSubFilter('AWAITING_ACTION')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs cursor-pointer transition-all flex items-center justify-between ${
+                reworkStatusSubFilter === 'AWAITING_ACTION'
+                  ? 'border-amber-500 ring-1 ring-amber-500/30 bg-amber-50/20'
+                  : 'border-slate-200/90 dark:border-slate-800 hover:border-amber-300'
+              }`}
+              title="Awaiting floor containment / rework execution"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Awaiting Floor Action</span>
+                <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">
+                  {reworkAwaitingCount}
+                </span>
+              </div>
+              <AlertCircle className="w-4 h-4 text-amber-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setReworkStatusSubFilter('IN_REVIEW')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs cursor-pointer transition-all flex items-center justify-between ${
+                reworkStatusSubFilter === 'IN_REVIEW'
+                  ? 'border-purple-500 ring-1 ring-purple-500/30 bg-purple-50/20'
+                  : 'border-slate-200/90 dark:border-slate-800 hover:border-purple-300'
+              }`}
+              title="Floor rework completed, in auditor verification review"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">In Verification Review</span>
+                <span className="text-base font-black text-purple-600 dark:text-purple-400 font-mono">
+                  {reworkInReviewCount}
+                </span>
+              </div>
+              <Clock className="w-4 h-4 text-purple-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setReworkStatusSubFilter('RESOLVED')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs cursor-pointer transition-all flex items-center justify-between ${
+                reworkStatusSubFilter === 'RESOLVED'
+                  ? 'border-emerald-500 ring-1 ring-emerald-500/30 bg-emerald-50/20'
+                  : 'border-slate-200/90 dark:border-slate-800 hover:border-emerald-300'
+              }`}
+              title="Successfully re-audited, verified and closed"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Resolved Post-Rework</span>
+                <span className="text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  {reworkResolvedCount}
+                </span>
+              </div>
+              <CheckCheck className="w-4 h-4 text-emerald-500 opacity-80" />
+            </div>
+
+            <div
+              onClick={() => setReworkStatusSubFilter('OVERDUE')}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs cursor-pointer transition-all flex items-center justify-between ${
+                reworkStatusSubFilter === 'OVERDUE'
+                  ? 'border-rose-500 ring-1 ring-rose-500/30 bg-rose-50/20'
+                  : 'border-slate-200/90 dark:border-slate-800 hover:border-rose-300'
+              }`}
+              title="Overdue target resolution deadline"
+            >
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Overdue SLA</span>
+                <span className="text-base font-black text-rose-600 dark:text-rose-400 font-mono">
+                  {reworkOverdueCount}
+                </span>
+              </div>
+              <AlertTriangle className="w-4 h-4 text-rose-500 opacity-80" />
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-semibold text-slate-400 block">Audit Rejection Rate</span>
+                <span className="text-base font-black text-indigo-600 dark:text-cyan-400 font-mono">
+                  {rejectionRate}%
+                </span>
+              </div>
+              <ShieldAlert className="w-4 h-4 text-indigo-500 opacity-80" />
+            </div>
+          </div>
+
+          {/* Sub-Filter Status Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setReworkStatusSubFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  reworkStatusSubFilter === 'ALL'
+                    ? 'bg-orange-500 text-white shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                All Rejections ({reworkComplaints.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReworkStatusSubFilter('AWAITING_ACTION')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  reworkStatusSubFilter === 'AWAITING_ACTION'
+                    ? 'bg-amber-500 text-white shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Floor Action Pending ({reworkAwaitingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReworkStatusSubFilter('IN_REVIEW')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  reworkStatusSubFilter === 'IN_REVIEW'
+                    ? 'bg-purple-600 text-white shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                In Auditor Review ({reworkInReviewCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setReworkStatusSubFilter('RESOLVED')}
+                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                  reworkStatusSubFilter === 'RESOLVED'
+                    ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                Resolved Post-Rework ({reworkResolvedCount})
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 font-mono">
+              Displaying {displayedReworkComplaints.length} of {reworkComplaints.length} Rejected NCs
+            </div>
+          </div>
+
+          {/* Rejection & Rework Detailed Audit Register Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+            <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-orange-500" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Rejected &amp; Reworked Non-Conformance Register
+                </h3>
+                <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/80 text-orange-700 dark:text-orange-300">
+                  {displayedReworkComplaints.length} Records
+                </span>
+              </div>
+              <span className="text-xs text-slate-400 hidden sm:inline">
+                Tracks auditor rejection causes, supervisor re-containment, &amp; closure proof
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              {displayedReworkComplaints.length === 0 ? (
+                <div className="p-16 text-center text-slate-500">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-950/60 text-orange-500 flex items-center justify-center mx-auto mb-3">
+                    <CheckCheck className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    No Rejected or Rework NCs in this category
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    All non-conformances under the selected filter are in good compliance standing without active rework directives.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                      <th className="py-2.5 px-3 text-center w-10">#</th>
+                      <th className="py-2.5 px-3">NC ID</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3">Dept &amp; Location</th>
+                      <th className="py-2.5 px-3 max-w-[220px]">Defect Finding</th>
+                      <th className="py-2.5 px-3 max-w-[280px]">Auditor Rejection Reason &amp; Directives</th>
+                      <th className="py-2.5 px-3">Rejected By &amp; When</th>
+                      <th className="py-2.5 px-3">Assigned Resolver</th>
+                      <th className="py-2.5 px-3 max-w-[220px]">Rework Containment Action</th>
+                      <th className="py-2.5 px-3 text-center">Due Date</th>
+                      <th className="py-2.5 px-3 text-center">Photos</th>
+                      <th className="py-2.5 px-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {displayedReworkComplaints.map((c, idx) => {
+                      const cRisk = (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase();
+                      const rejReason = getRejectionReasonText(c);
+                      const rejAuditor = getRejectionAuditor(c);
+                      const rejTime = getRejectionTimestamp(c);
+                      const isOverdue =
+                        c.status !== 'Closed' &&
+                        c.status !== 'Verified' &&
+                        c.deadlineTimestamp &&
+                        Date.now() > new Date(c.deadlineTimestamp).getTime();
+
+                      return (
+                        <tr
+                          key={c._id || c.id || c.complaintId || idx}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          {/* 1. Index */}
+                          <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
+                            {idx + 1}
+                          </td>
+
+                          {/* 2. NC ID */}
+                          <td className="py-3 px-3 align-top font-mono font-bold whitespace-nowrap">
+                            <span className="text-orange-600 dark:text-orange-400 block">
+                              {c.complaintId || 'NC-N/A'}
+                            </span>
+                            <span
+                              className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold mt-0.5 ${
+                                cRisk === 'CRITICAL'
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                                  : cRisk === 'HIGH'
+                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              }`}
+                            >
+                              {cRisk} RISK
+                            </span>
+                          </td>
+
+                          {/* 3. Status Badge */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                c.status === 'Closed' || c.status === 'Verified'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                  : c.status === 'CAP Submitted' || c.status === 'Under Review'
+                                  ? 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                  : 'bg-orange-50 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
+                              }`}
+                            >
+                              {c.status}
+                            </span>
+                            {isOverdue && (
+                              <span className="block text-[9px] text-rose-600 font-bold mt-0.5 font-mono">
+                                SLA Breached
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 4. Dept & Location */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap">
+                            <span className="font-bold text-slate-900 dark:text-white block">
+                              {c.department || '—'}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {c.location || 'Factory Floor'}
+                            </span>
+                          </td>
+
+                          {/* 5. Defect Finding */}
+                          <td className="py-3 px-3 align-top max-w-[220px]">
+                            <p className="text-slate-800 dark:text-slate-200 font-medium line-clamp-2 leading-snug">
+                              {getFindingText(c)}
+                            </p>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                              Standard: {c.requirement || '—'}
+                            </span>
+                          </td>
+
+                          {/* 6. Auditor Rejection Reason & Directives */}
+                          <td className="py-3 px-3 align-top max-w-[280px]">
+                            <div className="p-2 rounded-xl bg-orange-50/80 dark:bg-orange-950/40 border border-orange-200/80 dark:border-orange-800/80">
+                              <div className="flex items-center gap-1 text-[10px] font-bold text-orange-700 dark:text-orange-300 mb-0.5">
+                                <RotateCcw className="w-3 h-3 text-orange-600" />
+                                <span>Auditor Rejection Note:</span>
+                              </div>
+                              <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-snug line-clamp-3">
+                                {rejReason}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* 7. Rejected By & When */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                              {rejAuditor}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {rejTime}
+                            </span>
+                          </td>
+
+                          {/* 8. Assigned Resolver */}
+                          <td className="py-3 px-3 align-top whitespace-nowrap">
+                            <span className="font-semibold text-slate-900 dark:text-white block">
+                              {getAssignedToName(c)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              ID: {c.assignedTo?.employeeId || 'Floor Staff'}
+                            </span>
+                          </td>
+
+                          {/* 9. Rework Containment Action */}
+                          <td className="py-3 px-3 align-top max-w-[220px] text-slate-700 dark:text-slate-300">
+                            <p className="line-clamp-2 leading-snug">
+                              {getImmediateCorrectionText(c)}
+                            </p>
+                            {getRootCauseText(c) !== '—' && (
+                              <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
+                                Cause: {getRootCauseText(c)}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 10. Due Date */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap font-mono text-[11px]">
+                            <span className={isOverdue ? 'text-rose-600 font-bold' : 'text-slate-600 dark:text-slate-400'}>
+                              {getCapTargetDate(c)}
+                            </span>
+                          </td>
+
+                          {/* 11. Photos */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                            <div className="flex items-center justify-center gap-1">
+                              {c.beforePhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setLightboxPhoto({
+                                      url: c.beforePhoto,
+                                      title: `Initial Defect Photo: ${c.complaintId}`,
+                                      subtitle: getFindingText(c),
+                                    })
+                                  }
+                                  className="p-1 rounded bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-600 dark:text-rose-400 cursor-pointer"
+                                  title="View Original Defect Photo"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {c.afterPhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setLightboxPhoto({
+                                      url: c.afterPhoto,
+                                      title: `Rework Completion Proof: ${c.complaintId}`,
+                                      subtitle: `Status: ${c.status}`,
+                                    })
+                                  }
+                                  className="p-1 rounded bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400 cursor-pointer"
+                                  title="View Rework Completion Proof"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {!c.beforePhoto && !c.afterPhoto && (
+                                <span className="text-[10px] text-slate-400 font-mono">—</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 12. Actions */}
+                          <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => setDrilldownComplaint(c)}
+                              className="px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-950/60 hover:bg-orange-100 dark:hover:bg-orange-900/60 text-orange-600 dark:text-orange-400 font-bold text-[11px] transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                              title="Inspect Full Non-Conformance & Rejection Dossier"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Inspect</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Table Footer */}
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+              <span>Non-Conformance Rejection &amp; Rework Registry</span>
+              <span className="font-mono text-[11px]">{displayedReworkComplaints.length} Records Listed</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =======================================================================
           LIGHTBOX PHOTO MODAL (High-Resolution Zoom Modal)
           ======================================================================= */}
       {lightboxPhoto && (
@@ -3143,6 +3928,25 @@ export const ReportsView = ({
                 </div>
               </div>
             </div>
+
+            {/* Stage 3.5: Auditor Rejection Directives & Rework Instructions */}
+            {isRejectRework(drilldownComplaint) && (
+              <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-950/30 border border-orange-200/80 dark:border-orange-800/60 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-800 dark:text-orange-300">
+                  <RotateCcw className="w-3.5 h-3.5 text-orange-600" />
+                  <span>Auditor Rejection Directives &amp; Rework Request</span>
+                </div>
+                <div className="text-xs bg-white/80 dark:bg-slate-900/80 p-3 rounded-xl border border-orange-200/60 dark:border-orange-800/40">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                    <span>Rejected By: <strong className="text-slate-800 dark:text-slate-200">{getRejectionAuditor(drilldownComplaint)}</strong></span>
+                    <span className="font-mono">{getRejectionTimestamp(drilldownComplaint)}</span>
+                  </div>
+                  <p className="text-slate-800 dark:text-slate-200 font-medium">
+                    {getRejectionReasonText(drilldownComplaint)}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Photos & Evidence preview */}
             {(drilldownComplaint.beforePhoto || drilldownComplaint.afterPhoto) && (

@@ -341,7 +341,7 @@ export const DepartmentComplianceDashboard = ({
       {/* DEPARTMENT COMPLIANCE SCORECARD */}
       <div className="space-y-5 animate-fade-in">
           {/* SECTION 2: Top KPI Highlights Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {/* Card 1: Factory Overall Compliance Score */}
         <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
@@ -456,6 +456,26 @@ export const DepartmentComplianceDashboard = ({
             )}
           </div>
         </div>
+
+        {/* Card 5: Plant Rework & Rejected NCs */}
+        <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Plant Rework
+            </span>
+            <span className={`p-1 rounded-lg ${data?.totalRejectedNC > 0 ? 'bg-orange-100 text-orange-600 dark:bg-orange-950' : 'bg-slate-100 text-slate-400'}`}>
+              <RotateCcw className="w-3.5 h-3.5" />
+            </span>
+          </div>
+          <div>
+            <div className={`text-2xl sm:text-3xl font-black tracking-tight ${data?.totalRejectedNC > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-slate-900 dark:text-white'}`}>
+              {data?.totalRejectedNC ?? 0}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Returned by audit for floor re-work
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* SECTION 3: Control & View Mode Switcher */}
@@ -525,6 +545,7 @@ export const DepartmentComplianceDashboard = ({
                 <th className="py-3.5 px-3 font-bold text-center">Open NC</th>
                 <th className="py-3.5 px-3 font-bold text-center">Critical NC</th>
                 <th className="py-3.5 px-3 font-bold text-center">Overdue</th>
+                <th className="py-3.5 px-3 font-bold text-center">Rework</th>
                 <th className="py-3.5 px-3 font-bold text-center">Overdue CAP</th>
                 <th className="py-3.5 px-4 font-bold">CAP %</th>
                 <th className="py-3.5 px-4 font-bold text-right">Drill-Down</th>
@@ -621,7 +642,19 @@ export const DepartmentComplianceDashboard = ({
                       )}
                     </td>
 
-                    {/* 7. Overdue CAP */}
+                    {/* 7. Rework / Rejected NC */}
+                    <td className="py-4 px-3 text-center whitespace-nowrap">
+                      {(dept.rejectedNC || 0) > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold font-mono bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300 border border-orange-300 dark:border-orange-700">
+                          <RotateCcw className="w-3 h-3 text-orange-500" />
+                          <span>{dept.rejectedNC}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-mono text-xs font-semibold">0</span>
+                      )}
+                    </td>
+
+                    {/* 8. Overdue CAP */}
                     <td className="py-4 px-3 text-center whitespace-nowrap">
                       {(dept.overdueCap || 0) > 0 ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-orange-100 text-orange-700 border border-orange-300 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-700">

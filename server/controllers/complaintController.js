@@ -2150,6 +2150,9 @@ const getDepartmentComplianceStats = async (req, res) => {
       const overdueNC = deptComplaints.filter((c) => {
         return !['Closed', 'Verified'].includes(c.status) && new Date(c.deadlineTimestamp) < now;
       }).length;
+      const rejectedNC = deptComplaints.filter((c) =>
+        ['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status) || c.cap?.status === 'REJECTED'
+      ).length;
       const draftNC = deptComplaints.filter((c) => c.status === 'Draft').length;
 
       // When department has NO NCs logged, do NOT assign default fake 100%
@@ -2161,6 +2164,7 @@ const getDepartmentComplianceStats = async (req, res) => {
           totalNC: 0,
           openNC: 0,
           overdueNC: 0,
+          rejectedNC: 0,
           capPercent: null,
           closedNC: 0,
           verifiedNC: 0,
@@ -2235,6 +2239,7 @@ const getDepartmentComplianceStats = async (req, res) => {
         hasNC: true,
         openNC,
         overdueNC,
+        rejectedNC,
         capPercent,
         totalNC,
         closedNC,
@@ -2271,6 +2276,7 @@ const getDepartmentComplianceStats = async (req, res) => {
     const totalPlantNC = allComplaints.length;
     const totalOpenNC = allComplaints.filter((c) => !['Closed', 'Verified'].includes(c.status)).length;
     const totalOverdueNC = allComplaints.filter((c) => !['Closed', 'Verified'].includes(c.status) && new Date(c.deadlineTimestamp) < now).length;
+    const totalRejectedNC = allComplaints.filter((c) => ['Rejected / Rework', 'Rejected / Sent Back'].includes(c.status) || c.cap?.status === 'REJECTED').length;
     const totalClosedNC = allComplaints.filter((c) => ['Closed', 'Verified'].includes(c.status)).length;
     const avgCapPercent = totalPlantNC > 0
       ? Math.round((totalClosedNC / totalPlantNC) * 100)
@@ -2321,6 +2327,7 @@ const getDepartmentComplianceStats = async (req, res) => {
       totalPlantNC,
       totalOpenNC,
       totalOverdueNC,
+      totalRejectedNC,
       totalAudits,
       avgCapPercent,
       monthlyTrend,
