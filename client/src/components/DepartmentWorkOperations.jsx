@@ -158,7 +158,7 @@ export const DepartmentWorkOperations = ({
   // Dynamically compute department tabs
   const activeDepartments = useMemo(() => {
     if (departmentsList && departmentsList.length > 0) {
-      return departmentsList.map((d) => d.department);
+      return departmentsList.map((d) => d.department || d.name || d).filter(Boolean);
     }
     return FACTORY_DEPARTMENTS;
   }, [departmentsList]);
