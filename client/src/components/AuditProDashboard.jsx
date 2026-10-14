@@ -981,9 +981,9 @@ export const AuditProDashboard = ({
       {/* -----------------------------------------------------------------------
           ROW 2: 3 ANALYTICS VISUALIZATIONS (NC Inflow Trend, NC Severity, CAP Status)
           ----------------------------------------------------------------------- */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-stretch">
         {/* Visual 1: NC Defect Inflow & Resolution Trend (Combo Bar & Line Chart, 5 cols) */}
-        <div className="xl:col-span-5 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden">
+        <div className="xl:col-span-5 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 overflow-hidden h-full">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
@@ -1169,250 +1169,281 @@ export const AuditProDashboard = ({
           </div>
         </div>
 
-        {/* Visual 2: NC Severity Breakdown (Donut Chart, 3.5 cols) */}
-        <div className="xl:col-span-3.5 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0">
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 shrink-0">
-                  <ShieldAlert className="w-4 h-4" />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                    NC Severity Breakdown
-                  </h3>
-                  <p className="text-xs text-slate-400 truncate">
-                    Risk distribution of active non-conformances
-                  </p>
+        {/* Visuals 2 & 3: Donut Charts Container (7 cols, equal 2-col subgrid) */}
+        <div className="xl:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+          {/* Visual 2: NC Severity Breakdown */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 h-full">
+            <div className="flex-1 flex flex-col justify-between">
+              {/* Card Header */}
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 shrink-0">
+                    <ShieldAlert className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      NC Severity Breakdown
+                    </h3>
+                    <p className="text-xs text-slate-400 truncate">
+                      Risk distribution of active non-conformances
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Donut Container & Legend */}
+              <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 py-2 min-w-0">
+                {/* SVG Donut */}
+                <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 transform">
+                    {/* Background Track */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#f1f5f9"
+                      className="dark:stroke-slate-800"
+                      strokeWidth="13"
+                      fill="transparent"
+                    />
+                    {/* High (Red) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#ef4444"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(severityBreakdown.high.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset="0"
+                    />
+                    {/* Med (Amber) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#f59e0b"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(severityBreakdown.med.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset={`-${(severityBreakdown.high.pct * 238.76) / 100}`}
+                    />
+                    {/* Low (Blue) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#3b82f6"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(severityBreakdown.low.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset={`-${((severityBreakdown.high.pct + severityBreakdown.med.pct) * 238.76) / 100}`}
+                    />
+                  </svg>
+
+                  {/* Donut Center Text */}
+                  <div className="absolute text-center pointer-events-none">
+                    <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono leading-none">
+                      {severityBreakdown.total}
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Total NCs</div>
+                  </div>
+                </div>
+
+                {/* Legend List */}
+                <div className="w-full sm:flex-1 min-w-0 flex flex-col justify-center space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-rose-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">Critical / High</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {severityBreakdown.high.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.high.pct}%)</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-amber-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">Medium</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {severityBreakdown.med.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.med.pct}%)</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-blue-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">Low / Minor</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {severityBreakdown.low.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.low.pct}%)</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Donut Container & Legend */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-3 min-w-0">
-              {/* SVG Donut */}
-              <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 transform">
-                  {/* Background Track */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#f1f5f9"
-                    className="dark:stroke-slate-800"
-                    strokeWidth="13"
-                    fill="transparent"
-                  />
-                  {/* High (Red) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#ef4444"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(severityBreakdown.high.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset="0"
-                  />
-                  {/* Med (Amber) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#f59e0b"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(severityBreakdown.med.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset={`-${(severityBreakdown.high.pct * 238.76) / 100}`}
-                  />
-                  {/* Low (Blue) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#3b82f6"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(severityBreakdown.low.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset={`-${((severityBreakdown.high.pct + severityBreakdown.med.pct) * 238.76) / 100}`}
-                  />
-                </svg>
-
-                {/* Donut Center Text */}
-                <div className="absolute text-center pointer-events-none">
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono leading-none">
-                    {severityBreakdown.total}
-                  </div>
-                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Total NCs</div>
-                </div>
-              </div>
-
-              {/* Legend List */}
-              <div className="space-y-2 text-xs flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-rose-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">Critical / High</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {severityBreakdown.high.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.high.pct}%)</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-amber-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">Medium</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {severityBreakdown.med.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.med.pct}%)</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-blue-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">Low / Minor</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {severityBreakdown.low.count} <span className="text-[10px] text-slate-400 font-normal">({severityBreakdown.low.pct}%)</span>
-                  </span>
-                </div>
-              </div>
+            {/* Bottom Card Footer */}
+            <div className="pt-3 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span className="font-medium">Active Risk Levels</span>
+              <button
+                type="button"
+                onClick={() => onNavigateSection && onNavigateSection('nc-cap')}
+                className="text-rose-600 hover:text-rose-700 dark:text-rose-400 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span>View Active NCs</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Visual 3: CAP Status Breakdown (Donut Chart, 3.5 cols) */}
-        <div className="xl:col-span-3.5 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0">
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <CheckCheck className="w-4 h-4" />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                    CAP Status Breakdown
-                  </h3>
-                  <p className="text-xs text-slate-400 truncate">
-                    Corrective &amp; preventive action lifecycle
-                  </p>
+          {/* Visual 3: CAP Status Breakdown */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between min-w-0 h-full">
+            <div className="flex-1 flex flex-col justify-between">
+              {/* Card Header */}
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <CheckCheck className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                      CAP Status Breakdown
+                    </h3>
+                    <p className="text-xs text-slate-400 truncate">
+                      Corrective &amp; preventive action lifecycle
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Donut Container & Legend */}
+              <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 py-2 min-w-0">
+                {/* SVG Donut */}
+                <div className="relative w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 transform">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#f1f5f9"
+                      className="dark:stroke-slate-800"
+                      strokeWidth="13"
+                      fill="transparent"
+                    />
+                    {/* Closed / Verified (Green) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#10b981"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(capStatusBreakdown.submitted.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset="0"
+                    />
+                    {/* In Progress (Blue) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#3b82f6"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(capStatusBreakdown.inProgress.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset={`-${(capStatusBreakdown.submitted.pct * 238.76) / 100}`}
+                    />
+                    {/* Pending Review (Amber) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#f59e0b"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(capStatusBreakdown.pending.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset={`-${((capStatusBreakdown.submitted.pct + capStatusBreakdown.inProgress.pct) * 238.76) / 100}`}
+                    />
+                    {/* Not Submitted (Red) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#ef4444"
+                      strokeWidth="13"
+                      fill="transparent"
+                      strokeDasharray={`${(capStatusBreakdown.notSubmitted.pct * 238.76) / 100} 238.76`}
+                      strokeDashoffset={`-${((capStatusBreakdown.submitted.pct + capStatusBreakdown.inProgress.pct + capStatusBreakdown.pending.pct) * 238.76) / 100}`}
+                    />
+                  </svg>
+
+                  {/* Donut Center Text */}
+                  <div className="absolute text-center pointer-events-none">
+                    <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono leading-none">
+                      {capStatusBreakdown.total}
+                    </div>
+                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Total NCs</div>
+                  </div>
+                </div>
+
+                {/* Legend List */}
+                <div className="w-full sm:flex-1 min-w-0 flex flex-col justify-center space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-emerald-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">Closed / Verified</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {capStatusBreakdown.submitted.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.submitted.pct}%)</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-blue-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">In Progress</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {capStatusBreakdown.inProgress.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.inProgress.pct}%)</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-amber-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">Pending Review</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {capStatusBreakdown.pending.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.pending.pct}%)</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 py-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 bg-rose-500" />
+                      <span className="truncate whitespace-nowrap text-[11px]">Open / Not Started</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
+                      {capStatusBreakdown.notSubmitted.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.notSubmitted.pct}%)</span>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Donut Container & Legend */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-3 min-w-0">
-              {/* SVG Donut */}
-              <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90 transform">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#f1f5f9"
-                    className="dark:stroke-slate-800"
-                    strokeWidth="13"
-                    fill="transparent"
-                  />
-                  {/* Closed / Verified (Green) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#10b981"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(capStatusBreakdown.submitted.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset="0"
-                  />
-                  {/* In Progress (Blue) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#3b82f6"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(capStatusBreakdown.inProgress.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset={`-${(capStatusBreakdown.submitted.pct * 238.76) / 100}`}
-                  />
-                  {/* Pending Review (Amber) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#f59e0b"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(capStatusBreakdown.pending.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset={`-${((capStatusBreakdown.submitted.pct + capStatusBreakdown.inProgress.pct) * 238.76) / 100}`}
-                  />
-                  {/* Not Submitted (Red) */}
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="38"
-                    stroke="#ef4444"
-                    strokeWidth="13"
-                    fill="transparent"
-                    strokeDasharray={`${(capStatusBreakdown.notSubmitted.pct * 238.76) / 100} 238.76`}
-                    strokeDashoffset={`-${((capStatusBreakdown.submitted.pct + capStatusBreakdown.inProgress.pct + capStatusBreakdown.pending.pct) * 238.76) / 100}`}
-                  />
-                </svg>
-
-                {/* Donut Center Text */}
-                <div className="absolute text-center pointer-events-none">
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono leading-none">
-                    {capStatusBreakdown.total}
-                  </div>
-                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Total NCs</div>
-                </div>
-              </div>
-
-              {/* Legend List */}
-              <div className="space-y-1.5 text-xs flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">Closed / Verified</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {capStatusBreakdown.submitted.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.submitted.pct}%)</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">In Progress</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {capStatusBreakdown.inProgress.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.inProgress.pct}%)</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2 h-2 rounded-full shrink-0 bg-amber-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">Pending Review</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {capStatusBreakdown.pending.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.pending.pct}%)</span>
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between gap-1 py-0.5">
-                  <span className="flex items-center gap-1.5 min-w-0 font-medium text-slate-700 dark:text-slate-300">
-                    <span className="w-2 h-2 rounded-full shrink-0 bg-rose-500" />
-                    <span className="truncate whitespace-nowrap text-[11px]">Open / Not Started</span>
-                  </span>
-                  <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 shrink-0 whitespace-nowrap pl-1">
-                    {capStatusBreakdown.notSubmitted.count} <span className="text-[10px] text-slate-400 font-normal">({capStatusBreakdown.notSubmitted.pct}%)</span>
-                  </span>
-                </div>
-              </div>
+            {/* Bottom Card Footer */}
+            <div className="pt-3 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span className="font-medium">Lifecycle Tracking</span>
+              <button
+                type="button"
+                onClick={() => onNavigateSection && onNavigateSection('cap')}
+                className="text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <span>View CAP Register</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
