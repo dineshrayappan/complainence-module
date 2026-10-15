@@ -1079,41 +1079,51 @@ export const ReportsView = ({
           },
         });
 
-        // If department drilled down, also print its NCs
-        if (selectedDeptDetail) {
-          const deptObj = departmentStatsList.find((d) => d.department === selectedDeptDetail);
-          if (deptObj && deptObj.complaints.length > 0) {
-            const nextY = doc.lastAutoTable.finalY + 20;
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(...brandDark);
-            doc.text(`Non-Conformance Register for ${selectedDeptDetail}`, margin, nextY);
+        // If department drilled down or filtered, print its NC register and photo evidence
+        const targetDept = selectedDeptDetail || (departmentFilter !== 'ALL' ? departmentFilter : null);
+        const deptObj = targetDept ? departmentStatsList.find((d) => d.department === targetDept) : null;
+        const ncListToDraw = deptObj ? deptObj.complaints : (departmentStatsList.length === 1 ? departmentStatsList[0].complaints : []);
 
-            const ncRows = deptObj.complaints.map((c) => [
-              c.complaintId || 'NC-N/A',
-              getFindingText(c).slice(0, 50),
-              getAssignedToName(c),
-              (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase(),
-              c.status,
-              c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A',
-              c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : 'Pending',
-            ]);
+        if (ncListToDraw.length > 0) {
+          const nextY = doc.lastAutoTable.finalY + 20;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(11);
+          doc.setTextColor(...brandDark);
+          doc.text(`Non-Conformance Register for ${targetDept || 'Department'}`, margin, nextY);
 
-            autoTable(doc, {
-              startY: nextY + 8,
-              head: [['NC ID', 'Defect Finding', 'Assigned To', 'Risk', 'Status', 'Logged', 'Closed']],
-              body: ncRows,
-              theme: 'striped',
-              headStyles: { fillColor: [15, 23, 42], fontSize: 7.5 },
-              styles: { fontSize: 7, cellPadding: 3 },
-            });
+          const ncRows = ncListToDraw.map((c) => [
+            c.complaintId || 'NC-N/A',
+            getFindingText(c).slice(0, 50),
+            getAssignedToName(c),
+            (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase(),
+            c.status,
+            c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A',
+            c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : 'Pending',
+          ]);
 
-            // Detailed photographic evidence for department NCs
-            let deptPhotoY = doc.lastAutoTable.finalY + 16;
-            for (let idx = 0; idx < deptObj.complaints.length; idx++) {
-              const c = deptObj.complaints[idx];
-              deptPhotoY = await drawNCWithPhotos(doc, c, deptPhotoY, pageWidth, margin, contentWidth, idx);
-            }
+          autoTable(doc, {
+            startY: nextY + 8,
+            head: [['NC ID', 'Defect Finding', 'Assigned To', 'Risk', 'Status', 'Logged', 'Closed']],
+            body: ncRows,
+            theme: 'striped',
+            headStyles: { fillColor: [15, 23, 42], fontSize: 7.5 },
+            styles: { fontSize: 7, cellPadding: 3 },
+          });
+
+          // Detailed photographic evidence for department NCs
+          doc.addPage();
+          let deptPhotoY = margin + 15;
+          doc.setFillColor(...brandPrimary);
+          doc.roundedRect(margin, deptPhotoY, contentWidth, 24, 4, 4, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text(`Photographic Defect & Corrective Verification Evidence (${targetDept || 'Department'})`, margin + 10, deptPhotoY + 16);
+          deptPhotoY += 34;
+
+          for (let idx = 0; idx < ncListToDraw.length; idx++) {
+            const c = ncListToDraw[idx];
+            deptPhotoY = await drawNCWithPhotos(doc, c, deptPhotoY, pageWidth, margin, contentWidth, idx);
           }
         }
 
@@ -1168,6 +1178,23 @@ export const ReportsView = ({
             8: { halign: 'center', fontStyle: 'bold' },
           },
         });
+
+        if (datasetToExport.length > 0) {
+          doc.addPage();
+          let memPhotoY = margin + 15;
+          doc.setFillColor(...brandPrimary);
+          doc.roundedRect(margin, memPhotoY, contentWidth, 24, 4, 4, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text('Member Non-Conformance Defect & Corrective Photographic Verification Dossier', margin + 10, memPhotoY + 16);
+          memPhotoY += 34;
+
+          for (let idx = 0; idx < datasetToExport.length; idx++) {
+            const c = datasetToExport[idx];
+            memPhotoY = await drawNCWithPhotos(doc, c, memPhotoY, pageWidth, margin, contentWidth, idx);
+          }
+        }
 
         doc.save(`Garment_QMS_Department_Members_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
       }
