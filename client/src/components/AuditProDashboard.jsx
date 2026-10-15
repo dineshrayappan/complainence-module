@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { complaintService, taskService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { DepartmentWorkOperations } from './DepartmentWorkOperations';
 
 export const AuditProDashboard = ({
   onNavigateSection,
@@ -46,6 +47,19 @@ export const AuditProDashboard = ({
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [complaints, setComplaints] = useState([]);
+
+  // Dashboard View Tab: 'compliance' | 'operations'
+  const [dashboardViewTab, setDashboardViewTab] = useState('compliance');
+  const [liveOpsSummary, setLiveOpsSummary] = useState(null);
+
+  useEffect(() => {
+    taskService
+      .getLiveFloorStatus()
+      .then((res) => {
+        if (res?.data?.summary) setLiveOpsSummary(res.data.summary);
+      })
+      .catch(() => {});
+  }, []);
 
   // Filter & Search states
   const [dateRangePreset, setDateRangePreset] = useState('ALL'); // 'ALL', 'THIS_MONTH', '30D', '7D'
@@ -745,10 +759,73 @@ export const AuditProDashboard = ({
         </div>
       </div>
 
-      {/* -----------------------------------------------------------------------
-          ROW 1: 8 NC & CAP KPI METRIC CARDS
-          ----------------------------------------------------------------------- */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
+      {/* VIEW SELECTION SWITCHER & TELEMETRY RIBBON */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setDashboardViewTab('compliance')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              dashboardViewTab === 'compliance'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            <span>NC &amp; CAP Compliance Dashboard</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDashboardViewTab('operations')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              dashboardViewTab === 'operations'
+                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-sm border border-slate-200/60 dark:border-slate-700/60'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span>Live Department Work Operations</span>
+            {liveOpsSummary && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                <span>{liveOpsSummary.presentEmployees || 0} Present</span>
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Quick telemetry stats on the right */}
+        {dashboardViewTab === 'compliance' && liveOpsSummary && (
+          <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 px-2 overflow-x-auto">
+            <span>Floor Live:</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              🟢 {liveOpsSummary.presentEmployees || 0} Staff
+            </span>
+            <span>•</span>
+            <span className="font-bold text-amber-600 dark:text-amber-400 font-mono">
+              🟡 {liveOpsSummary.busyEmployees || 0} Busy
+            </span>
+            <span>•</span>
+            <span className="font-bold text-indigo-600 dark:text-cyan-400 font-mono">
+              📋 {liveOpsSummary.tasksInProgress || 0} In Progress
+            </span>
+          </div>
+        )}
+      </div>
+
+      {dashboardViewTab === 'operations' ? (
+        <DepartmentWorkOperations
+          initialDepartment="ALL"
+          embedded={true}
+          onBackToScorecard={() => setDashboardViewTab('compliance')}
+        />
+      ) : (
+        <>
+          {/* -----------------------------------------------------------------------
+              ROW 1: 8 NC & CAP KPI METRIC CARDS
+              ----------------------------------------------------------------------- */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
         {/* CARD 1: Total NCs */}
         <div
           onClick={() => onNavigateSection && onNavigateSection('nc-cap')}
@@ -1888,6 +1965,8 @@ export const AuditProDashboard = ({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

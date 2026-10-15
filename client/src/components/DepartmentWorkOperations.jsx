@@ -10,12 +10,17 @@ import {
   X,
   AlertCircle,
   AlertTriangle,
+  AlertOctagon,
   Clock,
   Calendar,
   ClipboardList,
   Check,
   Eye,
   Users,
+  UserCheck,
+  UserX,
+  Zap,
+  Filter,
   Sparkles,
   ArrowRight,
   ChevronRight,
@@ -51,6 +56,7 @@ const getDeptIcon = (deptName) => {
 export const DepartmentWorkOperations = ({
   initialDepartment = 'ALL',
   onBackToScorecard,
+  embedded = false,
 }) => {
   const { isAdmin, isAuditor, user } = useAuth();
   const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || (!isAdmin && !isAuditor);
@@ -64,6 +70,11 @@ export const DepartmentWorkOperations = ({
   const [liveStatusData, setLiveStatusData] = useState(null);
   const [usersList, setUsersList] = useState([]);
   const [departmentsList, setDepartmentsList] = useState([]);
+
+  // Admin & Auditor View Mode: 'employees' (Employee Details Table) | 'tasks' (Floor Tasks Queue)
+  const [activeViewMode, setActiveViewMode] = useState(isAdmin || isAuditor ? 'employees' : 'tasks');
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+  const [employeeAvailabilityFilter, setEmployeeAvailabilityFilter] = useState('ALL'); // 'ALL' | 'PRESENT' | 'ABSENT' | 'BUSY' | 'AVAILABLE'
 
   const [selectedDept, setSelectedDept] = useState(() => {
     if (initialDepartment && initialDepartment !== 'ALL') {
@@ -431,6 +442,8 @@ export const DepartmentWorkOperations = ({
             ? tasks
             : tasks.filter((t) => (t.department || '').toLowerCase() === selectedDept.toLowerCase());
 
+        const summary = liveStatusData?.summary || {};
+
         const pendingTasks = deptTasks.filter(
           (t) =>
             t.status !== 'Completed' &&
@@ -438,160 +451,589 @@ export const DepartmentWorkOperations = ({
             t.workStatus !== 'IN_PROGRESS' &&
             t.status !== 'In Progress'
         );
-        const busy = deptEmps.filter((e) => e.status === 'In Progress / Busy');
-        const completed = deptEmps.filter((e) => e.status === 'Completed');
+        const busy = deptEmps.filter((e) => e.isBusy || e.workAvailability === 'Busy' || e.status === 'In Progress / Busy');
+        const completed = deptEmps.filter((e) => e.status === 'Completed' || e.taskStatus === 'Completed');
+
+        return (
+          <div className="space-y-4">
+            {/* 1. TOP STATUS METRICS */}
+            {!isSupervisor ? (
+              /* ADMIN & AUDITOR OVERSIGHT: FULL 9 LIVE STATUS METRICS */
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-2.5 sm:gap-3">
+                {/* 1. Present Employees */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Present</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                    {summary.presentEmployees ?? deptEmps.filter((e) => e.isPresent).length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Logged in today</span>
+                </div>
+
+                {/* 2. Absent Employees */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Absent</span>
+                    <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-slate-600 dark:text-slate-300">
+                    {summary.absentEmployees ?? deptEmps.filter((e) => !e.isPresent).length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">No active session</span>
+                </div>
+
+                {/* 3. Busy Employees */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Busy</span>
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-amber-600 dark:text-amber-400">
+                    {summary.busyEmployees ?? busy.length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Occupied on task</span>
+                </div>
+
+                {/* 4. Available Employees */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-teal-200 dark:border-teal-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Available</span>
+                    <span className="w-2 h-2 rounded-full bg-teal-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-teal-600 dark:text-teal-400">
+                    {summary.availableEmployees ?? deptEmps.filter((e) => e.isPresent && !e.isBusy).length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Ready for work</span>
+                </div>
+
+                {/* 5. Currently Working */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Working</span>
+                    <Zap className="w-3 h-3 text-blue-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-blue-600 dark:text-blue-400">
+                    {summary.workingEmployees ?? busy.length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Active floor action</span>
+                </div>
+
+                {/* 6. Tasks In Progress */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">In Progress</span>
+                    <Clock className="w-3 h-3 text-indigo-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                    {summary.tasksInProgress ?? summary.inProgress ?? deptTasks.filter((t) => t.status === 'In Progress' || t.workStatus === 'IN_PROGRESS').length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Floor tasks started</span>
+                </div>
+
+                {/* 7. Completed Tasks */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Completed</span>
+                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-emerald-700 dark:text-emerald-300">
+                    {summary.completedTasks ?? summary.completed ?? deptTasks.filter((t) => t.status === 'Completed' || t.workStatus === 'COMPLETED').length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Saved &amp; verified</span>
+                </div>
+
+                {/* 8. Pending Tasks */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending</span>
+                    <ClipboardList className="w-3 h-3 text-violet-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-violet-600 dark:text-violet-400">
+                    {summary.pendingTasks ?? summary.pending ?? pendingTasks.length}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Awaiting floor start</span>
+                </div>
+
+                {/* 9. Overdue Tasks */}
+                <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-rose-200 dark:border-rose-900/60 shadow-xs flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Overdue</span>
+                    <AlertOctagon className="w-3 h-3 text-rose-500" />
+                  </div>
+                  <div className="mt-2 text-2xl font-black text-rose-600 dark:text-rose-400">
+                    {summary.overdueTasks ?? summary.overdue ?? 0}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Past SLA deadline</span>
+                </div>
+              </div>
+            ) : (
+              /* SUPERVISOR VIEW: FOCUSED FLOOR OPERATIONS CARDS */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {/* 1. PENDING TASKS QUEUE */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200/90 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Pending Floor Tasks</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300">
+                        Ready to Start
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white">
+                      {pendingTasks.length}{' '}
+                      <span className="text-xs font-medium text-slate-400">
+                        {pendingTasks.length === 1 ? 'task' : 'tasks'} queued
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-indigo-100 dark:border-indigo-950/60">
+                    {pendingTasks.length === 0 ? (
+                      <span className="text-[11px] text-slate-400 italic">No pending tasks queued</span>
+                    ) : (
+                      <div className="space-y-1.5 max-h-24 overflow-y-auto">
+                        {pendingTasks.slice(0, 5).map((t) => (
+                          <div
+                            key={t.id || t._id}
+                            className="p-1.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 text-[11px] flex items-center justify-between"
+                          >
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
+                              {t.title}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 shrink-0">
+                              {t.priority || 'MEDIUM'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. BUSY / IN PROGRESS */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800/80 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+                        <span>Busy / In Progress</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 animate-pulse">
+                        Working On Floor
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
+                      {busy.length}{' '}
+                      <span className="text-xs font-medium text-slate-400">
+                        {busy.length === 1 ? 'employee' : 'employees'} occupied
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-amber-100 dark:border-amber-950/60">
+                    {busy.length === 0 ? (
+                      <span className="text-[11px] text-slate-400 italic">No employees currently busy</span>
+                    ) : (
+                      <div className="space-y-1.5 max-h-24 overflow-y-auto">
+                        {busy.map((e) => (
+                          <div
+                            key={e.employeeId || e.userId}
+                            className="p-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-[11px] flex items-center justify-between"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                🟡 {e.name} ({e.employeeId})
+                              </span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">
+                                Task: {e.assignedTask?.title || 'Active inspection'}
+                              </span>
+                            </div>
+                            {e.startTime && (
+                              <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 shrink-0">
+                                {new Date(e.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. COMPLETED WITH VERIFIED PROOF */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-900/60 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Completed Tasks</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+                        Photo Verified
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900 dark:text-white">
+                      {completed.length}{' '}
+                      <span className="text-xs font-medium text-slate-400">with verified proof</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-2.5 border-t border-emerald-100 dark:border-emerald-950/60">
+                    {completed.length === 0 ? (
+                      <span className="text-[11px] text-slate-400 italic">No tasks completed yet in this section</span>
+                    ) : (
+                      <div className="space-y-1.5 max-h-24 overflow-y-auto">
+                        {completed.map((e) => (
+                          <div
+                            key={e.employeeId || e.userId}
+                            className="p-1.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-[11px] flex items-center justify-between"
+                          >
+                            <div className="min-w-0 pr-2">
+                              <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                🏆 {e.name} ({e.employeeId})
+                              </span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">
+                                {e.assignedTask?.title || 'Completed task'}
+                              </span>
+                            </div>
+                            {e.proofPhoto && (
+                              <button
+                                onClick={() =>
+                                  setViewProofTask({
+                                    title: e.assignedTask?.title || 'Completed Work',
+                                    department: e.department,
+                                    completedBy: e,
+                                    completedAt: e.completionTime,
+                                    proofPhoto: e.proofPhoto,
+                                    proofNotes: e.proofNotes,
+                                  })
+                                }
+                                className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shrink-0 cursor-pointer"
+                              >
+                                View Proof
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. ADMIN & AUDITOR VIEW MODE SWITCHER TABS */}
+            {!isSupervisor && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 pb-1 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveViewMode('employees')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeViewMode === 'employees'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Employee Details Table</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 text-white">
+                      {deptEmps.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveViewMode('tasks')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeViewMode === 'tasks'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <ClipboardList className="w-3.5 h-3.5" />
+                    <span>Department Floor Tasks Queue</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-500">
+                      {deptTasks.length}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* EMPLOYEE DETAILS TABLE (ADMIN & AUDITOR OVERSIGHT) */}
+      {!isSupervisor && activeViewMode === 'employees' && (() => {
+        const allEmps = liveStatusData?.employees || [];
+        let deptEmps =
+          selectedDept === 'ALL'
+            ? allEmps
+            : allEmps.filter((e) => (e.department || '').toLowerCase() === selectedDept.toLowerCase());
+
+        // Employee-wise search filter
+        if (employeeSearchQuery.trim()) {
+          const q = employeeSearchQuery.toLowerCase();
+          deptEmps = deptEmps.filter(
+            (e) =>
+              e.name?.toLowerCase().includes(q) ||
+              e.employeeId?.toLowerCase().includes(q) ||
+              e.department?.toLowerCase().includes(q) ||
+              e.designation?.toLowerCase().includes(q) ||
+              e.currentAssignedTask?.toLowerCase().includes(q) ||
+              e.assignedTask?.title?.toLowerCase().includes(q)
+          );
+        }
+
+        // Work availability / attendance filter
+        if (employeeAvailabilityFilter === 'PRESENT') {
+          deptEmps = deptEmps.filter((e) => e.isPresent);
+        } else if (employeeAvailabilityFilter === 'ABSENT') {
+          deptEmps = deptEmps.filter((e) => !e.isPresent);
+        } else if (employeeAvailabilityFilter === 'BUSY') {
+          deptEmps = deptEmps.filter((e) => e.isBusy || e.workAvailability === 'Busy');
+        } else if (employeeAvailabilityFilter === 'AVAILABLE') {
+          deptEmps = deptEmps.filter((e) => e.isPresent && !e.isBusy);
+        }
+
+        const presentCount = (selectedDept === 'ALL' ? allEmps : allEmps.filter((e) => (e.department || '').toLowerCase() === selectedDept.toLowerCase())).filter((e) => e.isPresent).length;
+        const absentCount = (selectedDept === 'ALL' ? allEmps : allEmps.filter((e) => (e.department || '').toLowerCase() === selectedDept.toLowerCase())).filter((e) => !e.isPresent).length;
+        const busyCount = (selectedDept === 'ALL' ? allEmps : allEmps.filter((e) => (e.department || '').toLowerCase() === selectedDept.toLowerCase())).filter((e) => e.isBusy || e.workAvailability === 'Busy').length;
+        const availableCount = (selectedDept === 'ALL' ? allEmps : allEmps.filter((e) => (e.department || '').toLowerCase() === selectedDept.toLowerCase())).filter((e) => e.isPresent && !e.isBusy).length;
 
         return (
           <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {/* 1. PENDING TASKS QUEUE */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200/90 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Pending Floor Tasks</span>
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300">
-                      Ready to Start
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-white">
-                    {pendingTasks.length}{' '}
-                    <span className="text-xs font-medium text-slate-400">
-                      {pendingTasks.length === 1 ? 'task' : 'tasks'} queued
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-indigo-100 dark:border-indigo-950/60">
-                  {pendingTasks.length === 0 ? (
-                    <span className="text-[11px] text-slate-400 italic">No pending tasks queued</span>
-                  ) : (
-                    <div className="space-y-1.5 max-h-24 overflow-y-auto">
-                      {pendingTasks.slice(0, 5).map((t) => (
-                        <div
-                          key={t.id || t._id}
-                          className="p-1.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 text-[11px] flex items-center justify-between"
-                        >
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
-                            {t.title}
-                          </span>
-                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 shrink-0">
-                            {t.priority || 'MEDIUM'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            {/* Search & Quick Filter Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter employee by name, ID, designation, or task..."
+                  value={employeeSearchQuery}
+                  onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
 
-              {/* 2. BUSY / IN PROGRESS */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800/80 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
-                      <span>Busy / In Progress</span>
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 animate-pulse">
-                      Working On Floor
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                    {busy.length}{' '}
-                    <span className="text-xs font-medium text-slate-400">
-                      {busy.length === 1 ? 'employee' : 'employees'} occupied
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-amber-100 dark:border-amber-950/60">
-                  {busy.length === 0 ? (
-                    <span className="text-[11px] text-slate-400 italic">No employees currently busy</span>
-                  ) : (
-                    <div className="space-y-1.5 max-h-24 overflow-y-auto">
-                      {busy.map((e) => (
-                        <div
-                          key={e.employeeId || e.userId}
-                          className="p-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-[11px] flex items-center justify-between"
-                        >
-                          <div className="min-w-0 pr-2">
-                            <span className="font-bold text-slate-900 dark:text-white block truncate">
-                              🟡 {e.name} ({e.employeeId})
-                            </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">
-                              Task: {e.assignedTask?.title || 'Active inspection'}
-                            </span>
-                          </div>
-                          {e.startTime && (
-                            <span className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 shrink-0">
-                              {new Date(e.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {/* Quick status filter pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                {[
+                  { id: 'ALL', label: 'All Staff' },
+                  { id: 'PRESENT', label: `🟢 Present (${presentCount})` },
+                  { id: 'ABSENT', label: `⚪ Absent (${absentCount})` },
+                  { id: 'BUSY', label: `🟡 Busy (${busyCount})` },
+                  { id: 'AVAILABLE', label: `🟢 Available (${availableCount})` },
+                ].map((pill) => (
+                  <button
+                    key={pill.id}
+                    onClick={() => setEmployeeAvailabilityFilter(pill.id)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                      employeeAvailabilityFilter === pill.id
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* 3. COMPLETED WITH VERIFIED PROOF */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-900/60 shadow-xs flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Completed Tasks</span>
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
-                      Photo Verified
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-slate-900 dark:text-white">
-                    {completed.length}{' '}
-                    <span className="text-xs font-medium text-slate-400">with verified proof</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-emerald-100 dark:border-emerald-950/60">
-                  {completed.length === 0 ? (
-                    <span className="text-[11px] text-slate-400 italic">No tasks completed yet in this section</span>
-                  ) : (
-                    <div className="space-y-1.5 max-h-24 overflow-y-auto">
-                      {completed.map((e) => (
-                        <div
-                          key={e.employeeId || e.userId}
-                          className="p-1.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-[11px] flex items-center justify-between"
-                        >
-                          <div className="min-w-0 pr-2">
-                            <span className="font-bold text-slate-900 dark:text-white block truncate">
-                              🏆 {e.name} ({e.employeeId})
+            {/* Table Container */}
+            <div className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 dark:bg-slate-800/50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200/80 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-3.5">Employee Name &amp; ID</th>
+                      <th className="py-3 px-3">Department</th>
+                      <th className="py-3 px-3">Attendance</th>
+                      <th className="py-3 px-3">Availability</th>
+                      <th className="py-3 px-3">Current Assigned Task</th>
+                      <th className="py-3 px-3">Start Time</th>
+                      <th className="py-3 px-3">Duration</th>
+                      <th className="py-3 px-3">Task Status</th>
+                      <th className="py-3 px-2 text-center">Assigned</th>
+                      <th className="py-3 px-2 text-center">Completed</th>
+                      <th className="py-3 px-2 text-center">Pending</th>
+                      <th className="py-3 px-3 text-right">Completion Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {deptEmps.length === 0 ? (
+                      <tr>
+                        <td colSpan={12} className="py-8 text-center text-slate-400 italic font-mono text-xs">
+                          No employee records match the selected filter criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      deptEmps.map((emp) => (
+                        <tr key={emp.employeeId || emp.userId} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
+                          {/* Employee */}
+                          <td className="py-2.5 px-3.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-black text-xs text-slate-700 dark:text-slate-300 shrink-0">
+                                {emp.name?.charAt(0)?.toUpperCase() || 'U'}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="font-bold text-slate-900 dark:text-white block truncate">
+                                  {emp.name}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400 block">
+                                  {emp.employeeId || 'N/A'} {emp.designation ? `• ${emp.designation}` : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Department */}
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              <span>{getDeptIcon(emp.department)}</span>
+                              <span>{emp.department || 'General'}</span>
                             </span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">
-                              {e.assignedTask?.title || 'Completed task'}
-                            </span>
-                          </div>
-                          {e.proofPhoto && (
-                            <button
-                              onClick={() =>
-                                setViewProofTask({
-                                  title: e.assignedTask?.title || 'Completed Work',
-                                  department: e.department,
-                                  completedBy: e,
-                                  completedAt: e.completionTime,
-                                  proofPhoto: e.proofPhoto,
-                                  proofNotes: e.proofNotes,
-                                })
-                              }
-                              className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shrink-0 cursor-pointer"
-                            >
-                              View Proof
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                          </td>
+
+                          {/* Attendance Status */}
+                          <td className="py-2.5 px-3">
+                            {emp.isPresent ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800" title={emp.loginTimestamp ? `Logged in: ${new Date(emp.loginTimestamp).toLocaleTimeString()}` : 'Active session'}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                <span>Present</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                <span>Absent</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Work Availability */}
+                          <td className="py-2.5 px-3">
+                            {emp.isBusy || emp.workAvailability === 'Busy' || emp.status === 'In Progress / Busy' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                <span>Busy</span>
+                              </span>
+                            ) : emp.isPresent ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-400 border border-teal-300 dark:border-teal-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                                <span>Available</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-400 dark:bg-slate-800/80 dark:text-slate-500">
+                                <span>Offline</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Current Assigned Task */}
+                          <td className="py-2.5 px-3">
+                            <div className="max-w-[180px]">
+                              {emp.assignedTask?.title || (emp.currentAssignedTask && emp.currentAssignedTask !== '-') ? (
+                                <div className="truncate">
+                                  <span className="font-semibold text-slate-800 dark:text-slate-200 block truncate" title={emp.assignedTask?.title || emp.currentAssignedTask}>
+                                    {emp.assignedTask?.title || emp.currentAssignedTask}
+                                  </span>
+                                  {emp.assignedTask?.priority && (
+                                    <span className={`text-[9px] font-bold font-mono uppercase ${emp.assignedTask.priority === 'HIGH' || emp.assignedTask.priority === 'CRITICAL' ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                      {emp.assignedTask.priority}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic">-</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Task Start Time */}
+                          <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                            {emp.startTime || emp.taskStartTime
+                              ? new Date(emp.startTime || emp.taskStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : '-'}
+                          </td>
+
+                          {/* Work Duration */}
+                          <td className="py-2.5 px-3 font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200 whitespace-nowrap">
+                            {emp.workDuration || '-'}
+                          </td>
+
+                          {/* Task Status */}
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            {emp.taskStatus === 'In Progress' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                <span>In Progress</span>
+                              </span>
+                            ) : emp.taskStatus === 'Completed' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                <span>Completed</span>
+                              </span>
+                            ) : emp.taskStatus === 'Overdue' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                <AlertOctagon className="w-3 h-3 text-rose-500" />
+                                <span>Overdue</span>
+                              </span>
+                            ) : emp.taskStatus === 'Pending' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                <span>Pending</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+
+                          {/* Tasks Assigned */}
+                          <td className="py-2.5 px-2 text-center font-mono font-bold text-[11px] text-slate-700 dark:text-slate-300">
+                            {emp.tasksAssigned || 0}
+                          </td>
+
+                          {/* Tasks Completed */}
+                          <td className="py-2.5 px-2 text-center font-mono font-bold text-[11px] text-emerald-600 dark:text-emerald-400">
+                            {emp.tasksCompleted || emp.totalCompletedCount || 0}
+                          </td>
+
+                          {/* Pending Tasks */}
+                          <td className="py-2.5 px-2 text-center font-mono font-bold text-[11px] text-amber-600 dark:text-amber-400">
+                            {emp.pendingTasks || 0}
+                          </td>
+
+                          {/* Task Completion Details */}
+                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                            {emp.taskCompletionDetails?.proofPhoto || emp.proofPhoto ? (
+                              <button
+                                onClick={() =>
+                                  setViewProofTask({
+                                    title: emp.taskCompletionDetails?.taskTitle || emp.assignedTask?.title || 'Completed Task',
+                                    department: emp.department,
+                                    completedBy: emp,
+                                    completedAt: emp.taskCompletionDetails?.completedAt || emp.completionTime,
+                                    proofPhoto: emp.taskCompletionDetails?.proofPhoto || emp.proofPhoto,
+                                    proofNotes: emp.taskCompletionDetails?.proofNotes || emp.proofNotes,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shadow-xs cursor-pointer transition-all active:scale-95"
+                              >
+                                <Eye className="w-3 h-3" />
+                                <span>View Proof</span>
+                              </button>
+                            ) : emp.taskCompletionDetails?.completedAt || emp.completionTime ? (
+                              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                                ✓ {new Date(emp.taskCompletionDetails?.completedAt || emp.completionTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[10px] italic">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -599,7 +1041,7 @@ export const DepartmentWorkOperations = ({
       })()}
 
       {/* TASKS LIST & WORK BUTTON CONTROLS */}
-      {(() => {
+      {(isSupervisor || activeViewMode === 'tasks') && (() => {
         // Filter tasks
         let list = tasks;
         if (selectedDept !== 'ALL') {

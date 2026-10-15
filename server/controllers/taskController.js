@@ -983,6 +983,20 @@ const deleteTask = async (req, res) => {
   }
 };
 
+const formatWorkDuration = (start, end) => {
+  if (!start) return '-';
+  const startTime = new Date(start).getTime();
+  if (isNaN(startTime) || startTime === 0) return '-';
+  const endTime = end ? new Date(end).getTime() : Date.now();
+  const diffMs = Math.max(0, endTime - startTime);
+  const totalMins = Math.floor(diffMs / 60000);
+  if (totalMins < 1) return '< 1m';
+  const hrs = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  if (hrs > 0) return `${hrs}h ${mins}m`;
+  return `${mins}m`;
+};
+
 // @desc    Get live employee work status across departments (who is working, who is available, who completed first)
 // @route   GET /api/tasks/live-status
 // @access  Private (Authenticated users, Admin & Auditor oversight)
@@ -991,6 +1005,7 @@ const getEmployeeWorkStatus = async (req, res) => {
     const { department, date } = req.query;
     const todayDate = date || getTodayISTString();
     const attendanceMap = await getDailyAttendanceMap(todayDate);
+    const nowTime = new Date();
 
     // 1. Fetch all users
     let allUsers = [];
@@ -1091,7 +1106,7 @@ const getEmployeeWorkStatus = async (req, res) => {
         return isWorker || isStarter || isInProgressAssigned;
       });
 
-      // 2. Check for tasks won/completed by this user
+      // 2. Check for tasks completed by this user
       const completedTasks = allTasks
         .filter((t) => {
           if (t.status !== 'Completed' && t.workStatus !== 'COMPLETED' && !t.completedAt) return false;
@@ -1132,8 +1147,64 @@ const getEmployeeWorkStatus = async (req, res) => {
 
       // Daily attendance status is evaluated strictly from the persistent Attendance database for today's date in IST
       const att = evaluateUserDailyAttendance(user, attendanceMap, todayDate);
-      const isPresent = att.isPresent;
-      const attendanceStatus = att.attendanceStatus; // 'Present' or 'Absent'
+      const isPresent = Boolean(att.isPresent);
+      const attendanceStatus = att.attendanceStatus || (isPresent ? 'Present' : 'Absent');
+
+      // Individual Assigned Tasks Breakdown
+      const userAssignedTasks = allTasks.filter((t) => {
+        const aEmp = (t.assignedTo?.employeeId || '').toUpperCase();
+        const aId = String(t.assignedTo?.userId || '');
+        return (uEmp && aEmp === uEmp) || (uId && aId === uId);
+      });
+      const userAssignedNCs = allComplaints.filter((c) => {
+        const aEmp = (c.assignedTo?.employeeId || '').toUpperCase();
+        const aId = String(c.assignedTo?.userId || '');
+        const aName = (c.assignedTo?.name || '').toLowerCase();
+        return (uEmp && aEmp === uEmp) || (uId && aId === uId) || (uName && aName === uName);
+      });
+
+      const tasksAssigned = userAssignedTasks.length + userAssignedNCs.length;
+      const tasksCompleted = completedTasks.length + completedNCs.length;
+
+      const pendingTasksCount =
+        userAssignedTasks.filter(
+          (t) =>
+            t.status !== 'Completed' &&
+            t.workStatus !== 'COMPLETED' &&
+            t.status !== 'In Progress' &&
+            t.workStatus !== 'IN_PROGRESS'
+        ).length +
+        userAssignedNCs.filter(
+          (c) =>
+            !['Closed', 'Verified', 'CAP Submitted', 'Under Review', 'Under Verification', 'In Progress'].includes(c.status)
+        ).length;
+
+      const overdueTasksCount =
+        userAssignedTasks.filter(
+          (t) =>
+            t.status !== 'Completed' &&
+            t.workStatus !== 'COMPLETED' &&
+            t.dueDate &&
+            new Date(t.dueDate) < nowTime
+        ).length +
+        userAssignedNCs.filter(
+          (c) =>
+            !['Closed', 'Verified'].includes(c.status) &&
+            (c.deadlineTimestamp || c.dueDate) &&
+            new Date(c.deadlineTimestamp || c.dueDate) < nowTime
+        ).length;
+
+      const isBusy = Boolean(activeNC || activeTask);
+      const isCurrentlyWorking = isBusy;
+
+      let workAvailability = 'Offline';
+      if (isBusy) {
+        workAvailability = 'Busy';
+      } else if (isPresent) {
+        workAvailability = 'Available';
+      } else {
+        workAvailability = 'Offline';
+      }
 
       let status = isPresent ? 'Available' : 'Absent';
       let currentTask = null;
@@ -1142,9 +1213,12 @@ const getEmployeeWorkStatus = async (req, res) => {
       let proofStatus = 'None';
       let proofPhoto = null;
       let proofNotes = null;
+      let taskStatus = '-';
+      let workDuration = '-';
 
       if (activeNC) {
         status = 'In Progress / Busy';
+        taskStatus = 'In Progress';
         currentTask = {
           id: activeNC.complaintId || activeNC.id,
           title: `NC: ${activeNC.complaintId} - ${activeNC.category || 'Floor Non-Conformance'}`,
@@ -1155,9 +1229,11 @@ const getEmployeeWorkStatus = async (req, res) => {
           complaintId: activeNC.complaintId,
         };
         startTime = activeNC.startedAt || activeNC.updatedAt || null;
+        workDuration = formatWorkDuration(startTime, null);
         proofStatus = 'Pending Upload (Stop Work to Submit)';
       } else if (activeTask) {
         status = 'In Progress / Busy';
+        taskStatus = 'In Progress';
         currentTask = {
           id: activeTask.id,
           title: activeTask.title,
@@ -1174,11 +1250,13 @@ const getEmployeeWorkStatus = async (req, res) => {
             )
           : null;
         startTime = workerEntry?.startedAt || activeTask.startedAt || activeTask.updatedAt || null;
+        workDuration = formatWorkDuration(startTime, null);
         proofStatus = 'Pending Upload';
       } else if (!isPresent) {
-        // Person has not logged in today -> Absent
         status = 'Absent';
         if (openDeptTask) {
+          const isTaskOverdue = openDeptTask.dueDate && new Date(openDeptTask.dueDate) < nowTime;
+          taskStatus = isTaskOverdue ? 'Overdue' : 'Pending';
           currentTask = {
             id: openDeptTask.id,
             title: openDeptTask.title,
@@ -1226,6 +1304,7 @@ const getEmployeeWorkStatus = async (req, res) => {
 
         if (bestCompleted) {
           status = 'Completed';
+          taskStatus = 'Completed';
           currentTask = {
             id: bestCompleted.id,
             title: bestCompleted.title,
@@ -1237,12 +1316,14 @@ const getEmployeeWorkStatus = async (req, res) => {
           };
           startTime = bestCompleted.startedAt;
           completionTime = bestCompleted.completedAt;
+          workDuration = formatWorkDuration(bestCompleted.startedAt, bestCompleted.completedAt);
           proofStatus = bestCompleted.proofPhoto ? 'Verified / Uploaded' : 'Submitted';
           proofPhoto = bestCompleted.proofPhoto;
           proofNotes = bestCompleted.proofNotes;
         } else if (openDeptTask) {
-          // Available, with an open task ready to start
           status = 'Available';
+          const isTaskOverdue = openDeptTask.dueDate && new Date(openDeptTask.dueDate) < nowTime;
+          taskStatus = isTaskOverdue ? 'Overdue' : 'Pending';
           currentTask = {
             id: openDeptTask.id,
             title: openDeptTask.title,
@@ -1252,6 +1333,18 @@ const getEmployeeWorkStatus = async (req, res) => {
           };
         }
       }
+
+      const taskCompletionDetails = completionTime || proofPhoto || proofNotes
+        ? {
+            completedAt: completionTime,
+            proofPhoto: proofPhoto || null,
+            proofNotes: proofNotes || null,
+            proofStatus: proofPhoto ? 'Photo Verified' : 'Submitted',
+            taskTitle: currentTask?.title || 'Completed Task',
+            taskId: currentTask?.id || null,
+            completedBy: user.name,
+          }
+        : null;
 
       return {
         userId: user.id || user._id,
@@ -1265,39 +1358,119 @@ const getEmployeeWorkStatus = async (req, res) => {
         attendanceStatus,
         attendanceDate: att.date,
         loginTimestamp: att.loginTimestamp || (isPresent ? user.lastLoginAt : null),
-        status, // 'Available' | 'In Progress / Busy' | 'Completed' | 'Absent'
+        status, // Legacy status ('Available' | 'In Progress / Busy' | 'Completed' | 'Absent')
+        workAvailability, // 'Available' | 'Busy' | 'Offline'
+        isBusy,
+        isCurrentlyWorking,
         assignedTask: currentTask,
+        currentAssignedTask: currentTask?.title || '-',
+        currentTaskTitle: currentTask?.title || '-',
         openTask: openDeptTask ? { id: openDeptTask.id, title: openDeptTask.title } : null,
         startTime,
+        taskStartTime: startTime,
+        workDuration,
         completionTime,
+        taskStatus,
+        tasksAssigned,
+        tasksCompleted,
+        pendingTasks: pendingTasksCount,
+        overdueTasks: overdueTasksCount,
+        taskCompletionDetails,
         proofStatus,
         proofPhoto,
         proofNotes,
         lastLoginAt: user.lastLoginAt || null,
         lastLogoutAt: user.lastLogoutAt || null,
-        totalCompletedCount: completedTasks.length + completedNCs.length,
+        totalCompletedCount: tasksCompleted,
       };
     });
 
     // Determine fast finisher rankings (who completed tasks first)
-    // Filter employees with completion timestamps and sort by earliest completionTime
     const completedEmployees = employeeStatuses
       .filter((e) => e.completionTime)
       .sort((a, b) => new Date(a.completionTime) - new Date(b.completionTime));
 
-    // Assign fast finisher ranks
     completedEmployees.forEach((emp, index) => {
       emp.completionRank = index + 1; // 1 = First Finisher 🏆
     });
 
-    // Summary counts
+    // Summary counts calculated dynamically from database records
+    const deptTasks = targetDept
+      ? allTasks.filter((t) => (t.department || '').trim().toLowerCase() === targetDept)
+      : allTasks;
+    const deptComplaints = targetDept
+      ? allComplaints.filter((c) => (c.department || '').trim().toLowerCase() === targetDept)
+      : allComplaints;
+
+    const tasksInProgressCount =
+      deptTasks.filter(
+        (t) =>
+          (t.status === 'In Progress' || t.workStatus === 'IN_PROGRESS') &&
+          t.status !== 'Completed' &&
+          t.workStatus !== 'COMPLETED'
+      ).length + deptComplaints.filter((c) => c.status === 'In Progress').length;
+
+    const completedTasksCount =
+      deptTasks.filter((t) => t.status === 'Completed' || t.workStatus === 'COMPLETED' || t.completedAt).length +
+      deptComplaints.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status)
+      ).length;
+
+    const pendingTasksCount =
+      deptTasks.filter(
+        (t) =>
+          t.status !== 'Completed' &&
+          t.workStatus !== 'COMPLETED' &&
+          t.workStatus !== 'IN_PROGRESS' &&
+          t.status !== 'In Progress'
+      ).length +
+      deptComplaints.filter((c) =>
+        !['Closed', 'Verified', 'CAP Submitted', 'Under Review', 'Under Verification', 'In Progress'].includes(c.status)
+      ).length;
+
+    const overdueTasksCount =
+      deptTasks.filter(
+        (t) =>
+          t.status !== 'Completed' &&
+          t.workStatus !== 'COMPLETED' &&
+          t.dueDate &&
+          new Date(t.dueDate) < nowTime
+      ).length +
+      deptComplaints.filter(
+        (c) =>
+          !['Closed', 'Verified'].includes(c.status) &&
+          (c.deadlineTimestamp || c.dueDate) &&
+          new Date(c.deadlineTimestamp || c.dueDate) < nowTime
+      ).length;
+
+    const presentEmployeesCount = employeeStatuses.filter((e) => e.isPresent).length;
+    const absentEmployeesCount = employeeStatuses.filter((e) => !e.isPresent).length;
+    const busyEmployeesCount = employeeStatuses.filter((e) => e.isBusy).length;
+    const availableEmployeesCount = employeeStatuses.filter((e) => e.isPresent && !e.isBusy).length;
+    const workingEmployeesCount = employeeStatuses.filter((e) => e.isBusy).length;
+
     const summary = {
       totalEmployees: employeeStatuses.length,
-      present: employeeStatuses.filter((e) => e.isPresent).length,
-      absent: employeeStatuses.filter((e) => !e.isPresent).length,
-      available: employeeStatuses.filter((e) => e.status === 'Available').length,
-      inProgress: employeeStatuses.filter((e) => e.status === 'In Progress / Busy').length,
-      completed: employeeStatuses.filter((e) => e.status === 'Completed').length,
+      presentEmployees: presentEmployeesCount,
+      absentEmployees: absentEmployeesCount,
+      busyEmployees: busyEmployeesCount,
+      availableEmployees: availableEmployeesCount,
+      workingEmployees: workingEmployeesCount,
+      tasksInProgress: tasksInProgressCount,
+      completedTasks: completedTasksCount,
+      pendingTasks: pendingTasksCount,
+      overdueTasks: overdueTasksCount,
+
+      // Legacy aliases for backward compatibility
+      present: presentEmployeesCount,
+      absent: absentEmployeesCount,
+      busy: busyEmployeesCount,
+      available: availableEmployeesCount,
+      working: workingEmployeesCount,
+      inProgress: tasksInProgressCount,
+      completed: completedTasksCount,
+      pending: pendingTasksCount,
+      overdue: overdueTasksCount,
     };
 
     res.json({

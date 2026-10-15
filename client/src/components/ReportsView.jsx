@@ -1081,8 +1081,7 @@ export const ReportsView = ({
 
         // If department drilled down or filtered, print its NC register and photo evidence
         const targetDept = selectedDeptDetail || (departmentFilter !== 'ALL' ? departmentFilter : null);
-        const deptObj = targetDept ? departmentStatsList.find((d) => d.department === targetDept) : null;
-        const ncListToDraw = deptObj ? deptObj.complaints : (departmentStatsList.length === 1 ? departmentStatsList[0].complaints : []);
+        const ncListToDraw = deptObj ? deptObj.complaints : (datasetToExport.length > 0 ? datasetToExport : []);
 
         if (ncListToDraw.length > 0) {
           const nextY = doc.lastAutoTable.finalY + 20;

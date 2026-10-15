@@ -12,23 +12,46 @@ export const getCandidateUrls = (rawSrc) => {
     src = rawSrc.url || rawSrc.dataUrl || rawSrc.path || rawSrc.src || '';
   }
   if (typeof src !== 'string') return [];
-  const trimmed = src.trim();
+  let trimmed = src.trim();
   if (!trimmed) return [];
+
+  // Normalize Windows filesystem backslashes to standard URL forward slashes
+  trimmed = trimmed.replace(/\\/g, '/');
 
   // 1. Data URLs and Blob URLs (already self-contained)
   if (trimmed.startsWith('data:') || trimmed.startsWith('blob:')) {
     return [trimmed];
   }
 
-  // 2. Base64 strings missing the "data:image/..." prefix (heuristic by magic bytes)
+  // 2. Base64 strings missing the "data:image/..." prefix (heuristic by magic bytes or length)
   if (trimmed.startsWith('/9j/')) return [`data:image/jpeg;base64,${trimmed}`];
   if (trimmed.startsWith('iVBORw0KGgo')) return [`data:image/png;base64,${trimmed}`];
   if (trimmed.startsWith('UklGR')) return [`data:image/webp;base64,${trimmed}`];
   if (trimmed.startsWith('PHN2Zy') || trimmed.startsWith('PD94bWw')) return [`data:image/svg+xml;base64,${trimmed}`];
+  if (!trimmed.includes('/') && !trimmed.includes(':') && trimmed.length > 100) {
+    return [`data:image/jpeg;base64,${trimmed}`];
+  }
 
-  // 3. Absolute HTTP/HTTPS URLs (Cloudinary, AWS S3, GCS, external servers)
+  // 3. Absolute HTTP/HTTPS URLs (Cloudinary, AWS S3, GCS, localhost or external backend)
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return [trimmed];
+    const candidates = [trimmed];
+    try {
+      const parsedUrl = new URL(trimmed);
+      if (parsedUrl.pathname && parsedUrl.pathname.includes('/uploads/')) {
+        const uploadIdx = parsedUrl.pathname.indexOf('/uploads/');
+        const relativeUpload = parsedUrl.pathname.slice(uploadIdx);
+        if (!candidates.includes(relativeUpload)) candidates.push(relativeUpload);
+        if (typeof window !== 'undefined' && window.location?.origin) {
+          const locOrigin = `${window.location.origin}${relativeUpload}`;
+          if (!candidates.includes(locOrigin)) candidates.push(locOrigin);
+        }
+        const port5000 = `http://localhost:5000${relativeUpload}`;
+        if (!candidates.includes(port5000)) candidates.push(port5000);
+      }
+    } catch (e) {
+      // Ignore URL parse error
+    }
+    return candidates;
   }
 
   // 4. Relative paths (e.g. /uploads/defect.jpg or uploads/defect.jpg)
@@ -43,7 +66,7 @@ export const getCandidateUrls = (rawSrc) => {
 
   // Candidate C: Base URL from Vite environment variable if configured
   try {
-    const envApi = import.meta.env?.VITE_API_URL;
+    const envApi = import.meta.env?.VITE_API_URL || import.meta.env?.VITE_API_BASE_URL;
     if (envApi && (envApi.startsWith('http://') || envApi.startsWith('https://'))) {
       const origin = new URL(envApi).origin;
       const full = `${origin}${normalizedPath}`;
@@ -67,13 +90,15 @@ export const getCandidateUrls = (rawSrc) => {
  * - Scales down oversized camera images (max 800px on the longest dimension) to preserve sharp print clarity
  *   without bloating PDF file sizes.
  * - Fills a solid white background to eliminate transparency artifacts from PNG/SVG images.
- * - Standardizes formats (e.g. WebP -> JPEG) to guarantee full compatibility with jsPDF doc.addImage.
+ * - Standardizes formats (e.g. WebP/PNG/SVG -> JPEG) to guarantee full compatibility with jsPDF doc.addImage.
  */
 const convertImageElementToJpeg = (img, maxDim = 800, quality = 0.88) => {
   try {
     const canvas = document.createElement('canvas');
     let w = img.naturalWidth || img.width || 400;
     let h = img.naturalHeight || img.height || 300;
+    if (w <= 0) w = 400;
+    if (h <= 0) h = 300;
 
     if (w > maxDim || h > maxDim) {
       if (w > h) {
@@ -125,13 +150,29 @@ export const getPdfImageSafe = async (rawSrc) => {
     return { status: 'empty', message: 'No valid photo source provided' };
   }
 
-  // A. If the source is already a Data URL (self-contained, no network request needed)
-  if (candidates[0].startsWith('data:')) {
+  // A. If the source is already a Data URL or Blob URL (self-contained, no network request needed)
+  if (candidates[0].startsWith('data:') || candidates[0].startsWith('blob:')) {
     const dataUrl = candidates[0];
     return new Promise((resolve) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          resolve({
+            status: 'error',
+            error: true,
+            message: 'Image decode timed out',
+            source: dataUrl.slice(0, 50),
+          });
+        }
+      }, 7000);
+
       const img = new Image();
       // NOTE: Do NOT set crossOrigin on data: URLs as it causes canvas tainting in some browsers
       img.onload = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         const res = convertImageElementToJpeg(img);
         if (res.status === 'success') {
           resolve(res);
@@ -148,6 +189,9 @@ export const getPdfImageSafe = async (rawSrc) => {
         }
       };
       img.onerror = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         resolve({
           status: 'error',
           error: true,
@@ -169,49 +213,90 @@ export const getPdfImageSafe = async (rawSrc) => {
   }
 
   for (const url of candidates) {
-    // Strategy 1: Fetch as Blob (handles CORS headers, authorization tokens, and avoids canvas taint)
+    // Strategy 1: Fetch as Blob with AbortController timeout (handles CORS headers, authorization tokens, avoids canvas taint)
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       const response = await fetch(url, {
         method: 'GET',
         headers: authHeader,
         mode: 'cors',
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const blob = await response.blob();
-        const dataUrl = await new Promise((resolveBlob, rejectBlob) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolveBlob(reader.result);
-          reader.onerror = rejectBlob;
-          reader.readAsDataURL(blob);
-        });
+        if (blob && blob.size > 0) {
+          const dataUrl = await new Promise((resolveBlob, rejectBlob) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolveBlob(reader.result);
+            reader.onerror = rejectBlob;
+            reader.readAsDataURL(blob);
+          });
 
-        // Load decoded dataUrl into offscreen canvas
-        const loaded = await new Promise((resolveImg) => {
-          const img = new Image();
-          img.onload = () => resolveImg(convertImageElementToJpeg(img));
-          img.onerror = () => resolveImg(null);
-          img.src = dataUrl;
-        });
+          if (dataUrl && typeof dataUrl === 'string') {
+            const loaded = await new Promise((resolveImg) => {
+              let settled = false;
+              const timer = setTimeout(() => {
+                if (!settled) {
+                  settled = true;
+                  resolveImg(null);
+                }
+              }, 6000);
 
-        if (loaded && loaded.status === 'success') {
-          return loaded;
+              const img = new Image();
+              img.onload = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolveImg(convertImageElementToJpeg(img));
+              };
+              img.onerror = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolveImg(null);
+              };
+              img.src = dataUrl;
+            });
+
+            if (loaded && loaded.status === 'success') {
+              return loaded;
+            }
+          }
         }
       }
     } catch (fetchErr) {
       // Continue to next strategy or candidate
     }
 
-    // Strategy 2: HTML Image element with crossOrigin anonymous
+    // Strategy 2: HTML Image element with crossOrigin anonymous and timeout
     try {
       const loaded = await new Promise((resolveImg) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            resolveImg(null);
+          }
+        }, 5000);
+
         const img = new Image();
         img.crossOrigin = 'Anonymous';
         img.onload = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
           const res = convertImageElementToJpeg(img);
           resolveImg(res);
         };
-        img.onerror = () => resolveImg(null);
+        img.onerror = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolveImg(null);
+        };
         img.src = url;
       });
 
@@ -231,7 +316,7 @@ export const getPdfImageSafe = async (rawSrc) => {
   return {
     status: 'error',
     error: true,
-    message: `Image could not be loaded from server or storage`,
+    message: 'Image could not be loaded from server or storage',
     source: shortSource,
   };
 };
@@ -242,15 +327,30 @@ export const getPdfImageSafe = async (rawSrc) => {
 
 export const extractBeforePhoto = (c) => {
   if (!c) return null;
+  // If photos array exists
+  if (Array.isArray(c.photos) && c.photos.length > 0) {
+    const candidate = c.photos[0];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    if (typeof candidate === 'object' && candidate !== null) {
+      return candidate.url || candidate.dataUrl || candidate.path || candidate.src || null;
+    }
+  }
   const p =
     c.beforePhoto ||
     c.beforePhotoUrl ||
     c.beforePhotoBase64 ||
     c.photo ||
+    c.photoUrl ||
     c.findingPhoto ||
     c.defectPhoto ||
     c.complaintPhoto ||
     c.image ||
+    c.imageUrl ||
+    c.evidencePhoto ||
+    c.initialPhoto ||
+    c.problemPhoto ||
+    c.cap?.beforePhoto ||
+    c.cap?.problemPhoto ||
     null;
   if (typeof p === 'object' && p !== null) {
     return p.url || p.dataUrl || p.path || p.src || null;
@@ -260,6 +360,21 @@ export const extractBeforePhoto = (c) => {
 
 export const extractAfterPhoto = (c) => {
   if (!c) return null;
+  // If afterPhotos or cap.photos array exists
+  if (Array.isArray(c.afterPhotos) && c.afterPhotos.length > 0) {
+    const candidate = c.afterPhotos[0];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    if (typeof candidate === 'object' && candidate !== null) {
+      return candidate.url || candidate.dataUrl || candidate.path || candidate.src || null;
+    }
+  }
+  if (Array.isArray(c.cap?.photos) && c.cap.photos.length > 0) {
+    const candidate = c.cap.photos[0];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+    if (typeof candidate === 'object' && candidate !== null) {
+      return candidate.url || candidate.dataUrl || candidate.path || candidate.src || null;
+    }
+  }
   const p =
     c.afterPhoto ||
     c.afterPhotoUrl ||
@@ -269,10 +384,13 @@ export const extractAfterPhoto = (c) => {
     c.cap?.rectificationPhoto ||
     c.cap?.evidence ||
     c.cap?.proofPhoto ||
+    c.cap?.verifiedPhoto ||
     c.proofPhoto ||
     c.actionTaken?.photo ||
     c.rectificationPhoto ||
     c.resolutionPhoto ||
+    c.completionPhoto ||
+    c.verificationPhoto ||
     null;
   if (typeof p === 'object' && p !== null) {
     return p.url || p.dataUrl || p.path || p.src || null;
