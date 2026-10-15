@@ -418,7 +418,7 @@ export const DepartmentWorkOperations = ({
         })}
       </div>
 
-      {/* LIVE EMPLOYEE AVAILABILITY & WORK TRACKING BAR */}
+      {/* LIVE DEPARTMENT WORK OPERATIONS & TASK TRACKING BAR */}
       {(() => {
         const allEmps = liveStatusData?.employees || [];
         const deptEmps =
@@ -426,76 +426,60 @@ export const DepartmentWorkOperations = ({
             ? allEmps
             : allEmps.filter((e) => (e.department || '').toLowerCase() === selectedDept.toLowerCase());
 
-        const presentEmps = deptEmps.filter((e) => e.isPresent);
-        const absentEmps = deptEmps.filter((e) => !e.isPresent || e.status === 'Absent');
-        const available = isSupervisor
-          ? deptEmps.filter((e) => e.status !== 'In Progress / Busy')
-          : deptEmps.filter((e) => e.isPresent && e.status === 'Available');
+        const deptTasks =
+          selectedDept === 'ALL'
+            ? tasks
+            : tasks.filter((t) => (t.department || '').toLowerCase() === selectedDept.toLowerCase());
+
+        const pendingTasks = deptTasks.filter(
+          (t) =>
+            t.status !== 'Completed' &&
+            t.workStatus !== 'COMPLETED' &&
+            t.workStatus !== 'IN_PROGRESS' &&
+            t.status !== 'In Progress'
+        );
         const busy = deptEmps.filter((e) => e.status === 'In Progress / Busy');
         const completed = deptEmps.filter((e) => e.status === 'Completed');
 
         return (
           <div className="space-y-3">
-            {/* Live Attendance Banner (hidden for department supervisor page) */}
-            {!isSupervisor && (
-              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span>Live Attendance:</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 text-[11px]">
-                    <span>🟢</span>
-                    <span>{presentEmps.length} Present</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 text-[11px]">
-                    <span>⚪</span>
-                    <span>{absentEmps.length} Absent</span>
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                  Active login marks employee <strong className="text-emerald-600 dark:text-emerald-400">Present</strong> on shop floor; logged out or unauthenticated staff are marked <strong className="text-rose-600 dark:text-rose-400">Absent</strong>.
-                </div>
-              </div>
-            )}
-
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${isSupervisor ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-3 sm:gap-4`}>
-              {/* 1. AVAILABLE WORKERS */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-900/60 shadow-xs flex flex-col justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {/* 1. PENDING TASKS QUEUE */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200/90 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                      <span>Available Workers</span>
+                    <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Pending Floor Tasks</span>
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
-                      {isSupervisor ? 'Ready for Floor' : 'Present & Ready'}
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300">
+                      Ready to Start
                     </span>
                   </div>
                   <div className="text-2xl font-black text-slate-900 dark:text-white">
-                    {available.length}{' '}
+                    {pendingTasks.length}{' '}
                     <span className="text-xs font-medium text-slate-400">
-                      {available.length === 1 ? 'employee' : 'employees'} idle
+                      {pendingTasks.length === 1 ? 'task' : 'tasks'} queued
                     </span>
                   </div>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-emerald-100 dark:border-emerald-950/60">
-                  {available.length === 0 ? (
-                    <span className="text-[11px] text-slate-400 italic">No idle staff</span>
+                <div className="mt-3 pt-2.5 border-t border-indigo-100 dark:border-indigo-950/60">
+                  {pendingTasks.length === 0 ? (
+                    <span className="text-[11px] text-slate-400 italic">No pending tasks queued</span>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
-                      {available.map((e) => (
-                        <span
-                          key={e.employeeId || e.userId}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                          title={isSupervisor ? `${e.name} (${e.employeeId}) • Available` : `${e.name} (${e.employeeId}) • Present & Available`}
+                    <div className="space-y-1.5 max-h-24 overflow-y-auto">
+                      {pendingTasks.slice(0, 5).map((t) => (
+                        <div
+                          key={t.id || t._id}
+                          className="p-1.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 text-[11px] flex items-center justify-between"
                         >
-                          <span>🟢</span>
-                          <span>{e.name}</span>
-                        </span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 truncate pr-2">
+                            {t.title}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 shrink-0">
+                            {t.priority || 'MEDIUM'}
+                          </span>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -552,14 +536,14 @@ export const DepartmentWorkOperations = ({
               </div>
 
               {/* 3. COMPLETED WITH VERIFIED PROOF */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-200/90 dark:border-indigo-900/60 shadow-xs flex flex-col justify-between">
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200/90 dark:border-emerald-900/60 shadow-xs flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-indigo-700 dark:text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Completed Tasks</span>
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-cyan-300">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
                       Photo Verified
                     </span>
                   </div>
@@ -568,7 +552,7 @@ export const DepartmentWorkOperations = ({
                     <span className="text-xs font-medium text-slate-400">with verified proof</span>
                   </div>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-indigo-100 dark:border-indigo-950/60">
+                <div className="mt-3 pt-2.5 border-t border-emerald-100 dark:border-emerald-950/60">
                   {completed.length === 0 ? (
                     <span className="text-[11px] text-slate-400 italic">No tasks completed yet in this section</span>
                   ) : (
@@ -576,7 +560,7 @@ export const DepartmentWorkOperations = ({
                       {completed.map((e) => (
                         <div
                           key={e.employeeId || e.userId}
-                          className="p-1.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 text-[11px] flex items-center justify-between"
+                          className="p-1.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 text-[11px] flex items-center justify-between"
                         >
                           <div className="min-w-0 pr-2">
                             <span className="font-bold text-slate-900 dark:text-white block truncate">
@@ -598,7 +582,7 @@ export const DepartmentWorkOperations = ({
                                   proofNotes: e.proofNotes,
                                 })
                               }
-                              className="px-2 py-0.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shrink-0 cursor-pointer"
+                              className="px-2 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shrink-0 cursor-pointer"
                             >
                               View Proof
                             </button>
@@ -609,49 +593,6 @@ export const DepartmentWorkOperations = ({
                   )}
                 </div>
               </div>
-
-              {/* 4. ABSENT STAFF (hidden for department supervisor page) */}
-              {!isSupervisor && (
-                <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-                        <span>Absent Staff</span>
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                        Not Logged In
-                      </span>
-                    </div>
-                    <div className="text-2xl font-black text-slate-700 dark:text-slate-300">
-                      {absentEmps.length}{' '}
-                      <span className="text-xs font-medium text-slate-400">
-                        {absentEmps.length === 1 ? 'employee' : 'employees'} absent
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
-                    {absentEmps.length === 0 ? (
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        All personnel are logged in & present!
-                      </span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
-                        {absentEmps.map((e) => (
-                          <span
-                            key={e.employeeId || e.userId}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                            title={`${e.name} (${e.employeeId}) • Absent / Not logged in`}
-                          >
-                            <span className="text-[9px]">⚪</span>
-                            <span>{e.name}</span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         );
@@ -737,7 +678,7 @@ export const DepartmentWorkOperations = ({
                   { id: 'ALL', label: 'All Tasks', count: tasks.filter((t) => selectedDept === 'ALL' || (t.department || '').toLowerCase() === selectedDept.toLowerCase()).length },
                   {
                     id: 'AVAILABLE',
-                    label: 'Available (Pending)',
+                    label: 'Pending Tasks',
                     count: tasks.filter((t) => (selectedDept === 'ALL' || (t.department || '').toLowerCase() === selectedDept.toLowerCase()) && t.status !== 'Completed' && t.workStatus !== 'COMPLETED' && t.workStatus !== 'IN_PROGRESS' && t.status !== 'In Progress').length,
                   },
                   {
@@ -852,9 +793,9 @@ export const DepartmentWorkOperations = ({
                               <span>In Progress / Busy</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300">
-                              <span>🟢</span>
-                              <span>Available</span>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                              <Clock className="w-3 h-3 text-indigo-500" />
+                              <span>Pending Action</span>
                             </span>
                           )}
                         </div>
@@ -913,7 +854,7 @@ export const DepartmentWorkOperations = ({
                             {isPrivilegedAuditorOrAdmin ? (
                               <span
                                 className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-mono font-medium"
-                                title="Floor task available for assigned department personnel"
+                                title="Floor task pending for assigned department personnel"
                               >
                                 Pending Floor Action
                               </span>
@@ -1303,16 +1244,12 @@ export const DepartmentWorkOperations = ({
                       const empStatus = (liveStatusData?.employees || []).find(
                         (e) => (e.employeeId || '').toUpperCase() === (u.employeeId || '').toUpperCase()
                       );
-                      const isPresent = Boolean(empStatus?.isPresent ?? u.isPresent);
                       const isBusy = empStatus?.status === 'In Progress / Busy';
-
-                      let badgeText = isSupervisor
-                        ? (isBusy ? '🟡 BUSY (Working on Floor)' : '🟢 AVAILABLE')
-                        : (isBusy ? '🟡 BUSY (Working on Floor)' : isPresent ? '🟢 PRESENT & AVAILABLE' : '⚪ ABSENT (Not Logged In)');
+                      const busyText = isBusy ? ' — 🟡 Busy on Floor Task' : '';
 
                       return (
                         <option key={u.id || u.employeeId} value={u.id || u.employeeId}>
-                          {u.name} ({u.employeeId}) — {badgeText}
+                          {u.name} ({u.employeeId}){busyText}
                         </option>
                       );
                     })}
@@ -1326,14 +1263,6 @@ export const DepartmentWorkOperations = ({
                       <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-semibold flex items-center gap-1">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         <span>Warning: This employee is currently Busy on "{selectedWorker.assignedTask?.title || 'active task'}". Avoid assigning another task to them unnecessarily.</span>
-                      </p>
-                    );
-                  }
-                  if (!isSupervisor && selectedWorker && !selectedWorker.isPresent) {
-                    return (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-semibold flex items-center gap-1">
-                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Notice: This employee is currently Absent (Not Logged In). They will receive this task upon login.</span>
                       </p>
                     );
                   }
