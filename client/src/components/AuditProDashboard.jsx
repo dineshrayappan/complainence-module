@@ -53,12 +53,14 @@ export const AuditProDashboard = ({
   const [liveOpsSummary, setLiveOpsSummary] = useState(null);
 
   useEffect(() => {
-    taskService
-      .getLiveFloorStatus()
-      .then((res) => {
-        if (res?.data?.summary) setLiveOpsSummary(res.data.summary);
-      })
-      .catch(() => {});
+    const fetchStatus = taskService?.getLiveStatus || taskService?.getLiveFloorStatus;
+    if (typeof fetchStatus === 'function') {
+      fetchStatus()
+        .then((res) => {
+          if (res?.data?.summary) setLiveOpsSummary(res.data.summary);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   // Filter & Search states

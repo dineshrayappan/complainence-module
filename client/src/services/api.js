@@ -110,6 +110,7 @@ export const taskService = {
   completeTask: (id, proofData = {}) => api.post(`/tasks/${id}/complete`, proofData),
   deleteTask: (id) => api.delete(`/tasks/${id}`),
   getLiveStatus: (params) => api.get('/tasks/live-status', { params }),
+  getLiveFloorStatus: (params) => api.get('/tasks/live-status', { params }),
 };
 
 export default api;
