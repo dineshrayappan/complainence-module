@@ -30,7 +30,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'Outfit', 'sans-serif'],
+        sans: ['Calibri', 'Carlito', 'Candara', 'Segoe UI', 'Optima', 'Arial', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       keyframes: {
