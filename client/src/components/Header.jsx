@@ -16,6 +16,7 @@ import {
   Minimize,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
 
 export const Header = ({
   onToggleSidebar,
@@ -26,6 +27,7 @@ export const Header = ({
   onSelectOverdue,
 }) => {
   const { user, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
+  const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -103,8 +105,12 @@ export const Header = ({
             </button>
 
             {/* Brand Logo & Name */}
-            <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 p-0.5 shadow-md shadow-indigo-500/20 flex items-center justify-center shrink-0">
+            <Link
+              to="/"
+              className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 group cursor-pointer focus:outline-none"
+              title="Go to Compliance Overview"
+            >
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 p-0.5 shadow-md shadow-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <div className="w-full h-full bg-white dark:bg-slate-950 rounded-[9px] flex items-center justify-center">
                   <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600 dark:text-cyan-400" />
                 </div>
@@ -112,7 +118,7 @@ export const Header = ({
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base lg:text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase font-sans truncate">
+                  <span className="text-sm sm:text-base lg:text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase font-sans truncate group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-colors">
                     COMPLIANCE MANAGEMENT
                   </span>
                   <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 shrink-0">
@@ -124,7 +130,7 @@ export const Header = ({
                   Continuous Closed-Loop Quality Assurance &amp; NC/CAP System
                 </p>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Right Header Controls: Refresh, 🔔 Notifications, Theme, Profile Pill, Sign Out */}
@@ -230,20 +236,19 @@ export const Header = ({
                       )}
                     </div>
 
-                    {onSelectOverdue && (
-                      <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowNotifications(false);
-                            onSelectOverdue();
-                          }}
-                          className="text-xs font-bold text-indigo-600 dark:text-cyan-400 hover:underline cursor-pointer"
-                        >
-                          View All Overdue Escalations →
-                        </button>
-                      </div>
-                    )}
+                    <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNotifications(false);
+                          if (onSelectOverdue) onSelectOverdue();
+                          navigate('/nc-cap?deadline=Overdue');
+                        }}
+                        className="text-xs font-bold text-indigo-600 dark:text-cyan-400 hover:underline cursor-pointer"
+                      >
+                        View All Overdue Escalations →
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -314,7 +319,10 @@ export const Header = ({
 
             {/* Sign Out Button */}
             <button
-              onClick={logout}
+              onClick={async () => {
+                await logout();
+                navigate('/login');
+              }}
               id="btn-sign-out"
               title="Sign out of system"
               className="flex items-center gap-1 p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:border-rose-900 dark:hover:text-rose-300 text-slate-600 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer"

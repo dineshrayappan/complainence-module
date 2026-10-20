@@ -1,16 +1,11 @@
 import React from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
-  ClipboardList,
-  ShieldCheck,
-  AlertTriangle,
   FileCheck,
-  Building2,
-  BookOpen,
   BarChart3,
   Settings,
   ChevronRight,
-  Flame,
   X,
   Activity,
 } from 'lucide-react';
@@ -24,12 +19,14 @@ export const SidebarNavigation = ({
   onClose,
 }) => {
   const { user, isAdmin, isAuditor } = useAuth();
+  const location = useLocation();
   const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || (!isAdmin && !isAuditor);
 
   const navItems = isSupervisor
     ? [
         {
           id: 'nc-cap',
+          path: '/nc-cap',
           label: 'NC/CAP',
           icon: FileCheck,
           badge:
@@ -41,6 +38,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'work-operations',
+          path: '/work-operations',
           label: 'Work Operations',
           icon: Activity,
           badge:
@@ -53,6 +51,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'reports',
+          path: '/reports',
           label: 'Reports',
           icon: BarChart3,
           badge: null,
@@ -62,6 +61,7 @@ export const SidebarNavigation = ({
     : [
         {
           id: 'dashboard',
+          path: '/dashboard',
           label: 'Dashboard',
           icon: LayoutDashboard,
           badge: null,
@@ -69,6 +69,7 @@ export const SidebarNavigation = ({
         },
         {
           id: 'nc-cap',
+          path: '/nc-cap',
           label: 'NC/CAP',
           icon: FileCheck,
           badge:
@@ -80,6 +81,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'work-operations',
+          path: '/work-operations',
           label: 'Work Operations',
           icon: Activity,
           badge:
@@ -92,6 +94,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'reports',
+          path: '/reports',
           label: 'Reports',
           icon: BarChart3,
           badge: null,
@@ -102,6 +105,7 @@ export const SidebarNavigation = ({
               { isDivider: true },
               {
                 id: 'settings',
+                path: '/settings',
                 label: 'Settings',
                 icon: Settings,
                 badge: 'Admin',
@@ -112,9 +116,41 @@ export const SidebarNavigation = ({
           : []),
       ];
 
-  const handleItemClick = (id) => {
-    onSelectSection(id);
+  const handleItemClick = (item) => {
+    if (onSelectSection) onSelectSection(item.id);
     if (onClose) onClose();
+  };
+
+  // Determine active item based on current route pathname
+  const isItemActive = (item) => {
+    if (!item.path) return false;
+    const currentPath = location.pathname;
+    if (item.id === 'dashboard') {
+      return currentPath === '/dashboard' || currentPath === '/';
+    }
+    if (item.id === 'nc-cap') {
+      return (
+        currentPath === '/nc-cap' ||
+        currentPath === '/nc' ||
+        currentPath === '/cap' ||
+        currentPath === '/tasks' ||
+        currentPath === '/complaints' ||
+        currentPath.startsWith('/nc-cap/')
+      );
+    }
+    if (item.id === 'work-operations') {
+      return currentPath.startsWith('/work-operations');
+    }
+    if (item.id === 'reports') {
+      return currentPath.startsWith('/reports');
+    }
+    if (item.id === 'settings') {
+      return currentPath.startsWith('/settings');
+    }
+    if (currentSection) {
+      return currentSection === item.id;
+    }
+    return currentPath === item.path;
   };
 
   return (
@@ -162,18 +198,15 @@ export const SidebarNavigation = ({
                 }
 
                 const Icon = item.icon;
-                const isActive =
-                  currentSection === item.id ||
-                  (item.id === 'nc-cap' &&
-                    (currentSection === 'nc' || currentSection === 'cap' || currentSection === 'nc-cap'));
+                const active = isItemActive(item);
 
                 return (
-                  <button
+                  <Link
                     key={item.id}
-                    onClick={() => handleItemClick(item.id)}
-                    type="button"
+                    to={item.path}
+                    onClick={() => handleItemClick(item)}
                     className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all group cursor-pointer ${
-                      isActive
+                      active
                         ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
                     }`}
@@ -181,7 +214,7 @@ export const SidebarNavigation = ({
                     <div className="flex items-center gap-3 min-w-0">
                       <Icon
                         className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
-                          isActive
+                          active
                             ? 'text-white'
                             : 'text-slate-400 dark:text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-cyan-400'
                         }`}
@@ -193,7 +226,7 @@ export const SidebarNavigation = ({
                       {item.badge && (
                         <span
                           className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md ${
-                            isActive
+                            active
                               ? 'bg-white/20 text-white'
                               : item.badgeColor
                           }`}
@@ -201,9 +234,9 @@ export const SidebarNavigation = ({
                           {item.badge}
                         </span>
                       )}
-                      {isActive && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
+                      {active && <ChevronRight className="w-3.5 h-3.5 opacity-80" />}
                     </div>
-                  </button>
+                  </Link>
                 );
               })}
           </nav>

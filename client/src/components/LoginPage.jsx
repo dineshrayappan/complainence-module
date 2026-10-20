@@ -1,15 +1,23 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, ShieldCheck, Lock, User, HelpCircle, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage = () => {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
+
+  // If already authenticated, redirect to root which routes to appropriate persona page
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -28,6 +36,10 @@ export const LoginPage = () => {
       const res = await login(identifier.trim(), password);
       if (res && res.success === false) {
         setError(res.message || 'Login failed. Please verify your credentials.');
+      } else if (res && res.success) {
+        const from = location.state?.from;
+        const targetPath = from?.pathname ? `${from.pathname}${from.search || ''}` : '/';
+        navigate(targetPath, { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please verify your credentials.');
