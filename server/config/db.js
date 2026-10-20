@@ -51,6 +51,33 @@ const connectDB = async () => {
       console.warn('⚠️ [Database] Default admin user initialization notice:', adminErr.message);
     }
 
+    // Automatically convert any legacy disk or non-base64 complaint photos to Base64 data URLs in database
+    try {
+      const Complaint = require('../models/Complaint');
+      const { toBase64DataUrl } = require('../utils/base64Helper');
+      const legacyDocs = await Complaint.find({
+        $or: [
+          { beforePhoto: { $not: /^data:image\// } },
+          { afterPhoto: { $exists: true, $ne: null, $not: /^data:image\// } },
+        ],
+      });
+      if (legacyDocs && legacyDocs.length > 0) {
+        console.log(`[Database] Migrating ${legacyDocs.length} legacy complaint photo(s) to Base64 encoding...`);
+        for (const doc of legacyDocs) {
+          if (doc.beforePhoto && !doc.beforePhoto.startsWith('data:image/')) {
+            doc.beforePhoto = toBase64DataUrl(doc.beforePhoto);
+          }
+          if (doc.afterPhoto && !doc.afterPhoto.startsWith('data:image/')) {
+            doc.afterPhoto = toBase64DataUrl(doc.afterPhoto);
+          }
+          await doc.save();
+        }
+        console.log('✅ [Database] All legacy complaint photos successfully migrated to Base64 encoding.');
+      }
+    } catch (migErr) {
+      console.warn('⚠️ [Database] Photo migration notice:', migErr.message);
+    }
+
     return true;
   } catch (err) {
     isConnected = false;

@@ -9,6 +9,7 @@ const {
   evaluateUserDailyAttendance,
   getTodayISTString,
 } = require('../utils/attendanceHelper');
+const { toBase64DataUrl } = require('../utils/base64Helper');
 
 /**
  * Compliance Tasks
@@ -736,6 +737,7 @@ const completeTask = async (req, res) => {
         name: req.user?.name || '',
         department: req.user?.department || task.department || '',
       };
+      const base64ProofPhoto = toBase64DataUrl(proofPhoto);
       if (isMongoConnected()) {
         try {
           const query = { $or: [{ complaintId: task.complaintId || task.id }] };
@@ -743,7 +745,7 @@ const completeTask = async (req, res) => {
           if (cur) {
             cur.status = 'CAP Submitted';
             cur.actualCompletedAt = now;
-            cur.afterPhoto = proofPhoto;
+            cur.afterPhoto = base64ProofPhoto;
             cur.actionNotes = proofNotes;
             cur.completedBy = currentWorker;
             await cur.save();
@@ -754,7 +756,7 @@ const completeTask = async (req, res) => {
       mockStore.updateComplaint(task.complaintId || task.id, {
         status: 'CAP Submitted',
         actualCompletedAt: now.toISOString(),
-        afterPhoto: proofPhoto,
+        afterPhoto: base64ProofPhoto,
         actionNotes: proofNotes,
         completedBy: currentWorker,
       });
@@ -822,7 +824,7 @@ const completeTask = async (req, res) => {
         completedAt,
         isFirstCompleter: true,
       },
-      proofPhoto: proofPhoto.trim(),
+      proofPhoto: toBase64DataUrl(proofPhoto.trim()),
       proofNotes: proofNotes.trim(),
       activeWorkers: [], // Clear active workers once task is claimed & completed
     };

@@ -7,6 +7,7 @@ const Department = require('../models/Department');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 const { computeDepartmentNCScore } = require('../utils/scoringEngine');
+const { toBase64DataUrl, isBase64DataUrl } = require('../utils/base64Helper');
 
 // Database status adapter: maps workflow statuses to canonical values
 // allows ('Assigned', 'In Progress', 'Closed'). We map workflow statuses to compatible DB values.
@@ -38,34 +39,9 @@ const setWorkflowStatusInDescription = (desc, status) => {
   return `[Workflow Status: ${status}] ${text}`;
 };
 
-// Helper to convert any image path (including disk files in /uploads) into a self-contained data URL
+// Helper to convert any image path (including disk files in /uploads) into a self-contained base64 data URL
 const ensureDataUrl = (photoPath) => {
-  if (!photoPath) return photoPath;
-  if (
-    photoPath.startsWith('data:image/') ||
-    photoPath.startsWith('http://') ||
-    photoPath.startsWith('https://')
-  ) {
-    return photoPath;
-  }
-  if (photoPath.startsWith('/uploads/') || !photoPath.includes('/')) {
-    const filename = photoPath.replace(/^\/uploads\//, '');
-    const diskPath = path.join(__dirname, '..', 'uploads', filename);
-    if (fs.existsSync(diskPath)) {
-      try {
-        const ext = path.extname(filename).toLowerCase();
-        let mime = 'image/jpeg';
-        if (ext === '.png') mime = 'image/png';
-        else if (ext === '.webp') mime = 'image/webp';
-        else if (ext === '.svg') mime = 'image/svg+xml';
-        const fileBuf = fs.readFileSync(diskPath);
-        return `data:${mime};base64,${fileBuf.toString('base64')}`;
-      } catch (e) {
-        // fallback
-      }
-    }
-  }
-  return photoPath;
+  return toBase64DataUrl(photoPath);
 };
 
 // Helper to ensure all complaint outputs have self-contained data URLs and compatible identifiers
@@ -76,10 +52,13 @@ const formatComplaintOutput = (complaint) => {
   obj.id = obj.id || obj._id;
 
   if (obj.beforePhoto) {
-    obj.beforePhoto = ensureDataUrl(obj.beforePhoto);
+    obj.beforePhoto = toBase64DataUrl(obj.beforePhoto);
   }
   if (obj.afterPhoto) {
-    obj.afterPhoto = ensureDataUrl(obj.afterPhoto);
+    obj.afterPhoto = toBase64DataUrl(obj.afterPhoto);
+  }
+  if (obj.cap && obj.cap.evidence) {
+    obj.cap.evidence = toBase64DataUrl(obj.cap.evidence);
   }
 
   // 1. Workflow Lifecycle Status: Draft -> Open -> CAP Submitted -> Under Review -> Rejected / Rework -> Verified -> Closed
@@ -283,30 +262,67 @@ const parseTimeline = (tl) => {
 
 // Helper to extract photo data URL from base64, memory buffer, disk file, or URL
 const extractPhotoPayload = (req, fieldName, base64FieldName) => {
-  if (req.body && req.body[base64FieldName] && req.body[base64FieldName].startsWith('data:image/')) {
-    return ensureDataUrl(req.body[base64FieldName]);
+  // 1. Direct Base64 field in body
+  if (req.body && req.body[base64FieldName]) {
+    const b64 = toBase64DataUrl(req.body[base64FieldName]);
+    if (b64) return b64;
   }
+
+  // 2. Standard field in body (can be Base64 string, SVG, or data URL)
+  if (req.body && req.body[fieldName]) {
+    const b64 = toBase64DataUrl(req.body[fieldName]);
+    if (b64) return b64;
+  }
+
+  // 3. Single uploaded file via multer (memory buffer or disk file)
   if (req.file) {
     try {
       const mime = req.file.mimetype || 'image/jpeg';
       if (req.file.buffer) {
-        return ensureDataUrl(`data:${mime};base64,${req.file.buffer.toString('base64')}`);
+        return toBase64DataUrl(req.file.buffer, mime);
       }
       if (req.file.path && fs.existsSync(req.file.path)) {
         const fileBuf = fs.readFileSync(req.file.path);
-        return ensureDataUrl(`data:${mime};base64,${fileBuf.toString('base64')}`);
+        return toBase64DataUrl(fileBuf, mime);
       }
     } catch (e) {}
     if (req.file.filename) {
-      return ensureDataUrl(getFileUrl(req, req.file.filename));
+      const b64 = toBase64DataUrl(`/uploads/${req.file.filename}`);
+      if (b64) return b64;
     }
   }
-  if (req.body && req.body[fieldName]) {
-    return ensureDataUrl(req.body[fieldName]);
+
+  // 4. Multiple uploaded files via multer (req.files)
+  if (req.files) {
+    const fileObj = req.files[fieldName]
+      ? Array.isArray(req.files[fieldName])
+        ? req.files[fieldName][0]
+        : req.files[fieldName]
+      : null;
+    if (fileObj) {
+      const mime = fileObj.mimetype || 'image/jpeg';
+      if (fileObj.buffer) {
+        return toBase64DataUrl(fileObj.buffer, mime);
+      }
+      if (fileObj.path && fs.existsSync(fileObj.path)) {
+        try {
+          const fileBuf = fs.readFileSync(fileObj.path);
+          return toBase64DataUrl(fileBuf, mime);
+        } catch (e) {}
+      }
+      if (fileObj.filename) {
+        const b64 = toBase64DataUrl(`/uploads/${fileObj.filename}`);
+        if (b64) return b64;
+      }
+    }
   }
+
+  // 5. Explicit URL field
   if (req.body && req.body[`${fieldName}Url`]) {
-    return ensureDataUrl(req.body[`${fieldName}Url`]);
+    const b64 = toBase64DataUrl(req.body[`${fieldName}Url`]);
+    if (b64) return b64;
   }
+
   return null;
 };
 

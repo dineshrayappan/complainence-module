@@ -151,6 +151,8 @@ const complaintSchema = new mongoose.Schema(
   }
 );
 
+const { toBase64DataUrl } = require('../utils/base64Helper');
+
 // Virtual property for overdue checking
 complaintSchema.virtual('isCurrentlyOverdue').get(function () {
   if (['Closed', 'Verified'].includes(this.status)) return false;
@@ -158,7 +160,20 @@ complaintSchema.virtual('isCurrentlyOverdue').get(function () {
   return new Date() > this.deadlineTimestamp;
 });
 
-// Auto-generate complaintId (CMP-XXXXX) if missing & set deadlineTimestamp
+// Enforce Base64 data URLs on all image fields before database validation
+complaintSchema.pre('validate', function () {
+  if (this.beforePhoto) {
+    this.beforePhoto = toBase64DataUrl(this.beforePhoto);
+  }
+  if (this.afterPhoto) {
+    this.afterPhoto = toBase64DataUrl(this.afterPhoto);
+  }
+  if (this.cap && this.cap.evidence) {
+    this.cap.evidence = toBase64DataUrl(this.cap.evidence);
+  }
+});
+
+// Auto-generate complaintId (CMP-XXXXX) if missing, set deadlineTimestamp, and ensure Base64 encoding
 complaintSchema.pre('save', function () {
   if (this.isNew && !this.complaintId) {
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
@@ -169,6 +184,16 @@ complaintSchema.pre('save', function () {
     const baseTime = this.createdAt || new Date();
     const durationMs = (this.deadlineHours || 16) * 60 * 60 * 1000;
     this.deadlineTimestamp = new Date(baseTime.getTime() + durationMs);
+  }
+
+  if (this.beforePhoto) {
+    this.beforePhoto = toBase64DataUrl(this.beforePhoto);
+  }
+  if (this.afterPhoto) {
+    this.afterPhoto = toBase64DataUrl(this.afterPhoto);
+  }
+  if (this.cap && this.cap.evidence) {
+    this.cap.evidence = toBase64DataUrl(this.cap.evidence);
   }
 });
 

@@ -1,4 +1,5 @@
 // In-Memory state for offline development, serverless cold-starts, or cloud deployment fallback
+const { toBase64DataUrl } = require('../utils/base64Helper');
 const initialUsers = [
   {
     _id: 'admin-001',
@@ -142,20 +143,25 @@ module.exports = {
     );
   },
   createComplaint: (data) => {
+    const safeData = { ...data };
+    if (safeData.beforePhoto) safeData.beforePhoto = toBase64DataUrl(safeData.beforePhoto);
+    if (safeData.afterPhoto) safeData.afterPhoto = toBase64DataUrl(safeData.afterPhoto);
+    if (safeData.cap && safeData.cap.evidence) safeData.cap.evidence = toBase64DataUrl(safeData.cap.evidence);
+
     const newTicket = {
-      _id: data._id || data.id || `cmp-${Date.now()}`,
-      complaintId: data.complaintId || `CMP-${Math.floor(10000 + Math.random() * 90000)}`,
-      ...data,
-      status: data.status || 'Assigned',
-      timeline: data.timeline || [
+      _id: safeData._id || safeData.id || `cmp-${Date.now()}`,
+      complaintId: safeData.complaintId || `CMP-${Math.floor(10000 + Math.random() * 90000)}`,
+      ...safeData,
+      status: safeData.status || 'Assigned',
+      timeline: safeData.timeline || [
         {
           action: 'CREATED',
-          performedBy: data.createdBy,
+          performedBy: safeData.createdBy,
           notes: '',
           timestamp: new Date(),
         },
       ],
-      createdAt: data.createdAt || new Date(),
+      createdAt: safeData.createdAt || new Date(),
     };
     const existingIdx = mockComplaints.findIndex(
       (c) =>
@@ -172,11 +178,16 @@ module.exports = {
   },
   updateComplaint: (id, updates) => {
     const s = String(id);
+    const safeUpdates = { ...updates };
+    if (safeUpdates.beforePhoto) safeUpdates.beforePhoto = toBase64DataUrl(safeUpdates.beforePhoto);
+    if (safeUpdates.afterPhoto) safeUpdates.afterPhoto = toBase64DataUrl(safeUpdates.afterPhoto);
+    if (safeUpdates.cap && safeUpdates.cap.evidence) safeUpdates.cap.evidence = toBase64DataUrl(safeUpdates.cap.evidence);
+
     const idx = mockComplaints.findIndex(
       (c) => String(c._id) === s || String(c.id) === s || String(c.complaintId) === s
     );
     if (idx !== -1) {
-      mockComplaints[idx] = { ...mockComplaints[idx], ...updates };
+      mockComplaints[idx] = { ...mockComplaints[idx], ...safeUpdates };
       return mockComplaints[idx];
     }
     return null;
@@ -201,6 +212,8 @@ module.exports = {
         ...t,
         _id: t.id || t._id,
         complaintId: t.complaintId,
+        beforePhoto: toBase64DataUrl(t.beforePhoto),
+        afterPhoto: toBase64DataUrl(t.afterPhoto),
       }));
     }
     return mockComplaints;

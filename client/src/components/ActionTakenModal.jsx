@@ -169,11 +169,24 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
       formData.append('actionNotes', actionNotes);
       formData.append('feedbackRemarks', feedbackRemarks);
 
-      if (photoBase64) {
-        formData.append('afterPhotoBase64', photoBase64);
+      let effectiveBase64 = photoBase64;
+      if (!effectiveBase64 && afterFile) {
+        try {
+          effectiveBase64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(afterFile);
+          });
+        } catch (e) {}
+      }
+
+      if (effectiveBase64) {
+        formData.append('afterPhotoBase64', effectiveBase64);
+        formData.append('afterPhoto', effectiveBase64);
       }
       if (afterFile) {
-        formData.append('afterPhoto', afterFile);
+        formData.append('afterPhotoFile', afterFile);
       }
 
       const targetId = complaint._id || complaint.id || complaint.complaintId;

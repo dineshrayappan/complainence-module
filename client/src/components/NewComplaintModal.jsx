@@ -328,14 +328,27 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
         formData.append('dueDate', new Date(dueDate).toISOString());
       }
 
-      // Attach photo evidence or automatic audit snapshot
-      if (photoBase64) {
-        formData.append('beforePhotoBase64', photoBase64);
-      } else if (beforeFile) {
-        formData.append('beforePhoto', beforeFile);
-      } else {
-        const fallbackSvg = generateDefaultAuditPhoto(department, priority, description);
-        formData.append('beforePhotoBase64', fallbackSvg);
+      // Attach photo evidence strictly encoded as Base64 Data URL or fallback SVG
+      let effectiveBase64 = photoBase64;
+      if (!effectiveBase64 && beforeFile) {
+        try {
+          effectiveBase64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(beforeFile);
+          });
+        } catch (e) {}
+      }
+
+      if (!effectiveBase64) {
+        effectiveBase64 = generateDefaultAuditPhoto(department, priority, description);
+      }
+
+      formData.append('beforePhotoBase64', effectiveBase64);
+      formData.append('beforePhoto', effectiveBase64);
+      if (beforeFile) {
+        formData.append('beforePhotoFile', beforeFile);
       }
 
       const res = await complaintService.createComplaint(formData);
