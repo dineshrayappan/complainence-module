@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   User,
   Users,
+  UserCog,
   Building2,
   KeyRound,
   FileText,
