@@ -4,6 +4,12 @@
     "client": {
       "root": "client",
       "framework": "vite",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ],
       "bindings": [
         {
           "type": "service",
