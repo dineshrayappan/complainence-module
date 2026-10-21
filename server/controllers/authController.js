@@ -9,6 +9,7 @@ const {
   evaluateUserDailyAttendance,
   getTodayISTString,
 } = require('../utils/attendanceHelper');
+const { logEvent } = require('../utils/eventLogger');
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -128,6 +129,21 @@ const login = async (req, res) => {
           }
 
           const token = generateToken(user._id.toString());
+
+          // Event log
+          logEvent({
+            req,
+            action: 'AUTH_LOGIN_SUCCESS',
+            actionLabel: 'User Signed In',
+            category: 'AUTH',
+            severity: 'SUCCESS',
+            entityType: 'USER',
+            entityId: user.employeeId,
+            entityName: user.name,
+            details: `User ${user.name} (${user.employeeId}) signed in as ${user.role}.`,
+            payload: { role: user.role, department: user.department },
+          });
+
           return res.status(200).json({
             success: true,
             token,
@@ -140,8 +156,17 @@ const login = async (req, res) => {
     }
 
     // 2. Fallback to mockStore
-    const user = mockStore.findUserByIdentifier(queryIdentifier);
     if (!user) {
+      logEvent({
+        req,
+        action: 'AUTH_LOGIN_FAILED',
+        actionLabel: 'Failed Login: User Not Found',
+        category: 'SECURITY',
+        severity: 'WARNING',
+        entityType: 'AUTH',
+        entityId: queryIdentifier,
+        details: `Login attempt failed: account '${queryIdentifier}' not found.`,
+      });
       return res.status(401).json({
         success: false,
         message: `Account '${queryIdentifier}' not found. Please check your credentials.`,
@@ -158,6 +183,16 @@ const login = async (req, res) => {
     }
 
     if (!isMatch) {
+      logEvent({
+        req,
+        action: 'AUTH_LOGIN_FAILED',
+        actionLabel: 'Failed Login: Bad Password',
+        category: 'SECURITY',
+        severity: 'WARNING',
+        entityType: 'AUTH',
+        entityId: queryIdentifier,
+        details: `Invalid password attempt for account '${queryIdentifier}'.`,
+      });
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials. Incorrect password.',
@@ -185,6 +220,21 @@ const login = async (req, res) => {
     }
 
     const token = generateToken(user._id || user.id);
+
+    // Event log
+    logEvent({
+      req,
+      action: 'AUTH_LOGIN_SUCCESS',
+      actionLabel: 'User Signed In',
+      category: 'AUTH',
+      severity: 'SUCCESS',
+      entityType: 'USER',
+      entityId: user.employeeId,
+      entityName: user.name,
+      details: `User ${user.name} (${user.employeeId}) signed in as ${user.role}.`,
+      payload: { role: user.role, department: user.department },
+    });
+
     return res.status(200).json({
       success: true,
       token,

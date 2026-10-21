@@ -14,6 +14,7 @@ const userRoutes = require('./routes/userRoutes');
 const complaintRoutes = require('./routes/complaintRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
+const auditLogRoutes = require('./routes/auditLogRoutes');
 
 const app = express();
 
@@ -117,6 +118,8 @@ const apiOverview = (req, res) => {
       tasks: 'GET /api/tasks',
       users: 'GET /api/users',
       departments: 'GET /api/departments',
+      auditLogs: 'GET /api/audit-logs',
+      auditLogStats: 'GET /api/audit-logs/stats',
     },
   });
 };
@@ -149,6 +152,8 @@ app.use('/api/tasks', taskRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/departments', departmentRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
+app.use('/audit-logs', auditLogRoutes);
 
 // Central Error Handler
 app.use((err, req, res, next) => {

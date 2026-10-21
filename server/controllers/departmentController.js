@@ -5,6 +5,7 @@ const Complaint = require('../models/Complaint');
 const ComplianceTask = require('../models/ComplianceTask');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
+const { logEvent } = require('../utils/eventLogger');
 
 // Helper to normalize department name
 const normalizeDeptName = (name) => (name || '').trim();
@@ -302,6 +303,19 @@ const createDepartment = async (req, res) => {
       headcount: Number(headcount) || 20,
     });
 
+    logEvent({
+      req,
+      action: 'DEPT_CREATED',
+      actionLabel: 'Department Provisioned',
+      category: 'DEPARTMENT',
+      severity: 'SUCCESS',
+      entityType: 'DEPARTMENT',
+      entityId: newDept.code,
+      entityName: newDept.name,
+      details: `Created factory department '${newDept.name}' (${newDept.code}) with manager ${newDept.manager}.`,
+      payload: { code: newDept.code, headcount: newDept.headcount, manager: newDept.manager },
+    });
+
     return res.status(201).json({
       success: true,
       message: `Department '${newDept.name}' (${newDept.code}) created successfully.`,
@@ -439,6 +453,18 @@ const deleteDepartment = async (req, res) => {
 
     // Delete in mockStore
     mockStore.deleteDepartment(targetDept.id || targetDept._id || targetDept.name);
+
+    logEvent({
+      req,
+      action: 'DEPT_DELETED',
+      actionLabel: 'Department Removed',
+      category: 'DEPARTMENT',
+      severity: 'CRITICAL',
+      entityType: 'DEPARTMENT',
+      entityId: targetDept.code,
+      entityName: targetDept.name,
+      details: `Administrator deleted department '${targetDept.name}' (${targetDept.code}).`,
+    });
 
     return res.status(200).json({
       success: true,

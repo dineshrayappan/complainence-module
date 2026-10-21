@@ -563,6 +563,10 @@ export const App = () => {
           }
         />
         <Route path="admin/users" element={<Navigate to="/settings" replace />} />
+        <Route path="logs" element={<Navigate to="/settings?tab=logs" replace />} />
+        <Route path="audit-logs" element={<Navigate to="/settings?tab=logs" replace />} />
+        <Route path="admin/logs" element={<Navigate to="/settings?tab=logs" replace />} />
+        <Route path="admin/events" element={<Navigate to="/settings?tab=logs" replace />} />
 
         {/* 404 Inside App Shell */}
         <Route path="*" element={<NotFoundPage />} />

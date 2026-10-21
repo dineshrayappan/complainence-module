@@ -363,6 +363,150 @@ module.exports = {
     return mockAttendance.filter((a) => a.date === dateString);
   },
   getAllAttendance: () => [...mockAttendance],
+
+  // ---- System Event Logger & Audit Trail ----
+  getAuditLogs: (params = {}) => {
+    let list = [...mockAuditLogs];
+
+    // Search query
+    if (params.search && params.search.trim()) {
+      const q = params.search.trim().toLowerCase();
+      list = list.filter((item) => {
+        return (
+          (item.action_label && item.action_label.toLowerCase().includes(q)) ||
+          (item.action && item.action.toLowerCase().includes(q)) ||
+          (item.user_name && item.user_name.toLowerCase().includes(q)) ||
+          (item.user_id && item.user_id.toLowerCase().includes(q)) ||
+          (item.details && item.details.toLowerCase().includes(q)) ||
+          (item.entity_id && item.entity_id.toLowerCase().includes(q)) ||
+          (item.entity_name && item.entity_name.toLowerCase().includes(q)) ||
+          (item.category && item.category.toLowerCase().includes(q)) ||
+          (item.severity && item.severity.toLowerCase().includes(q)) ||
+          (item.ip_address && item.ip_address.toLowerCase().includes(q))
+        );
+      });
+    }
+
+    // Category filter
+    if (params.category && params.category !== 'ALL') {
+      const cat = params.category.toUpperCase();
+      list = list.filter((item) => (item.category || '').toUpperCase() === cat);
+    }
+
+    // Severity filter
+    if (params.severity && params.severity !== 'ALL') {
+      const sev = params.severity.toUpperCase();
+      list = list.filter((item) => (item.severity || '').toUpperCase() === sev);
+    }
+
+    // Timeframe filter
+    if (params.timeframe && params.timeframe !== 'all') {
+      const now = Date.now();
+      let maxAgeMs = 0;
+      if (params.timeframe === '1h') maxAgeMs = 3600 * 1000;
+      else if (params.timeframe === '24h') maxAgeMs = 24 * 3600 * 1000;
+      else if (params.timeframe === '7d') maxAgeMs = 7 * 24 * 3600 * 1000;
+
+      if (maxAgeMs > 0) {
+        list = list.filter((item) => {
+          const itemTime = new Date(item.created_at).getTime();
+          return now - itemTime <= maxAgeMs;
+        });
+      }
+    }
+
+    // Sort descending by time
+    list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const total = list.length;
+    const page = Math.max(1, parseInt(params.page, 10) || 1);
+    const limit = Math.max(1, Math.min(200, parseInt(params.limit, 10) || 50));
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const pagedLogs = list.slice(startIndex, startIndex + limit);
+
+    return {
+      logs: pagedLogs,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  },
+  addAuditLog: (log) => {
+    mockAuditLogs.unshift(log);
+    // Keep list bounded to last 600 items in memory
+    if (mockAuditLogs.length > 600) {
+      mockAuditLogs = mockAuditLogs.slice(0, 600);
+    }
+    return log;
+  },
+  clearAuditLogs: () => {
+    mockAuditLogs = [];
+    return true;
+  },
+  getAuditLogStats: () => {
+    const total = mockAuditLogs.length;
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 3600 * 1000;
+
+    let todayCount = 0;
+    let criticalCount = 0;
+    let warningCount = 0;
+    let successCount = 0;
+    let infoCount = 0;
+
+    const categoryCounts = {
+      AUTH: 0,
+      USER_MGMT: 0,
+      NC_DEFECT: 0,
+      WORK_TASK: 0,
+      DEPARTMENT: 0,
+      SECURITY: 0,
+      SYSTEM: 0,
+    };
+
+    const userActivityMap = {};
+
+    mockAuditLogs.forEach((l) => {
+      const time = new Date(l.created_at).getTime();
+      if (time >= oneDayAgo) todayCount++;
+
+      const sev = (l.severity || '').toUpperCase();
+      if (sev === 'CRITICAL') criticalCount++;
+      else if (sev === 'WARNING') warningCount++;
+      else if (sev === 'SUCCESS') successCount++;
+      else infoCount++;
+
+      const cat = (l.category || '').toUpperCase();
+      if (categoryCounts[cat] !== undefined) {
+        categoryCounts[cat]++;
+      } else {
+        categoryCounts[cat] = 1;
+      }
+
+      const actor = l.user_name || l.user_id || 'Unknown';
+      userActivityMap[actor] = (userActivityMap[actor] || 0) + 1;
+    });
+
+    const activeUsers = Object.entries(userActivityMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      total,
+      todayCount,
+      criticalCount,
+      warningCount,
+      successCount,
+      infoCount,
+      categoryCounts,
+      activeUsers,
+      lastEventTimestamp: mockAuditLogs[0]?.created_at || null,
+    };
+  },
+  getAudits: () => [...mockAudits],
 };
 
 let mockDepartments = [
@@ -387,3 +531,218 @@ let complianceThresholds = {
   updatedAt: new Date().toISOString(),
   updatedBy: 'Administrator',
 };
+
+let mockAuditLogs = [
+  {
+    id: 'evt-101',
+    user_id: 'admin-001',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'SYSTEM_BOOT',
+    action_label: 'QMS Engine Initialized',
+    category: 'SYSTEM',
+    severity: 'INFO',
+    entity_type: 'SYSTEM',
+    entity_id: 'SYS-CORE',
+    entity_name: 'Garment QMS Engine',
+    details: 'System services started. In-memory resilient data store mounted with 7 factory departments.',
+    payload: { version: '2.4.0', environment: 'production-ready', mongoStatus: 'resilient-mode' },
+    ip_address: '127.0.0.1',
+    is_immutable: true,
+    tamper_hash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+    created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+  },
+  {
+    id: 'evt-102',
+    user_id: 'admin-001',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'AUTH_LOGIN_SUCCESS',
+    action_label: 'Admin Authenticated',
+    category: 'AUTH',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'ADMIN',
+    entity_name: 'Administrator',
+    details: 'Administrator logged into Executive Oversight Console with full administrative clearance.',
+    payload: { employeeId: 'ADMIN', role: 'ADMIN', authMethod: 'JWT_BEARER' },
+    ip_address: '192.168.1.10',
+    is_immutable: true,
+    tamper_hash: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8',
+    created_at: new Date(Date.now() - 3600000 * 4.5).toISOString(),
+  },
+  {
+    id: 'evt-103',
+    user_id: 'admin-001',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'USER_CREATED',
+    action_label: 'Lead Auditor Onboarded',
+    category: 'USER_MGMT',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'QA-001',
+    entity_name: 'Priya Sharma',
+    details: 'Created Quality Auditor account for Priya Sharma (QA-001) in Quality Assurance department.',
+    payload: { role: 'AUDITOR', department: 'Quality', designation: 'Senior Quality Auditor' },
+    ip_address: '192.168.1.10',
+    is_immutable: true,
+    tamper_hash: '4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a',
+    created_at: new Date(Date.now() - 3600000 * 3.8).toISOString(),
+  },
+  {
+    id: 'evt-104',
+    user_id: 'admin-001',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'USER_CREATED',
+    action_label: 'Line Supervisor Onboarded',
+    category: 'USER_MGMT',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'SUP-002',
+    entity_name: 'Rajesh Kumar',
+    details: 'Created Line Supervisor account for Rajesh Kumar (SUP-002) in Production line 2.',
+    payload: { role: 'SUPERVISOR', department: 'Production', designation: 'Floor Incharge Line 2' },
+    ip_address: '192.168.1.10',
+    is_immutable: true,
+    tamper_hash: 'ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d',
+    created_at: new Date(Date.now() - 3600000 * 3.2).toISOString(),
+  },
+  {
+    id: 'evt-105',
+    user_id: 'auditor-001',
+    user_name: 'Priya Sharma',
+    user_role: 'AUDITOR',
+    action: 'NC_CREATED',
+    action_label: 'Critical NC Logged: Broken Needle',
+    category: 'NC_DEFECT',
+    severity: 'CRITICAL',
+    entity_type: 'NC',
+    entity_id: 'NC-2026-0001',
+    entity_name: 'Broken Needle Fragment',
+    related_nc_id: 'NC-2026-0001',
+    details: 'High-severity safety defect registered on Sewing Line 2. Metal detector triggered on batch #LOT-992.',
+    payload: { department: 'Production', line: 'Line 2', severity: 'Critical', defectType: 'Broken Needle' },
+    ip_address: '192.168.1.45',
+    is_immutable: true,
+    tamper_hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    created_at: new Date(Date.now() - 3600000 * 2.5).toISOString(),
+  },
+  {
+    id: 'evt-106',
+    user_id: 'sup-002',
+    user_name: 'Rajesh Kumar',
+    user_role: 'SUPERVISOR',
+    action: 'TASK_STARTED',
+    action_label: 'Needle Search & Isolation Initiated',
+    category: 'WORK_TASK',
+    severity: 'INFO',
+    entity_type: 'TASK',
+    entity_id: 'TSK-2026-0014',
+    entity_name: 'Machine #14 Inspection',
+    details: 'Supervisor initiated 9-point needle containment protocol and paused Line 2 sewing unit.',
+    payload: { taskId: 'TSK-2026-0014', machineNo: 'M-14', line: 'Line 2' },
+    ip_address: '192.168.1.52',
+    is_immutable: true,
+    tamper_hash: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
+    created_at: new Date(Date.now() - 3600000 * 2.1).toISOString(),
+  },
+  {
+    id: 'evt-107',
+    user_id: 'sup-002',
+    user_name: 'Rajesh Kumar',
+    user_role: 'SUPERVISOR',
+    action: 'NC_ACTION_SUBMITTED',
+    action_label: 'Corrective Action (CAP) Submitted',
+    category: 'NC_DEFECT',
+    severity: 'SUCCESS',
+    entity_type: 'NC',
+    entity_id: 'NC-2026-0001',
+    entity_name: 'Broken Needle Fragment',
+    related_nc_id: 'NC-2026-0001',
+    details: 'Needle log updated, broken tip retrieved (100% matched), proof photo uploaded. Submitted for verification.',
+    payload: { rootCause: 'Operator forced dense seam without reducing feed speed', actionTaken: 'Replaced needle with Groz-Beckert Titanium #14, re-calibrated tension.' },
+    ip_address: '192.168.1.52',
+    is_immutable: true,
+    tamper_hash: '3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d',
+    created_at: new Date(Date.now() - 3600000 * 1.4).toISOString(),
+  },
+  {
+    id: 'evt-108',
+    user_id: 'auditor-001',
+    user_name: 'Priya Sharma',
+    user_role: 'AUDITOR',
+    action: 'NC_VERIFIED',
+    action_label: 'NC Verified & Approved',
+    category: 'NC_DEFECT',
+    severity: 'SUCCESS',
+    entity_type: 'NC',
+    entity_id: 'NC-2026-0001',
+    entity_name: 'Broken Needle Fragment',
+    related_nc_id: 'NC-2026-0001',
+    details: 'Physical verification passed. Needle logbook signed. Batch passed secondary metal detection. NC closed.',
+    payload: { verifiedBy: 'Priya Sharma', status: 'Closed', resolutionTimeHours: 1.8 },
+    ip_address: '192.168.1.45',
+    is_immutable: true,
+    tamper_hash: '2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae',
+    created_at: new Date(Date.now() - 3600000 * 0.9).toISOString(),
+  },
+  {
+    id: 'evt-109',
+    user_id: 'unknown',
+    user_name: 'Unknown Caller',
+    user_role: 'GUEST',
+    action: 'AUTH_LOGIN_FAILED',
+    action_label: 'Failed Login Attempt: Bad Password',
+    category: 'SECURITY',
+    severity: 'WARNING',
+    entity_type: 'AUTH',
+    entity_id: 'SUP-002',
+    entity_name: 'Failed Authentication',
+    details: 'Repeated invalid password attempt for employee ID SUP-002 from remote terminal.',
+    payload: { identifier: 'SUP-002', reason: 'INVALID_CREDENTIALS', attemptCount: 1 },
+    ip_address: '192.168.1.88',
+    is_immutable: true,
+    tamper_hash: 'fcde2b2edba56bf408686f337b3b7332074f04ecf166f707519b4a534747480f',
+    created_at: new Date(Date.now() - 1800000).toISOString(),
+  },
+  {
+    id: 'evt-110',
+    user_id: 'admin-001',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'DEPT_CREATED',
+    action_label: 'Plant Department Provisioned',
+    category: 'DEPARTMENT',
+    severity: 'SUCCESS',
+    entity_type: 'DEPARTMENT',
+    entity_id: 'FIN',
+    entity_name: 'Finishing & Packing',
+    details: 'Provisioned new plant division Finishing & Packing (FIN) with 45 assigned personnel.',
+    payload: { code: 'FIN', manager: 'Anand Varma', headcount: 45 },
+    ip_address: '192.168.1.10',
+    is_immutable: true,
+    tamper_hash: 'b10a8db164e0754105b7a99be72e3fe5',
+    created_at: new Date(Date.now() - 900000).toISOString(),
+  },
+  {
+    id: 'evt-111',
+    user_id: 'admin-001',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'COMPLIANCE_CONFIG_UPDATED',
+    action_label: 'SLA & Compliance Thresholds Updated',
+    category: 'SYSTEM',
+    severity: 'INFO',
+    entity_type: 'SYSTEM',
+    entity_id: 'CFG-THRESHOLDS',
+    entity_name: 'Compliance Config',
+    details: 'Quality score thresholds set: Green >= 90%, Amber 75-89%, Red < 75%. Enforcing ISO 9001:2015 rules.',
+    payload: { highThreshold: 90, moderateThreshold: 75, updatedBy: 'Administrator' },
+    ip_address: '192.168.1.10',
+    is_immutable: true,
+    tamper_hash: 'a256956f87d57b3f9824',
+    created_at: new Date(Date.now() - 300000).toISOString(),
+  },
+];
