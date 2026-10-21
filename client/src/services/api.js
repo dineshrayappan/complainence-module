@@ -113,12 +113,4 @@ export const taskService = {
   getLiveFloorStatus: (params) => api.get('/tasks/live-status', { params }),
 };
 
-export const auditLogService = {
-  getLogs: (params) => api.get('/audit-logs', { params }),
-  getStats: () => api.get('/audit-logs/stats'),
-  logEvent: (eventData) => api.post('/audit-logs', eventData),
-  clearLogs: () => api.delete('/audit-logs'),
-  exportLogs: (format = 'csv') => api.get('/audit-logs/export', { params: { format }, responseType: 'blob' }),
-};
-
 export default api;

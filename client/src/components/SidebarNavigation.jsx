@@ -8,7 +8,6 @@ import {
   ChevronRight,
   X,
   Activity,
-  Terminal,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -113,15 +112,6 @@ export const SidebarNavigation = ({
                 badgeColor:
                   'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
               },
-              {
-                id: 'event-logs',
-                path: '/settings?tab=logs',
-                label: 'Event Logger',
-                icon: Terminal,
-                badge: 'Live',
-                badgeColor:
-                  'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20',
-              },
             ]
           : []),
       ];
@@ -154,11 +144,8 @@ export const SidebarNavigation = ({
     if (item.id === 'reports') {
       return currentPath.startsWith('/reports');
     }
-    if (item.id === 'event-logs') {
-      return currentPath.startsWith('/settings') && location.search.includes('tab=logs');
-    }
     if (item.id === 'settings') {
-      return currentPath.startsWith('/settings') && !location.search.includes('tab=logs');
+      return currentPath.startsWith('/settings');
     }
     if (currentSection) {
       return currentSection === item.id;

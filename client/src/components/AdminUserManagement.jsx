@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
   Users,
   UserPlus,
@@ -29,10 +28,8 @@ import {
   AlertOctagon,
   Layers,
   Activity,
-  Terminal,
 } from 'lucide-react';
 import { userService, departmentService } from '../services/api';
-import EventLoggerPanel from './EventLoggerPanel';
 
 const FACTORY_DEPARTMENTS = [
   'Production',
@@ -45,24 +42,13 @@ const FACTORY_DEPARTMENTS = [
 ];
 
 export const AdminUserManagement = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [departmentsList, setDepartmentsList] = useState([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState(
-    initialTab === 'logs' || initialTab === 'event-logs' ? 'EVENT_LOGS' : 'ALL'
-  ); // 'ALL', 'AUDITOR', 'SUPERVISOR', 'DEPARTMENTS', 'ADMIN', 'INACTIVE', 'EVENT_LOGS'
+  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL', 'AUDITOR', 'SUPERVISOR', 'DEPARTMENTS', 'ADMIN', 'INACTIVE'
   const [toastMessage, setToastMessage] = useState(null);
-
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'logs' || tab === 'event-logs') {
-      setRoleFilter('EVENT_LOGS');
-    }
-  }, [searchParams]);
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -541,21 +527,6 @@ export const AdminUserManagement = () => {
             <Building2 className="w-4 h-4" />
             <span>+ Add Department</span>
           </button>
-
-          <button
-            onClick={() => {
-              setRoleFilter('EVENT_LOGS');
-              setSearchParams({ tab: 'logs' });
-            }}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-102 cursor-pointer whitespace-nowrap ${
-              roleFilter === 'EVENT_LOGS'
-                ? 'bg-slate-900 text-cyan-300 border border-cyan-400 shadow-cyan-500/20'
-                : 'bg-gradient-to-r from-slate-800 to-indigo-950 hover:from-slate-700 hover:to-indigo-900 text-white shadow-indigo-900/20'
-            }`}
-          >
-            <Terminal className="w-4 h-4 text-cyan-400" />
-            <span>📋 Event Logger</span>
-          </button>
         </div>
       </div>
 
@@ -649,23 +620,7 @@ export const AdminUserManagement = () => {
         {/* Filter Pills with Horizontal Scroll on Mobile */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto py-0.5">
           <button
-            onClick={() => {
-              setRoleFilter('EVENT_LOGS');
-              setSearchParams({ tab: 'logs' });
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-              roleFilter === 'EVENT_LOGS'
-                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/30'
-                : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-cyan-400 hover:bg-indigo-100'
-            }`}
-          >
-            📋 Event Logger
-          </button>
-          <button
-            onClick={() => {
-              setRoleFilter('ALL');
-              setSearchParams({});
-            }}
+            onClick={() => setRoleFilter('ALL')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
               roleFilter === 'ALL'
                 ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
@@ -760,10 +715,8 @@ export const AdminUserManagement = () => {
         </div>
       </div>
 
-      {/* Cards Grid: Factory Departments View OR Personnel Directory OR Event Logger */}
-      {roleFilter === 'EVENT_LOGS' ? (
-        <EventLoggerPanel />
-      ) : roleFilter === 'DEPARTMENTS' ? (
+      {/* Cards Grid: Factory Departments View OR Personnel Directory */}
+      {roleFilter === 'DEPARTMENTS' ? (
         departmentsLoading && departmentsList.length === 0 ? (
           <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
             <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-3" />

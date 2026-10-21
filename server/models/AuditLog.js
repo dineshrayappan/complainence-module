@@ -7,8 +7,6 @@ const auditLogSchema = new mongoose.Schema(
     user_role: { type: String, required: true },
     action: { type: String, required: true },
     action_label: { type: String, required: true },
-    category: { type: String, default: 'SYSTEM' }, // 'AUTH' | 'USER_MGMT' | 'NC_DEFECT' | 'WORK_TASK' | 'DEPARTMENT' | 'SECURITY' | 'SYSTEM'
-    severity: { type: String, default: 'INFO' }, // 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL'
     entity_type: { type: String, default: 'NC' },
     entity_id: { type: String },
     entity_name: { type: String },
