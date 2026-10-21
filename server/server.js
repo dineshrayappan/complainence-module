@@ -125,6 +125,13 @@ const apiOverview = (req, res) => {
 app.get('/', apiOverview);
 app.get('/api', apiOverview);
 app.get('/health', (req, res) => res.redirect('/api/health'));
+app.get('/favicon.ico', (req, res) => {
+  const icoPath = path.join(__dirname, '../client/public/favicon.ico');
+  if (require('fs').existsSync(icoPath)) {
+    return res.sendFile(icoPath);
+  }
+  res.status(204).end();
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
