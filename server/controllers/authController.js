@@ -9,6 +9,7 @@ const {
   evaluateUserDailyAttendance,
   getTodayISTString,
 } = require('../utils/attendanceHelper');
+const { logEvent } = require('../utils/eventLogger');
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -127,6 +128,27 @@ const login = async (req, res) => {
             console.warn('[AuthController:login] Attendance record notice:', attErr.message);
           }
 
+          // Track user login time in audit log history
+          await logEvent({
+            req,
+            userId: user.employeeId || user._id,
+            userName: user.name,
+            userRole: user.role,
+            action: 'AUTH_LOGIN_SUCCESS',
+            actionLabel: 'User Sign In',
+            category: 'AUTH',
+            severity: 'SUCCESS',
+            entityType: 'USER',
+            entityId: user.employeeId || String(user._id),
+            entityName: user.name,
+            details: `${user.name} (${user.employeeId} • ${user.designation}) signed in successfully from ${req.ip || 'Web Console'}.`,
+            payload: {
+              department: user.department,
+              designation: user.designation,
+              loginTimestamp: now.toISOString(),
+            },
+          });
+
           const token = generateToken(user._id.toString());
           return res.status(200).json({
             success: true,
@@ -183,6 +205,27 @@ const login = async (req, res) => {
     } catch (attErr) {
       console.warn('[AuthController:login:fallback] Attendance record notice:', attErr.message);
     }
+
+    // Track user login time in fallback audit log history
+    await logEvent({
+      req,
+      userId: user.employeeId || user._id || user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: 'AUTH_LOGIN_SUCCESS',
+      actionLabel: 'User Sign In',
+      category: 'AUTH',
+      severity: 'SUCCESS',
+      entityType: 'USER',
+      entityId: user.employeeId || String(user._id || user.id),
+      entityName: user.name,
+      details: `${user.name} (${user.employeeId} • ${user.designation}) signed in successfully from ${req.ip || 'Web Console'}.`,
+      payload: {
+        department: user.department,
+        designation: user.designation,
+        loginTimestamp: now.toISOString(),
+      },
+    });
 
     const token = generateToken(user._id || user.id);
     return res.status(200).json({
@@ -394,6 +437,21 @@ const logout = async (req, res) => {
         lastLogoutAt: now,
       });
     }
+
+    await logEvent({
+      req,
+      userId: userId || req.user?.employeeId || 'USER',
+      userName: req.user?.name || 'User',
+      userRole: req.user?.role || 'USER',
+      action: 'AUTH_LOGOUT',
+      actionLabel: 'User Sign Out',
+      category: 'AUTH',
+      severity: 'INFO',
+      entityType: 'USER',
+      entityId: String(userId),
+      details: `User ${req.user?.name || userId} signed out.`,
+      payload: { logoutTimestamp: now.toISOString() },
+    });
 
     return res.status(200).json({
       success: true,

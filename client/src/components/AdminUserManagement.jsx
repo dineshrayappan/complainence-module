@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users,
   UserPlus,
@@ -28,8 +29,13 @@ import {
   AlertOctagon,
   Layers,
   Activity,
+  Clock,
+  History,
+  LogIn,
 } from 'lucide-react';
 import { userService, departmentService } from '../services/api';
+import UserLoginTrackerPanel from './UserLoginTrackerPanel';
+import LogHistoryPanel from './LogHistoryPanel';
 
 const FACTORY_DEPARTMENTS = [
   'Production',
@@ -42,6 +48,33 @@ const FACTORY_DEPARTMENTS = [
 ];
 
 export const AdminUserManagement = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const initialTab =
+    urlTab === 'logins' || urlTab === 'login-times' || urlTab === 'login-tracker'
+      ? 'LOGIN_TRACKER'
+      : urlTab === 'logs' || urlTab === 'history' || urlTab === 'audit-logs'
+      ? 'LOG_HISTORY'
+      : urlTab === 'departments'
+      ? 'DEPARTMENTS'
+      : 'PERSONNEL';
+
+  const [adminTab, setAdminTab] = useState(initialTab);
+  const [selectedLoginUser, setSelectedLoginUser] = useState(null);
+
+  const handleTabChange = (newTab) => {
+    setAdminTab(newTab);
+    const tabParam =
+      newTab === 'LOGIN_TRACKER'
+        ? 'login-times'
+        : newTab === 'LOG_HISTORY'
+        ? 'history'
+        : newTab === 'DEPARTMENTS'
+        ? 'departments'
+        : 'personnel';
+    setSearchParams({ tab: tabParam }, { replace: true });
+  };
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [departmentsList, setDepartmentsList] = useState([]);
@@ -603,120 +636,70 @@ export const AdminUserManagement = () => {
         </div>
       </div>
 
-      {/* Search & Filter Controls with smooth horizontal swipe */}
-      <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        {/* Search input */}
-        <div className="relative flex-1 max-w-md w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search name, Employee ID, department..."
-            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
-          />
-        </div>
+      {/* Primary Admin Navigation Tabs */}
+      <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-slate-200/60 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 w-full overflow-x-auto no-scrollbar shadow-inner">
+        <button
+          onClick={() => handleTabChange('PERSONNEL')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'PERSONNEL'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Users className="w-4 h-4 text-indigo-500" />
+          <span>👥 Personnel Directory ({totalUsers})</span>
+        </button>
 
-        {/* Filter Pills with Horizontal Scroll on Mobile */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto py-0.5">
-          <button
-            onClick={() => setRoleFilter('ALL')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'ALL'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            All Personnel ({users.length})
-          </button>
-          <button
-            onClick={() => setRoleFilter('AUDITOR')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'AUDITOR'
-                ? 'bg-purple-600 text-white shadow-xs'
-                : 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
-            }`}
-          >
-            Auditors ({auditorCount})
-          </button>
-          <button
-            onClick={() => setRoleFilter('SUPERVISOR')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'SUPERVISOR'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
-            }`}
-          >
-            Supervisors ({supervisorCount})
-          </button>
-          <button
-            onClick={() => setRoleFilter('DEPARTMENTS')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'DEPARTMENTS'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100'
-            }`}
-          >
-            🏢 Departments ({departmentsList.length})
-          </button>
-          <button
-            onClick={() => setRoleFilter('ADMIN')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'ADMIN'
-                ? 'bg-amber-500 text-white shadow-xs'
-                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
-            }`}
-          >
-            Admins ({adminCount})
-          </button>
-          {inactiveCount > 0 && (
-            <button
-              onClick={() => setRoleFilter('INACTIVE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                roleFilter === 'INACTIVE'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
-              }`}
-            >
-              Inactive ({inactiveCount})
-            </button>
-          )}
-          <button
-            onClick={() => setRoleFilter('PRESENT')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'PRESENT'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
-            }`}
-          >
-            🟢 Present ({presentCount})
-          </button>
-          <button
-            onClick={() => setRoleFilter('ABSENT')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-              roleFilter === 'ABSENT'
-                ? 'bg-slate-700 text-white shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-            }`}
-          >
-            ⚪ Absent ({absentCount})
-          </button>
+        <button
+          onClick={() => handleTabChange('DEPARTMENTS')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'DEPARTMENTS'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Building2 className="w-4 h-4 text-blue-500" />
+          <span>🏢 Factory Departments ({departmentsList.length})</span>
+        </button>
 
-          <button
-            onClick={() => {
-              loadUsers();
-              loadDepartments();
-            }}
-            title="Refresh Personnel & Departments"
-            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors shrink-0"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading || departmentsLoading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setSelectedLoginUser(null);
+            handleTabChange('LOGIN_TRACKER');
+          }}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'LOGIN_TRACKER'
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Clock className="w-4 h-4 text-emerald-500" />
+          <span>🕒 User Login Times Tracker</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        </button>
+
+        <button
+          onClick={() => handleTabChange('LOG_HISTORY')}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'LOG_HISTORY'
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <History className="w-4 h-4 text-purple-500" />
+          <span>📜 Activity & Past Records Log</span>
+          <span className="px-1.5 py-0.2 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 text-[10px] font-bold">
+            Ledger
+          </span>
+        </button>
       </div>
 
-      {/* Cards Grid: Factory Departments View OR Personnel Directory */}
-      {roleFilter === 'DEPARTMENTS' ? (
+      {/* Render Active View Based on Selected Admin Tab */}
+      {adminTab === 'LOGIN_TRACKER' ? (
+        <UserLoginTrackerPanel initialFilterUserId={selectedLoginUser} />
+      ) : adminTab === 'LOG_HISTORY' ? (
+        <LogHistoryPanel />
+      ) : adminTab === 'DEPARTMENTS' ? (
         departmentsLoading && departmentsList.length === 0 ? (
           <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
             <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin mb-3" />
@@ -817,7 +800,118 @@ export const AdminUserManagement = () => {
             ))}
           </div>
         )
-      ) : loading && users.length === 0 ? (
+      ) : (
+        <>
+          {/* Search & Filter Controls with smooth horizontal swipe */}
+          <div className="p-3 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Search input */}
+            <div className="relative flex-1 max-w-md w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, Employee ID, department..."
+                className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+
+            {/* Filter Pills with Horizontal Scroll on Mobile */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto py-0.5">
+              <button
+                onClick={() => setRoleFilter('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                  roleFilter === 'ALL'
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                All Personnel ({users.length})
+              </button>
+              <button
+                onClick={() => setRoleFilter('AUDITOR')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                  roleFilter === 'AUDITOR'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
+                }`}
+              >
+                Auditors ({auditorCount})
+              </button>
+              <button
+                onClick={() => setRoleFilter('SUPERVISOR')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                  roleFilter === 'SUPERVISOR'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+                }`}
+              >
+                Supervisors ({supervisorCount})
+              </button>
+              <button
+                onClick={() => handleTabChange('DEPARTMENTS')}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100"
+              >
+                🏢 Departments ({departmentsList.length})
+              </button>
+              <button
+                onClick={() => setRoleFilter('ADMIN')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                  roleFilter === 'ADMIN'
+                    ? 'bg-amber-500 text-white shadow-xs'
+                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
+                }`}
+              >
+                Admins ({adminCount})
+              </button>
+              {inactiveCount > 0 && (
+                <button
+                  onClick={() => setRoleFilter('INACTIVE')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                    roleFilter === 'INACTIVE'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
+                  }`}
+                >
+                  Inactive ({inactiveCount})
+                </button>
+              )}
+              <button
+                onClick={() => setRoleFilter('PRESENT')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                  roleFilter === 'PRESENT'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+                }`}
+              >
+                🟢 Present ({presentCount})
+              </button>
+              <button
+                onClick={() => setRoleFilter('ABSENT')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                  roleFilter === 'ABSENT'
+                    ? 'bg-slate-700 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                ⚪ Absent ({absentCount})
+              </button>
+
+              <button
+                onClick={() => {
+                  loadUsers();
+                  loadDepartments();
+                }}
+                title="Refresh Personnel & Departments"
+                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading || departmentsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Personnel Directory View */}
+          {loading && users.length === 0 ? (
         <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin mb-3" />
           <span>Scanning Factory Personnel Directory...</span>
@@ -998,6 +1092,17 @@ export const AdminUserManagement = () => {
                   </button>
 
                   <button
+                    onClick={() => {
+                      setSelectedLoginUser(u.employeeId);
+                      handleTabChange('LOGIN_TRACKER');
+                    }}
+                    className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
+                    title="Track this user's login times and sessions"
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
                     onClick={() => handleOpenEditUser(u)}
                     className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
                     title="Edit profile and department"
@@ -1034,6 +1139,8 @@ export const AdminUserManagement = () => {
           })}
         </div>
       )}
+    </>
+  )}
 
       {/* ================= MODAL 1: ONBOARD NEW USER ================= */}
       {isCreateModalOpen && (

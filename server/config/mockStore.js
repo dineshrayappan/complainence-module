@@ -363,6 +363,141 @@ module.exports = {
     return mockAttendance.filter((a) => a.date === dateString);
   },
   getAllAttendance: () => [...mockAttendance],
+  addAuditLog: (log) => {
+    mockAuditLogs.unshift(log);
+    if (mockAuditLogs.length > 2000) {
+      mockAuditLogs.pop();
+    }
+    return log;
+  },
+  getAuditLogs: (params = {}) => {
+    const {
+      search = '',
+      category = 'ALL',
+      severity = 'ALL',
+      timeframe = 'all',
+      userId = '',
+      page = 1,
+      limit = 50,
+    } = params;
+
+    let filtered = [...mockAuditLogs];
+
+    if (category && category !== 'ALL') {
+      filtered = filtered.filter((l) => (l.category || '').toUpperCase() === category.toUpperCase());
+    }
+
+    if (severity && severity !== 'ALL') {
+      filtered = filtered.filter((l) => (l.severity || '').toUpperCase() === severity.toUpperCase());
+    }
+
+    if (userId) {
+      const uId = userId.trim().toLowerCase();
+      filtered = filtered.filter((l) => (l.user_id || '').toLowerCase() === uId);
+    }
+
+    if (timeframe && timeframe !== 'all') {
+      const now = Date.now();
+      let cutoff = 0;
+      if (timeframe === 'today') {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        cutoff = d.getTime();
+      } else if (timeframe === '7days') {
+        cutoff = now - 7 * 24 * 3600 * 1000;
+      } else if (timeframe === '30days') {
+        cutoff = now - 30 * 24 * 3600 * 1000;
+      }
+      if (cutoff > 0) {
+        filtered = filtered.filter((l) => new Date(l.created_at).getTime() >= cutoff);
+      }
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(
+        (l) =>
+          (l.user_name || '').toLowerCase().includes(q) ||
+          (l.user_id || '').toLowerCase().includes(q) ||
+          (l.action_label || '').toLowerCase().includes(q) ||
+          (l.action || '').toLowerCase().includes(q) ||
+          (l.details || '').toLowerCase().includes(q) ||
+          (l.entity_name || '').toLowerCase().includes(q) ||
+          (l.related_nc_id || '').toLowerCase().includes(q)
+      );
+    }
+
+    const total = filtered.length;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+    const totalPages = Math.ceil(total / limitNum) || 1;
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginated = filtered.slice(startIndex, startIndex + limitNum);
+
+    return {
+      logs: paginated,
+      total,
+      page: pageNum,
+      totalPages,
+    };
+  },
+  getLoginHistory: (params = {}) => {
+    const { userId, employeeId, timeframe = 'all', limit = 100 } = params;
+    let list = mockAuditLogs.filter(
+      (l) => l.category === 'AUTH' || (l.action && l.action.startsWith('AUTH_'))
+    );
+
+    if (userId || employeeId) {
+      const target = (userId || employeeId || '').toLowerCase().trim();
+      list = list.filter((l) => (l.user_id || '').toLowerCase() === target);
+    }
+
+    if (timeframe && timeframe !== 'all') {
+      const now = Date.now();
+      let cutoff = 0;
+      if (timeframe === 'today') {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        cutoff = d.getTime();
+      } else if (timeframe === '7days') {
+        cutoff = now - 7 * 24 * 3600 * 1000;
+      } else if (timeframe === '30days') {
+        cutoff = now - 30 * 24 * 3600 * 1000;
+      }
+      if (cutoff > 0) {
+        list = list.filter((l) => new Date(l.created_at).getTime() >= cutoff);
+      }
+    }
+
+    return list.slice(0, parseInt(limit, 10) || 100);
+  },
+  getAuditLogStats: () => {
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 3600 * 1000;
+    const total = mockAuditLogs.length;
+    const todayCount = mockAuditLogs.filter(
+      (l) => new Date(l.created_at).getTime() >= oneDayAgo
+    ).length;
+    const criticalCount = mockAuditLogs.filter((l) => l.severity === 'CRITICAL').length;
+    const warningCount = mockAuditLogs.filter((l) => l.severity === 'WARNING').length;
+    const successCount = mockAuditLogs.filter((l) => l.severity === 'SUCCESS').length;
+    const infoCount = mockAuditLogs.filter((l) => l.severity === 'INFO').length;
+    const authCount = mockAuditLogs.filter((l) => l.category === 'AUTH').length;
+
+    return {
+      total,
+      todayCount,
+      criticalCount,
+      warningCount,
+      successCount,
+      infoCount,
+      authCount,
+    };
+  },
+  clearAuditLogs: () => {
+    mockAuditLogs = [];
+    return true;
+  },
 };
 
 let mockDepartments = [
@@ -380,6 +515,128 @@ let mockAttendance = [];
 let mockTasks = [];
 
 let mockAudits = [];
+
+const seedTime = Date.now();
+let mockAuditLogs = [
+  {
+    id: 'evt-seed-01',
+    user_id: 'ADMIN',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'AUTH_LOGIN_SUCCESS',
+    action_label: 'User Sign In',
+    category: 'AUTH',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'ADMIN',
+    entity_name: 'Administrator',
+    details: 'Administrator (ADMIN - Operations Director) authenticated successfully via Web Console.',
+    ip_address: '192.168.1.100',
+    is_immutable: true,
+    created_at: new Date(seedTime - 12 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-02',
+    user_id: 'AUD-001',
+    user_name: 'Kavita Nair',
+    user_role: 'AUDITOR',
+    action: 'AUTH_LOGIN_SUCCESS',
+    action_label: 'User Sign In',
+    category: 'AUTH',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'AUD-001',
+    entity_name: 'Kavita Nair',
+    details: 'QA Lead Auditor Kavita Nair signed in to conduct daily floor audits.',
+    ip_address: '192.168.1.104',
+    is_immutable: true,
+    created_at: new Date(seedTime - 45 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-03',
+    user_id: 'AUD-001',
+    user_name: 'Kavita Nair',
+    user_role: 'AUDITOR',
+    action: 'NC_CREATED',
+    action_label: 'Non-Conformance Raised',
+    category: 'NC_DEFECT',
+    severity: 'WARNING',
+    entity_type: 'NC',
+    entity_id: 'NC-2026-001',
+    entity_name: 'Skipped Stitches on Hemline',
+    related_nc_id: 'NC-2026-001',
+    details: 'Critical seam slippage detected at Line 2 Sewing section during pre-final audit inspection.',
+    ip_address: '192.168.1.104',
+    is_immutable: true,
+    created_at: new Date(seedTime - 38 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-04',
+    user_id: 'SUP-101',
+    user_name: 'Rajesh Kumar',
+    user_role: 'ACTION_PERSON',
+    action: 'AUTH_LOGIN_SUCCESS',
+    action_label: 'User Sign In',
+    category: 'AUTH',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'SUP-101',
+    entity_name: 'Rajesh Kumar',
+    details: 'Line Supervisor Rajesh Kumar logged in from Sewing floor terminal.',
+    ip_address: '192.168.1.112',
+    is_immutable: true,
+    created_at: new Date(seedTime - 35 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-05',
+    user_id: 'SUP-101',
+    user_name: 'Rajesh Kumar',
+    user_role: 'ACTION_PERSON',
+    action: 'NC_IN_PROGRESS',
+    action_label: 'Rework Started',
+    category: 'NC_DEFECT',
+    severity: 'INFO',
+    entity_type: 'NC',
+    entity_id: 'NC-2026-001',
+    related_nc_id: 'NC-2026-001',
+    details: 'Rework initiated: Needle replacement and tension gauge calibration started on machine SN-402.',
+    ip_address: '192.168.1.112',
+    is_immutable: true,
+    created_at: new Date(seedTime - 25 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-06',
+    user_id: 'ADMIN',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'USER_CREATED',
+    action_label: 'Personnel Onboarded',
+    category: 'USER_MGMT',
+    severity: 'SUCCESS',
+    entity_type: 'USER',
+    entity_id: 'SUP-102',
+    entity_name: 'Anand Verma',
+    details: 'New Line Supervisor Anand Verma onboarded for Cutting department.',
+    ip_address: '192.168.1.100',
+    is_immutable: true,
+    created_at: new Date(seedTime - 180 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-07',
+    user_id: 'SYSTEM',
+    user_name: 'QMS Engine',
+    user_role: 'SYSTEM',
+    action: 'SYSTEM_STARTUP',
+    action_label: 'System Initialized',
+    category: 'SYSTEM',
+    severity: 'INFO',
+    entity_type: 'SYSTEM',
+    details: 'Textile QMS Engine online. SLA deadline monitors and audit ledger active.',
+    ip_address: '127.0.0.1',
+    is_immutable: true,
+    created_at: new Date(seedTime - 360 * 60 * 1000),
+  },
+];
 
 let complianceThresholds = {
   highThreshold: 90,     // >= 90% is Green

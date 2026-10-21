@@ -10,6 +10,7 @@ const {
   evaluateUserDailyAttendance,
   getTodayISTString,
 } = require('../utils/attendanceHelper');
+const { logEvent } = require('../utils/eventLogger');
 
 const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
   if (!u) return null;
@@ -289,6 +290,20 @@ const createUser = async (req, res) => {
           mobileNumber: inserted.mobileNumber,
         });
 
+        // Record audit event
+        await logEvent({
+          req,
+          action: 'USER_CREATED',
+          actionLabel: 'Personnel Onboarded',
+          category: 'USER_MGMT',
+          severity: 'SUCCESS',
+          entityType: 'USER',
+          entityId: inserted.employeeId,
+          entityName: inserted.name,
+          details: `Administrator created ${inserted.role} account for ${inserted.name} (${inserted.employeeId} • ${inserted.department}).`,
+          payload: { role: inserted.role, department: inserted.department, designation: inserted.designation },
+        });
+
         return res.status(201).json({
           success: true,
           message: `User '${inserted.name}' (${inserted.employeeId}) created successfully.`,
@@ -373,6 +388,19 @@ const updateUser = async (req, res) => {
         const updated = await User.findOneAndUpdate(query, updateData, { new: true });
         if (updated) {
           mockStore.updateUser(userId, updateData);
+          await logEvent({
+            req,
+            action: 'USER_UPDATED',
+            actionLabel: 'User Profile Updated',
+            category: 'USER_MGMT',
+            severity: 'INFO',
+            entityType: 'USER',
+            entityId: updated.employeeId || userId,
+            entityName: updated.name,
+            details: `Profile details updated for ${updated.name} (${updated.employeeId}).`,
+            payload: updateData,
+          });
+
           return res.status(200).json({
             success: true,
             message: `User '${updated.name}' updated successfully.`,
@@ -444,6 +472,18 @@ const resetUserPassword = async (req, res) => {
           user.password = newPassword;
           await user.save();
           mockStore.updateUser(userId, { password: newPassword });
+          await logEvent({
+            req,
+            action: 'USER_PASSWORD_RESET',
+            actionLabel: 'Password Reset',
+            category: 'SECURITY',
+            severity: 'WARNING',
+            entityType: 'USER',
+            entityId: user.employeeId,
+            entityName: user.name,
+            details: `Password reset executed for ${user.name} (${user.employeeId}) by Administrator.`,
+          });
+
           return res.status(200).json({
             success: true,
             message: `Password for '${user.name}' (${user.employeeId}) has been successfully updated.`,
@@ -505,6 +545,18 @@ const toggleUserStatus = async (req, res) => {
           current.isActive = !current.isActive;
           await current.save();
           mockStore.updateUser(userId, { isActive: current.isActive });
+          await logEvent({
+            req,
+            action: 'USER_STATUS_TOGGLED',
+            actionLabel: 'User Status Toggled',
+            category: 'USER_MGMT',
+            severity: 'WARNING',
+            entityType: 'USER',
+            entityId: current.employeeId,
+            entityName: current.name,
+            details: `User ${current.name} (${current.employeeId}) account was ${current.isActive ? 'activated' : 'deactivated'}.`,
+          });
+
           return res.status(200).json({
             success: true,
             message: `User '${current.name}' has been ${current.isActive ? 'activated' : 'deactivated'}.`,
@@ -783,6 +835,18 @@ const deleteUser = async (req, res) => {
 
     // Delete from mockStore
     mockStore.deleteUser(userId);
+
+    await logEvent({
+      req,
+      action: 'USER_DELETED',
+      actionLabel: 'User Account Deleted',
+      category: 'USER_MGMT',
+      severity: 'CRITICAL',
+      entityType: 'USER',
+      entityId: targetUser.employeeId,
+      entityName: targetUser.name,
+      details: `User account '${targetUser.name}' (${targetUser.employeeId}) permanently deleted by Administrator.`,
+    });
 
     return res.status(200).json({
       success: true,
