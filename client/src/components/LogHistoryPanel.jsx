@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   History,
+  Clock,
   Search,
   Filter,
   Download,
@@ -71,8 +72,9 @@ const formatRelativeTime = (dateStr) => {
 };
 
 const CATEGORIES = [
-  { id: 'ALL', label: 'All Records', icon: History },
-  { id: 'AUTH', label: '🔐 Logins & Auth', icon: LogIn },
+  { id: 'ALL', label: 'All Past Records', icon: History },
+  { id: 'DELETIONS', label: '🗑️ Deleted Records (Who Deleted What)', icon: Trash2 },
+  { id: 'AUTH', label: '⏱️ Login & Logout Times', icon: Clock },
   { id: 'NC_DEFECT', label: '⚠️ Defect NCs', icon: AlertTriangle },
   { id: 'USER_MGMT', label: '👥 User Accounts', icon: Users },
   { id: 'DEPARTMENT', label: '🏢 Departments', icon: Building2 },
@@ -218,40 +220,40 @@ export const LogHistoryPanel = () => {
 
         <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-500/20 shadow-xs">
           <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-1">
-            <span>Auth & Login Events</span>
-            <LogIn className="w-4 h-4 text-emerald-500" />
+            <span>Login & Logout Times</span>
+            <Clock className="w-4 h-4 text-emerald-500" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-300">
-            {logs.filter((l) => l.category === 'AUTH').length}
+            {logs.filter((l) => l.category === 'AUTH' || (l.action && l.action.startsWith('AUTH_'))).length}
           </div>
           <span className="text-[10px] text-slate-400 font-mono truncate block">
-            Current page entries
+            User sign-ins & sign-outs
           </span>
         </div>
 
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/20 shadow-xs">
-          <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 text-xs font-semibold mb-1">
-            <span>Defect Actions</span>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-rose-500/20 shadow-xs">
+          <div className="flex items-center justify-between text-rose-600 dark:text-rose-400 text-xs font-semibold mb-1">
+            <span>Record Deletions</span>
+            <Trash2 className="w-4 h-4 text-rose-500" />
           </div>
-          <div className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-300">
-            {logs.filter((l) => l.category === 'NC_DEFECT').length}
+          <div className="text-xl sm:text-2xl font-black text-rose-700 dark:text-rose-300">
+            {logs.filter((l) => (l.action && l.action.includes('DELET')) || (l.details && l.details.toLowerCase().includes('delet'))).length}
           </div>
           <span className="text-[10px] text-slate-400 font-mono truncate block">
-            Rectification history
+            Who deleted what audit trail
           </span>
         </div>
 
         <div className="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-purple-500/20 shadow-xs">
           <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 text-xs font-semibold mb-1">
-            <span>Admin Actions</span>
+            <span>Defect & Admin Actions</span>
             <UserCog className="w-4 h-4 text-purple-500" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-purple-700 dark:text-purple-300">
-            {logs.filter((l) => l.category === 'USER_MGMT' || l.category === 'SECURITY').length}
+            {logs.filter((l) => l.category === 'NC_DEFECT' || l.category === 'USER_MGMT' || l.category === 'DEPT_OPS').length}
           </div>
           <span className="text-[10px] text-slate-400 font-mono truncate block">
-            User & role operations
+            Quality & personnel ops
           </span>
         </div>
       </div>
@@ -377,11 +379,25 @@ export const LogHistoryPanel = () => {
                 {logs.map((log) => {
                   const badge = getActionBadge(log);
                   const Icon = badge.icon;
+                  const isDelete =
+                    (log.action && log.action.includes('DELET')) ||
+                    (log.action_label && log.action_label.toLowerCase().includes('delete')) ||
+                    (log.details && log.details.toLowerCase().includes('deleted by'));
+                  const isLogout = log.action === 'AUTH_LOGOUT';
+                  const isLogin = log.action === 'AUTH_LOGIN_SUCCESS' || log.action === 'AUTH_LOGIN';
 
                   return (
                     <tr
                       key={log.id || log._id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors"
+                      className={`transition-colors ${
+                        isDelete
+                          ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40 border-l-4 border-l-rose-500'
+                          : isLogout
+                          ? 'bg-slate-50/40 dark:bg-slate-800/20 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 border-l-4 border-l-slate-400'
+                          : isLogin
+                          ? 'hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 border-l-4 border-l-emerald-500'
+                          : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/30'
+                      }`}
                     >
                       {/* Timestamp */}
                       <td className="py-3 px-4 whitespace-nowrap">
@@ -399,22 +415,47 @@ export const LogHistoryPanel = () => {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badge.bg}`}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
+                              isDelete
+                                ? 'bg-rose-50 text-rose-700 border-rose-300 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800'
+                                : badge.bg
+                            }`}
                           >
-                            <Icon className="w-3 h-3 shrink-0" />
+                            <Icon className="w-3.5 h-3.5 shrink-0" />
                             <span>{log.action_label || log.action}</span>
                           </span>
                         </div>
                       </td>
 
-                      {/* Actor */}
+                      {/* Actor (Who performed the action / Who deleted) */}
                       <td className="py-3 px-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-[11px] text-slate-700 dark:text-slate-300">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] text-white shrink-0 shadow-2xs ${
+                              isDelete
+                                ? 'bg-rose-600'
+                                : isLogout
+                                ? 'bg-slate-600'
+                                : isLogin
+                                ? 'bg-emerald-600'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
                             {log.user_name?.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <span className="font-bold text-slate-900 dark:text-white block leading-tight">
+                            {isDelete && (
+                              <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 block tracking-tight">
+                                Deleted By
+                              </span>
+                            )}
+                            <span
+                              className={`font-bold block leading-tight ${
+                                isDelete
+                                  ? 'text-rose-700 dark:text-rose-300 font-extrabold'
+                                  : 'text-slate-900 dark:text-white'
+                              }`}
+                            >
                               {log.user_name}
                             </span>
                             <div className="flex items-center gap-1 font-mono text-[10px] text-slate-400">
@@ -430,7 +471,16 @@ export const LogHistoryPanel = () => {
 
                       {/* Entity / Reference */}
                       <td className="py-3 px-4">
-                        {log.related_nc_id || log.entity_name || log.entity_id ? (
+                        {isDelete ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-md bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 font-mono border border-rose-200 dark:border-rose-800">
+                              Deleted {log.entity_type || 'Record'}
+                            </span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white text-xs truncate max-w-[170px]">
+                              {log.related_nc_id || log.entity_name || log.entity_id}
+                            </span>
+                          </div>
+                        ) : log.related_nc_id || log.entity_name || log.entity_id ? (
                           <div className="flex flex-col items-start gap-0.5">
                             {log.related_nc_id && (
                               <span className="font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 rounded-md border border-amber-200 dark:border-amber-800 text-[10px]">
@@ -446,11 +496,65 @@ export const LogHistoryPanel = () => {
                         )}
                       </td>
 
-                      {/* Details */}
+                      {/* Details (With Login Time, Logout Time, Duration & Deletion Notices) */}
                       <td className="py-3 px-4">
-                        <p className="text-slate-600 dark:text-slate-300 text-xs line-clamp-2 max-w-md">
-                          {log.details || log.action_label}
-                        </p>
+                        {isDelete ? (
+                          <div className="space-y-1">
+                            <p className="text-slate-800 dark:text-slate-100 text-xs font-semibold">
+                              {log.details || log.action_label}
+                            </p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 text-[10px] font-bold">
+                                <Trash2 className="w-3 h-3 text-rose-600" />
+                                <span>Permanent Deletion Audit</span>
+                              </span>
+                              {log.payload?.reason && (
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  Reason: {log.payload.reason}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : isLogout ? (
+                          <div className="space-y-1">
+                            <p className="text-slate-700 dark:text-slate-200 text-xs font-medium">
+                              {log.details}
+                            </p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {log.payload?.sessionDuration && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-cyan-300 text-[10px] font-mono font-bold">
+                                  <Clock className="w-3 h-3 text-indigo-500" />
+                                  <span>Session: {log.payload.sessionDuration}</span>
+                                </span>
+                              )}
+                              {log.payload?.loginTimeIST && (
+                                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                                  Login: {log.payload.loginTimeIST}
+                                </span>
+                              )}
+                              {log.payload?.logoutTimeIST && (
+                                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 font-bold">
+                                  Logout: {log.payload.logoutTimeIST}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : isLogin ? (
+                          <div className="space-y-1">
+                            <p className="text-slate-700 dark:text-slate-200 text-xs font-medium">
+                              {log.details}
+                            </p>
+                            <div className="flex items-center gap-2 text-[10px] font-mono text-emerald-600 dark:text-emerald-400">
+                              <Clock className="w-3 h-3 shrink-0" />
+                              <span className="font-bold">Login Time: {formatDateTime(log.created_at)}</span>
+                              <span className="text-slate-400">• IP: {log.ip_address || '127.0.0.1'}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-slate-600 dark:text-slate-300 text-xs line-clamp-2 max-w-md">
+                            {log.details || log.action_label}
+                          </p>
+                        )}
                       </td>
 
                       {/* Inspect Button */}
@@ -529,6 +633,71 @@ export const LogHistoryPanel = () => {
             </div>
 
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+              {/* Highlight Banner for Deletion Records */}
+              {((inspectLog.action && inspectLog.action.includes('DELET')) ||
+                (inspectLog.action_label && inspectLog.action_label.toLowerCase().includes('delete')) ||
+                (inspectLog.details && inspectLog.details.toLowerCase().includes('deleted by'))) && (
+                <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 text-rose-900 dark:text-rose-200 space-y-2">
+                  <div className="flex items-center gap-2 font-black text-sm text-rose-700 dark:text-rose-300">
+                    <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Permanent Record Deletion Audit Trail</span>
+                  </div>
+                  <p className="text-xs text-rose-800 dark:text-rose-300 font-medium">
+                    This entry records an irreversible record deletion from the factory system.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-rose-200/60 dark:border-rose-800/60 text-xs font-mono">
+                    <div>
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 block uppercase">Deleted By:</span>
+                      <strong className="text-slate-900 dark:text-white">{inspectLog.user_name} ({inspectLog.user_id})</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 block uppercase">Actor Role:</span>
+                      <strong className="text-slate-900 dark:text-white">{inspectLog.user_role}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 block uppercase">Deleted Entity:</span>
+                      <strong className="text-rose-700 dark:text-rose-400">{inspectLog.related_nc_id || inspectLog.entity_name || inspectLog.entity_id}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 block uppercase">Deletion Timestamp:</span>
+                      <strong className="text-slate-900 dark:text-white">{formatDateTime(inspectLog.created_at)}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Highlight Banner for Login & Logout Sessions */}
+              {(inspectLog.category === 'AUTH' || (inspectLog.action && inspectLog.action.startsWith('AUTH_'))) && (
+                <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-cyan-200 space-y-2">
+                  <div className="flex items-center gap-2 font-black text-sm text-indigo-700 dark:text-cyan-300">
+                    <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span>User Login & Logout Session Timeline</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-indigo-200/60 dark:border-indigo-800/60 text-xs font-mono">
+                    <div>
+                      <span className="text-[10px] text-indigo-600 dark:text-cyan-400 block uppercase">Login Timestamp:</span>
+                      <strong className="text-emerald-700 dark:text-emerald-400 font-bold block">
+                        {inspectLog.payload?.loginTimestamp ? formatDateTime(inspectLog.payload.loginTimestamp) : inspectLog.payload?.loginTimeIST || formatDateTime(inspectLog.created_at)}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-indigo-600 dark:text-cyan-400 block uppercase">Logout Timestamp:</span>
+                      <strong className="text-slate-800 dark:text-slate-200 block">
+                        {inspectLog.payload?.logoutTimestamp
+                          ? formatDateTime(inspectLog.payload.logoutTimestamp)
+                          : inspectLog.payload?.logoutTimeIST || (inspectLog.action === 'AUTH_LOGOUT' ? formatDateTime(inspectLog.created_at) : 'Active Session')}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-indigo-600 dark:text-cyan-400 block uppercase">Session Duration:</span>
+                      <strong className="text-indigo-600 dark:text-cyan-300 font-bold block">
+                        {inspectLog.payload?.sessionDuration || (inspectLog.action === 'AUTH_LOGOUT' ? '—' : '🟢 Active Now')}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 font-mono text-[11px]">
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase">Timestamp (IST)</span>

@@ -8,6 +8,7 @@ const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 const { computeDepartmentNCScore } = require('../utils/scoringEngine');
 const { toBase64DataUrl, isBase64DataUrl } = require('../utils/base64Helper');
+const { logEvent } = require('../utils/eventLogger');
 
 // Database status adapter: maps workflow statuses to canonical values
 // allows ('Assigned', 'In Progress', 'Closed'). We map workflow statuses to compatible DB values.
@@ -2053,27 +2054,70 @@ const reassignComplaint = async (req, res) => {
 const deleteComplaint = async (req, res) => {
   try {
     const paramId = req.params.id;
+    let existingComplaint = null;
 
-    // Delete from MongoDB if configured
+    // Fetch existing complaint details before deletion
     if (isMongoConnected()) {
       try {
         const query = { $or: [{ complaintId: paramId }] };
         if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.push({ _id: paramId });
         }
+        existingComplaint = await Complaint.findOne(query).lean();
         await Complaint.deleteOne(query);
       } catch (err) {
         console.error('[ComplaintController:deleteComplaint] MongoDB exception:', err.message);
       }
     }
 
+    if (!existingComplaint) {
+      existingComplaint = mockStore.getComplaint(paramId);
+    }
+
     // Delete from in-memory mock store
     mockStore.deleteComplaint(paramId);
 
+    const actorName = req.user?.name || 'Administrator';
+    const actorEmpId = req.user?.employeeId || 'ADMIN';
+    const actorRole = req.user?.role || 'ADMIN';
+    const ncId = existingComplaint?.complaintId || paramId;
+    const ncTitle = existingComplaint?.title || 'Defect Entry';
+    const ncDept = existingComplaint?.department || 'N/A';
+    const ncBuyer = existingComplaint?.buyer || 'N/A';
+
+    // Log who deleted the record with brief & complete details
+    await logEvent({
+      req,
+      userId: actorEmpId,
+      userName: actorName,
+      userRole: actorRole,
+      action: 'NC_DELETED',
+      actionLabel: 'Defect Record Deleted',
+      category: 'COMPLAINT',
+      severity: 'CRITICAL',
+      entityType: 'COMPLAINT',
+      entityId: ncId,
+      relatedNcId: ncId,
+      details: `Record ${ncId} ("${ncTitle}") was permanently deleted by ${actorName} (${actorEmpId} • ${actorRole}). Department: ${ncDept}, Buyer: ${ncBuyer}.`,
+      payload: {
+        deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
+        deletedRecord: {
+          complaintId: ncId,
+          title: ncTitle,
+          department: ncDept,
+          buyer: ncBuyer,
+          severity: existingComplaint?.severity,
+          stage: existingComplaint?.stage,
+        },
+        deletedAt: new Date().toISOString(),
+      },
+    });
+
     return res.status(200).json({
       success: true,
-      message: `Defect log ${paramId} deleted successfully.`,
+      message: `Defect log ${paramId} deleted successfully by ${actorName}.`,
       id: paramId,
+      deletedBy: { name: actorName, employeeId: actorEmpId },
     });
   } catch (error) {
     console.error('[ComplaintController:deleteComplaint] Error:', error);

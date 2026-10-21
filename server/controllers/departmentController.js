@@ -5,6 +5,7 @@ const Complaint = require('../models/Complaint');
 const ComplianceTask = require('../models/ComplianceTask');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
+const { logEvent } = require('../utils/eventLogger');
 
 // Helper to normalize department name
 const normalizeDeptName = (name) => (name || '').trim();
@@ -440,9 +441,38 @@ const deleteDepartment = async (req, res) => {
     // Delete in mockStore
     mockStore.deleteDepartment(targetDept.id || targetDept._id || targetDept.name);
 
+    const actorName = req.user?.name || 'Administrator';
+    const actorEmpId = req.user?.employeeId || 'ADMIN';
+    const actorRole = req.user?.role || 'ADMIN';
+
+    await logEvent({
+      req,
+      userId: actorEmpId,
+      userName: actorName,
+      userRole: actorRole,
+      action: 'DEPARTMENT_DELETED',
+      actionLabel: 'Department Deleted',
+      category: 'DEPT_OPS',
+      severity: 'CRITICAL',
+      entityType: 'DEPARTMENT',
+      entityId: targetDept.code || targetDept.name,
+      entityName: targetDept.name,
+      details: `Department '${targetDept.name}' (${targetDept.code}) was permanently deleted by ${actorName} (${actorEmpId} • ${actorRole}).`,
+      payload: {
+        deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
+        deletedDepartment: {
+          name: targetDept.name,
+          code: targetDept.code,
+          manager: targetDept.manager,
+          headcount: targetDept.headcount,
+        },
+        deletedAt: new Date().toISOString(),
+      },
+    });
+
     return res.status(200).json({
       success: true,
-      message: `Department '${targetDept.name}' (${targetDept.code}) has been deleted successfully. Historical audit records remain preserved.`,
+      message: `Department '${targetDept.name}' (${targetDept.code}) has been deleted successfully by ${actorName}. Historical audit records remain preserved.`,
       deletedDepartment: targetDept,
     });
   } catch (error) {

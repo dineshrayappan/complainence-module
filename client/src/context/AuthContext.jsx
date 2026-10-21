@@ -113,7 +113,12 @@ export const AuthProvider = ({ children }) => {
       const storedUser = user || JSON.parse(localStorage.getItem('garment_qms_user') || '{}');
       const userId = storedUser._id || storedUser.id || storedUser.employeeId;
       if (userId) {
-        await authService.logout({ userId });
+        await authService.logout({
+          userId,
+          userName: storedUser.name,
+          employeeId: storedUser.employeeId,
+          userRole: storedUser.role,
+        });
       }
     } catch (e) {
       console.warn('[AuthContext:logout] server notice:', e.message);

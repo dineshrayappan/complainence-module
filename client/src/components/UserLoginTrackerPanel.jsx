@@ -281,6 +281,16 @@ export const UserLoginTrackerPanel = ({ initialFilterUserId = null }) => {
               👥 Personnel Roster ({filteredRoster.length})
             </button>
             <button
+              onClick={() => setActiveTab('SESSIONS')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'SESSIONS'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              ⏱️ Login & Logout Sessions
+            </button>
+            <button
               onClick={() => setActiveTab('FEED')}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'FEED'
@@ -288,7 +298,7 @@ export const UserLoginTrackerPanel = ({ initialFilterUserId = null }) => {
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
-              ⚡ Live Sign-In Feed ({(data.recentLogins || []).length})
+              ⚡ Live Event Feed ({(data.recentLogins || []).length})
             </button>
           </div>
 
@@ -441,18 +451,31 @@ export const UserLoginTrackerPanel = ({ initialFilterUserId = null }) => {
                         {/* Last Activity / Logout Time */}
                         <td className="py-3 px-4">
                           {u.isPresent ? (
-                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                              <span>Active Session</span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Active Session</span>
+                              </div>
+                              {u.sessionDuration && (
+                                <span className="text-[10px] font-mono text-indigo-600 dark:text-cyan-400 font-semibold">
+                                  ⏱️ Live: {u.sessionDuration}
+                                </span>
+                              )}
                             </div>
                           ) : u.lastLogoutAt ? (
                             <div className="flex flex-col">
-                              <span className="text-slate-600 dark:text-slate-300 font-mono text-xs">
+                              <div className="flex items-center gap-1.5 font-mono font-bold text-slate-700 dark:text-slate-300 text-xs">
+                                <LogOut className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <span>{formatTimeOnly(u.lastLogoutAt)}</span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-mono">
                                 {formatDateTime(u.lastLogoutAt)}
                               </span>
-                              <span className="text-[10px] text-slate-400">
-                                Logged out ({formatRelativeTime(u.lastLogoutAt)})
-                              </span>
+                              {u.sessionDuration && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-mono font-bold mt-0.5 w-fit">
+                                  Duration: {u.sessionDuration}
+                                </span>
+                              )}
                             </div>
                           ) : u.lastLoginAt ? (
                             <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">
@@ -499,8 +522,102 @@ export const UserLoginTrackerPanel = ({ initialFilterUserId = null }) => {
             </div>
           </div>
         )
+      ) : activeTab === 'SESSIONS' ? (
+        /* ================= SUB-TAB 2: LOGIN & LOGOUT SESSIONS ================= */
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-emerald-500" />
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                User Login & Logout Session Timestamps
+              </h3>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {(data.recentLogins || []).length} session logs recorded
+            </span>
+          </div>
+
+          {(data.recentLogins || []).length === 0 ? (
+            <div className="p-12 text-center text-slate-400 font-mono text-xs">
+              No session events recorded yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-4">Event Type</th>
+                    <th className="py-3 px-4">Personnel</th>
+                    <th className="py-3 px-4">Timestamp (IST)</th>
+                    <th className="py-3 px-4">Session Duration</th>
+                    <th className="py-3 px-4">Terminal / IP</th>
+                    <th className="py-3 px-4">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {(data.recentLogins || []).map((l, idx) => {
+                    const isLogout = l.action === 'AUTH_LOGOUT';
+
+                    return (
+                      <tr key={l.id || idx} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/30 transition-colors">
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          {isLogout ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                              <LogOut className="w-3.5 h-3.5 text-slate-500" />
+                              <span>User Sign Out</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+                              <LogIn className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>User Sign In</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-bold text-slate-900 dark:text-white">{l.user_name}</div>
+                          <div className="text-[10px] font-mono text-slate-400">
+                            <span className="font-semibold text-indigo-600 dark:text-cyan-400">{l.user_id}</span> • {l.user_role}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">
+                            {formatDateTime(l.created_at)}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {formatRelativeTime(l.created_at)}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          {l.payload?.sessionDuration ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-cyan-300 text-[11px] font-mono font-bold">
+                              <Clock className="w-3 h-3 text-indigo-500" />
+                              <span>{l.payload.sessionDuration}</span>
+                            </span>
+                          ) : isLogout ? (
+                            <span className="text-slate-400 font-mono text-[11px]">—</span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>Active Session</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                          {l.ip_address || '127.0.0.1'}
+                        </td>
+                        <td className="py-3 px-4 text-xs text-slate-600 dark:text-slate-300 max-w-xs">
+                          {l.details}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       ) : (
-        /* ================= SUB-TAB 2: LIVE SIGN-IN EVENT FEED ================= */
+        /* ================= SUB-TAB 3: LIVE SIGN-IN EVENT FEED ================= */
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/30 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -673,35 +790,53 @@ export const UserLoginTrackerPanel = ({ initialFilterUserId = null }) => {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {userHistoryEvents.map((ev, idx) => (
-                      <div
-                        key={ev.id || idx}
-                        className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                            <LogIn className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-slate-900 dark:text-white block">
-                              {ev.action_label || 'User Sign In'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              IP: {ev.ip_address || '127.0.0.1'}
-                            </span>
-                          </div>
-                        </div>
+                    {userHistoryEvents.map((ev, idx) => {
+                      const isLogout = ev.action === 'AUTH_LOGOUT';
 
-                        <div className="text-right font-mono">
-                          <span className="text-slate-700 dark:text-slate-200 font-semibold block">
-                            {formatDateTime(ev.created_at)}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {formatRelativeTime(ev.created_at)}
-                          </span>
+                      return (
+                        <div
+                          key={ev.id || idx}
+                          className="p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between text-xs"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                isLogout
+                                  ? 'bg-slate-500/10 text-slate-600 dark:text-slate-300'
+                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              }`}
+                            >
+                              {isLogout ? <LogOut className="w-3.5 h-3.5" /> : <LogIn className="w-3.5 h-3.5" />}
+                            </div>
+                            <div>
+                              <span className="font-bold text-slate-900 dark:text-white block">
+                                {ev.action_label || (isLogout ? 'User Sign Out' : 'User Sign In')}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                                <span>IP: {ev.ip_address || '127.0.0.1'}</span>
+                                {ev.payload?.sessionDuration && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-indigo-600 dark:text-cyan-400 font-semibold">
+                                      Duration: {ev.payload.sessionDuration}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right font-mono">
+                            <span className="text-slate-700 dark:text-slate-200 font-semibold block">
+                              {formatDateTime(ev.created_at)}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {formatRelativeTime(ev.created_at)}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -384,7 +384,16 @@ module.exports = {
     let filtered = [...mockAuditLogs];
 
     if (category && category !== 'ALL') {
-      filtered = filtered.filter((l) => (l.category || '').toUpperCase() === category.toUpperCase());
+      if (category === 'DELETIONS') {
+        filtered = filtered.filter(
+          (l) =>
+            (l.action && l.action.toLowerCase().includes('delet')) ||
+            (l.action_label && l.action_label.toLowerCase().includes('delet')) ||
+            (l.details && l.details.toLowerCase().includes('delet'))
+        );
+      } else {
+        filtered = filtered.filter((l) => (l.category || '').toUpperCase() === category.toUpperCase());
+      }
     }
 
     if (severity && severity !== 'ALL') {
@@ -635,6 +644,90 @@ let mockAuditLogs = [
     ip_address: '127.0.0.1',
     is_immutable: true,
     created_at: new Date(seedTime - 360 * 60 * 1000),
+  },
+  {
+    id: 'evt-seed-08',
+    user_id: 'ADMIN',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'NC_DELETED',
+    action_label: 'Defect Record Deleted',
+    category: 'COMPLAINT',
+    severity: 'CRITICAL',
+    entity_type: 'COMPLAINT',
+    entity_id: 'NC-2026-0042',
+    entity_name: 'Broken Needle In Hemline',
+    related_nc_id: 'NC-2026-0042',
+    details: 'Record NC-2026-0042 ("Broken Needle In Hemline") was permanently deleted by Administrator (ADMIN • General Operations Director). Department: Sewing, Buyer: Zara. Reason: Duplicate log submitted during shift handover.',
+    ip_address: '192.168.1.100',
+    is_immutable: true,
+    created_at: new Date(seedTime - 95 * 60 * 1000),
+    payload: {
+      deletedBy: { name: 'Administrator', employeeId: 'ADMIN', role: 'ADMIN' },
+      deletedRecord: {
+        complaintId: 'NC-2026-0042',
+        title: 'Broken Needle In Hemline',
+        department: 'Sewing',
+        buyer: 'Zara',
+        severity: 'Major',
+        stage: 'Sewing Line 3',
+      },
+      reason: 'Duplicate log submitted during shift handover',
+    },
+  },
+  {
+    id: 'evt-seed-09',
+    user_id: 'ADMIN',
+    user_name: 'Administrator',
+    user_role: 'ADMIN',
+    action: 'USER_DELETED',
+    action_label: 'User Account Deleted',
+    category: 'USER_MGMT',
+    severity: 'CRITICAL',
+    entity_type: 'USER',
+    entity_id: 'SUP-099',
+    entity_name: 'Vikram Joshi',
+    details: 'User account \'Vikram Joshi\' (SUP-099 • Line Supervisor • Finishing) was permanently deleted by Administrator (ADMIN • Operations Director). Notice: Employee resigned, pending responsibilities handed over to Rajesh Kumar.',
+    ip_address: '192.168.1.100',
+    is_immutable: true,
+    created_at: new Date(seedTime - 140 * 60 * 1000),
+    payload: {
+      deletedBy: { name: 'Administrator', employeeId: 'ADMIN', role: 'ADMIN' },
+      deletedUser: {
+        name: 'Vikram Joshi',
+        employeeId: 'SUP-099',
+        role: 'ACTION_PERSON',
+        department: 'Finishing',
+        designation: 'Finishing Line Supervisor',
+      },
+      reason: 'Resignation & Department Handover',
+    },
+  },
+  {
+    id: 'evt-seed-10',
+    user_id: 'AUD-001',
+    user_name: 'Kavita Nair',
+    user_role: 'AUDITOR',
+    action: 'AUTH_LOGOUT',
+    action_label: 'User Sign Out',
+    category: 'AUTH',
+    severity: 'INFO',
+    entity_type: 'USER',
+    entity_id: 'AUD-001',
+    entity_name: 'Kavita Nair',
+    details: 'User Kavita Nair (AUD-001) signed out at 01:30 PM. (Login Time: 09:15 AM • Logout Time: 01:30 PM • Session Duration: 4h 15m). Morning shift quality audit complete.',
+    ip_address: '192.168.1.104',
+    is_immutable: true,
+    created_at: new Date(seedTime - 18 * 60 * 1000),
+    payload: {
+      loginTimestamp: new Date(seedTime - 273 * 60 * 1000).toISOString(),
+      logoutTimestamp: new Date(seedTime - 18 * 60 * 1000).toISOString(),
+      loginTimeIST: '09:15 AM',
+      logoutTimeIST: '01:30 PM',
+      sessionDuration: '4h 15m',
+      department: 'Quality',
+      designation: 'QA Lead Auditor',
+    },
   },
 ];
 

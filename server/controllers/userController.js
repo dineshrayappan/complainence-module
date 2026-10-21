@@ -836,8 +836,15 @@ const deleteUser = async (req, res) => {
     // Delete from mockStore
     mockStore.deleteUser(userId);
 
+    const actorName = req.user?.name || 'Administrator';
+    const actorEmpId = req.user?.employeeId || 'ADMIN';
+    const actorRole = req.user?.role || 'ADMIN';
+
     await logEvent({
       req,
+      userId: actorEmpId,
+      userName: actorName,
+      userRole: actorRole,
       action: 'USER_DELETED',
       actionLabel: 'User Account Deleted',
       category: 'USER_MGMT',
@@ -845,7 +852,19 @@ const deleteUser = async (req, res) => {
       entityType: 'USER',
       entityId: targetUser.employeeId,
       entityName: targetUser.name,
-      details: `User account '${targetUser.name}' (${targetUser.employeeId}) permanently deleted by Administrator.`,
+      details: `User account '${targetUser.name}' (${targetUser.employeeId} • ${targetUser.role} • ${targetUser.department}) was permanently deleted by ${actorName} (${actorEmpId} • ${actorRole}).`,
+      payload: {
+        deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
+        deletedUser: {
+          name: targetUser.name,
+          employeeId: targetUser.employeeId,
+          role: targetUser.role,
+          department: targetUser.department,
+          designation: targetUser.designation,
+          email: targetUser.email,
+        },
+        deletedAt: new Date().toISOString(),
+      },
     });
 
     return res.status(200).json({

@@ -413,8 +413,9 @@ const getMe = async (req, res) => {
 // @access  Public / Private
 const logout = async (req, res) => {
   try {
-    const userId = req.user?._id || req.user?.id || req.body?.userId;
+    const userId = req.user?._id || req.user?.id || req.body?.userId || req.body?.employeeId;
     const now = new Date();
+    let targetUser = null;
 
     if (isMongoConnected() && userId) {
       try {
@@ -422,40 +423,94 @@ const logout = async (req, res) => {
         if (typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: userId });
         }
-        // Record logout timestamp only. DO NOT reset attendance status to Absent;
-        // Daily attendance remains "Present" for the entire day.
-        await User.updateMany(query, {
-          lastLogoutAt: now,
-        });
+        targetUser = await User.findOne(query);
+        if (targetUser) {
+          targetUser.lastLogoutAt = now;
+          await targetUser.save();
+        }
       } catch (e) {
         console.warn('[AuthController:logout] MongoDB logout update error:', e.message);
       }
     }
 
-    if (userId) {
-      mockStore.updateUser(userId.toString(), {
-        lastLogoutAt: now,
-      });
+    if (!targetUser && userId) {
+      targetUser = mockStore.getUser(userId.toString());
+      if (targetUser) {
+        mockStore.updateUser(userId.toString(), {
+          lastLogoutAt: now,
+        });
+      }
     }
+
+    const userName = targetUser?.name || req.body?.userName || req.user?.name || 'User';
+    const userEmpId = targetUser?.employeeId || req.body?.employeeId || req.user?.employeeId || userId || 'USER';
+    const userRole = targetUser?.role || req.body?.userRole || req.user?.role || 'USER';
+    const loginTime = targetUser?.lastLoginAt || targetUser?.loginTimestamp;
+
+    let durationText = '';
+    if (loginTime) {
+      const diffMs = Math.max(0, now.getTime() - new Date(loginTime).getTime());
+      const diffMins = Math.floor(diffMs / 60000);
+      const hrs = Math.floor(diffMins / 60);
+      const mins = diffMins % 60;
+      durationText = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+    }
+
+    const loginIST = loginTime
+      ? new Date(loginTime).toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : null;
+
+    const logoutIST = now.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const logoutDateIST = now.toLocaleDateString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    const details = loginIST
+      ? `User ${userName} (${userEmpId}) signed out at ${logoutIST} on ${logoutDateIST}. (Login Time: ${loginIST} • Logout Time: ${logoutIST} • Session Duration: ${durationText || '< 1m'}).`
+      : `User ${userName} (${userEmpId}) signed out at ${logoutIST} on ${logoutDateIST}.`;
 
     await logEvent({
       req,
-      userId: userId || req.user?.employeeId || 'USER',
-      userName: req.user?.name || 'User',
-      userRole: req.user?.role || 'USER',
+      userId: userEmpId,
+      userName,
+      userRole,
       action: 'AUTH_LOGOUT',
       actionLabel: 'User Sign Out',
       category: 'AUTH',
       severity: 'INFO',
       entityType: 'USER',
-      entityId: String(userId),
-      details: `User ${req.user?.name || userId} signed out.`,
-      payload: { logoutTimestamp: now.toISOString() },
+      entityId: String(userEmpId),
+      details,
+      payload: {
+        loginTimestamp: loginTime ? new Date(loginTime).toISOString() : null,
+        logoutTimestamp: now.toISOString(),
+        loginTimeIST: loginIST,
+        logoutTimeIST: logoutIST,
+        sessionDuration: durationText || '< 1m',
+        department: targetUser?.department,
+        designation: targetUser?.designation,
+      },
     });
 
     return res.status(200).json({
       success: true,
       message: 'User signed out. Daily attendance status remains Present for today.',
+      sessionDuration: durationText,
+      logoutTimestamp: now.toISOString(),
     });
   } catch (error) {
     console.error('[AuthController:logout] Error:', error);
