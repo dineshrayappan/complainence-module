@@ -28,6 +28,9 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
     designation: u.designation,
     mobileNumber: u.mobileNumber,
     isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
+    isDeleted: Boolean(u.isDeleted),
+    deletedAt: u.deletedAt || null,
+    deletedBy: u.deletedBy || null,
     isPresent,
     attendance: isPresent ? 'Present' : 'Absent',
     attendanceStatus: isPresent ? 'Present' : 'Absent',
@@ -56,6 +59,7 @@ const getLineSupervisors = async (req, res) => {
         const data = await User.find({
           role: { $in: ['ACTION_PERSON', 'SUPERVISOR'] },
           isActive: true,
+          isDeleted: { $ne: true },
         })
           .sort({ department: 1, name: 1 })
           .lean();
@@ -74,8 +78,8 @@ const getLineSupervisors = async (req, res) => {
     }
 
     const supervisors = mockStore
-      .getUsers()
-      .filter((u) => (u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR') && u.isActive)
+      .getUsers(false)
+      .filter((u) => (u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR') && u.isActive && !u.isDeleted)
       .map((u) => formatUser(u, attendanceMap, todayDate));
 
     res.status(200).json({
@@ -97,7 +101,7 @@ const getLineSupervisors = async (req, res) => {
 // @access  Private (Admin or Authenticated)
 const getAllUsers = async (req, res) => {
   try {
-    const { role, department, search, isActive, date } = req.query;
+    const { role, department, search, isActive, date, includeDeleted, archived } = req.query;
     const todayDate = date || getTodayISTString();
     const attendanceMap = await getDailyAttendanceMap(todayDate);
 
@@ -108,7 +112,13 @@ const getAllUsers = async (req, res) => {
       try {
         const query = {};
 
-        if (role && role !== 'PRESENT' && role !== 'ABSENT') {
+        if (archived === 'true' || role === 'ARCHIVED') {
+          query.isDeleted = true;
+        } else if (includeDeleted !== 'true') {
+          query.isDeleted = { $ne: true };
+        }
+
+        if (role && role !== 'PRESENT' && role !== 'ABSENT' && role !== 'ARCHIVED') {
           if (role === 'SUPERVISOR') {
             query.role = { $in: ['ACTION_PERSON', 'SUPERVISOR'] };
           } else {
@@ -159,8 +169,15 @@ const getAllUsers = async (req, res) => {
     }
 
     // Fallback store filtering
-    let users = mockStore.getUsers();
-    if (role && role !== 'PRESENT' && role !== 'ABSENT') {
+    const shouldIncludeDeleted = archived === 'true' || role === 'ARCHIVED' || includeDeleted === 'true';
+    let users = mockStore.getUsers(shouldIncludeDeleted);
+    if (archived === 'true' || role === 'ARCHIVED') {
+      users = users.filter((u) => u.isDeleted);
+    } else if (includeDeleted !== 'true') {
+      users = users.filter((u) => !u.isDeleted);
+    }
+
+    if (role && role !== 'PRESENT' && role !== 'ABSENT' && role !== 'ARCHIVED') {
       if (role === 'SUPERVISOR') {
         users = users.filter((u) => u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR');
       } else {
@@ -716,7 +733,7 @@ const checkUserDependencies = async (req, res) => {
       });
     }
 
-    const canDelete = activeTasks === 0 && openNCs === 0 && scheduledAudits === 0;
+    const canDelete = true;
 
     return res.status(200).json({
       success: true,
@@ -735,9 +752,7 @@ const checkUserDependencies = async (req, res) => {
         scheduledAudits,
       },
       canDelete,
-      reason: canDelete
-        ? 'Account has no active blockers. Safe to delete.'
-        : `Cannot delete: Account has ${openNCs > 0 ? `${openNCs} open NC(s)` : ''} ${activeTasks > 0 ? `${activeTasks} active task(s)` : ''} ${scheduledAudits > 0 ? `${scheduledAudits} scheduled audit(s)` : ''} assigned.`,
+      reason: 'Account will be safely archived (soft-deleted). All NC details, CAP submissions, evidence photos, and audit logs remain permanently preserved.',
     });
   } catch (error) {
     console.error('[checkUserDependencies] Error:', error);
@@ -749,7 +764,7 @@ const checkUserDependencies = async (req, res) => {
   }
 };
 
-// @desc    Admin: Delete existing user account (Auditor, Supervisor, etc.)
+// @desc    Admin: Soft-delete / archive existing user account (Auditor, Supervisor, etc.)
 // @route   DELETE /api/users/:id
 // @access  Private (Admin Only)
 const deleteUser = async (req, res) => {
@@ -794,42 +809,18 @@ const deleteUser = async (req, res) => {
       });
     }
 
-    const uId = String(targetUser._id || targetUser.id || '');
-    const uEmp = String(targetUser.employeeId || '').toUpperCase();
+    const actorName = req.user?.name || 'Administrator';
+    const actorEmpId = req.user?.employeeId || 'ADMIN';
+    const actorRole = req.user?.role || 'ADMIN';
 
-    // Check active open NCs
-    if (isMongoConnected()) {
-      const openNcCount = await Complaint.countDocuments({
-        $or: [
-          { 'assignedTo.userId': uId, status: { $nin: ['Closed', 'Verified'] } },
-          { 'assignedTo.employeeId': uEmp, status: { $nin: ['Closed', 'Verified'] } },
-        ],
-      });
-      if (openNcCount > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot delete ${targetUser.name}: This account has ${openNcCount} active open Non-Conformance(s) currently assigned. Please reassign or close them first.`,
-        });
-      }
-    }
+    const deletedInfo = {
+      deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
+      deletedAt: new Date(),
+      isDeleted: true,
+      isActive: false,
+    };
 
-    // Check active compliance tasks
-    if (isMongoConnected()) {
-      const activeTaskCount = await ComplianceTask.countDocuments({
-        $or: [
-          { 'assignedTo.userId': uId, status: { $ne: 'Completed' } },
-          { 'assignedTo.employeeId': uEmp, status: { $ne: 'Completed' } },
-        ],
-      });
-      if (activeTaskCount > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Cannot delete ${targetUser.name}: This account has ${activeTaskCount} active pending compliance task(s). Please reassign or complete them first.`,
-        });
-      }
-    }
-
-    // Delete from MongoDB
+    // Soft delete from MongoDB (Never permanently delete records)
     if (isMongoConnected()) {
       const query = {
         $or: [{ employeeId: userId }, { email: userId }],
@@ -837,15 +828,18 @@ const deleteUser = async (req, res) => {
       if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
         query.$or.unshift({ _id: userId });
       }
-      await User.findOneAndDelete(query);
+      await User.updateOne(query, {
+        $set: {
+          isDeleted: true,
+          isActive: false,
+          deletedAt: deletedInfo.deletedAt,
+          deletedBy: deletedInfo.deletedBy,
+        },
+      });
     }
 
-    // Delete from mockStore
-    mockStore.deleteUser(userId);
-
-    const actorName = req.user?.name || 'Administrator';
-    const actorEmpId = req.user?.employeeId || 'ADMIN';
-    const actorRole = req.user?.role || 'ADMIN';
+    // Soft delete from mockStore
+    mockStore.deleteUser(userId, deletedInfo);
 
     await logEvent({
       req,
@@ -853,15 +847,15 @@ const deleteUser = async (req, res) => {
       userName: actorName,
       userRole: actorRole,
       action: 'USER_DELETED',
-      actionLabel: 'User Account Deleted',
+      actionLabel: 'User Account Soft-Deleted / Archived',
       category: 'USER_MGMT',
       severity: 'CRITICAL',
       entityType: 'USER',
       entityId: targetUser.employeeId,
       entityName: targetUser.name,
-      details: `User account '${targetUser.name}' (${targetUser.employeeId} • ${targetUser.role} • ${targetUser.department}) was permanently deleted by ${actorName} (${actorEmpId} • ${actorRole}).`,
+      details: `User account '${targetUser.name}' (${targetUser.employeeId} • ${targetUser.role} • ${targetUser.department}) was soft-deleted and archived by ${actorName} (${actorEmpId} • ${actorRole}). All historical NCs, CAP submissions, evidence photos, and audit logs remain permanently preserved.`,
       payload: {
-        deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
+        deletedBy: deletedInfo.deletedBy,
         deletedUser: {
           name: targetUser.name,
           employeeId: targetUser.employeeId,
@@ -870,19 +864,21 @@ const deleteUser = async (req, res) => {
           designation: targetUser.designation,
           email: targetUser.email,
         },
-        deletedAt: new Date().toISOString(),
+        deletedAt: deletedInfo.deletedAt.toISOString(),
       },
     });
 
     return res.status(200).json({
       success: true,
-      message: `Account '${targetUser.name}' (${targetUser.employeeId}) has been successfully deleted. Historical audit records and closed defect archives remain preserved.`,
+      message: `Account '${targetUser.name}' (${targetUser.employeeId}) has been safely archived. All existing NCs, CAP records, evidence photos, and audit history remain permanently preserved.`,
       deletedUser: {
         id: targetUser._id ? targetUser._id.toString() : targetUser.id,
         employeeId: targetUser.employeeId,
         name: targetUser.name,
         role: targetUser.role,
         department: targetUser.department,
+        isDeleted: true,
+        deletedAt: deletedInfo.deletedAt,
       },
     });
   } catch (error) {
@@ -890,6 +886,259 @@ const deleteUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete user account.',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Admin: Get list of soft-deleted / archived users with NC stats
+// @route   GET /api/users/archived
+// @access  Private (Admin Only)
+const getArchivedUsers = async (req, res) => {
+  try {
+    let archivedUsers = [];
+
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
+
+    if (isMongoConnected()) {
+      try {
+        const data = await User.find({ isDeleted: true }).sort({ deletedAt: -1 }).lean();
+        if (data) {
+          archivedUsers = data;
+        }
+      } catch (dbErr) {
+        console.warn('[UserController:getArchivedUsers] Mongo query notice:', dbErr.message);
+      }
+    }
+
+    if (!archivedUsers || archivedUsers.length === 0) {
+      archivedUsers = mockStore.getUsers(true).filter((u) => u.isDeleted);
+    }
+
+    // Attach NC summary counts for each archived user
+    const usersWithNcStats = await Promise.all(
+      archivedUsers.map(async (u) => {
+        const uId = String(u._id || u.id || '');
+        const uEmp = String(u.employeeId || '').toUpperCase();
+        let totalNcCount = 0;
+        let createdNcCount = 0;
+        let assignedNcCount = 0;
+
+        if (isMongoConnected()) {
+          try {
+            createdNcCount = await Complaint.countDocuments({
+              $or: [{ 'createdBy.userId': uId }, { 'createdBy.employeeId': uEmp }],
+            });
+            assignedNcCount = await Complaint.countDocuments({
+              $or: [{ 'assignedTo.userId': uId }, { 'assignedTo.employeeId': uEmp }],
+            });
+            totalNcCount = await Complaint.countDocuments({
+              $or: [
+                { 'createdBy.userId': uId },
+                { 'createdBy.employeeId': uEmp },
+                { 'assignedTo.userId': uId },
+                { 'assignedTo.employeeId': uEmp },
+              ],
+            });
+          } catch (e) {}
+        } else {
+          const complaints = mockStore.getComplaints({});
+          complaints.forEach((c) => {
+            const isCr = (c.createdBy?.userId && String(c.createdBy.userId) === uId) ||
+                         (c.createdBy?.employeeId && String(c.createdBy.employeeId).toUpperCase() === uEmp);
+            const isAs = (c.assignedTo?.userId && String(c.assignedTo.userId) === uId) ||
+                         (c.assignedTo?.employeeId && String(c.assignedTo.employeeId).toUpperCase() === uEmp);
+            if (isCr) createdNcCount++;
+            if (isAs) assignedNcCount++;
+            if (isCr || isAs) totalNcCount++;
+          });
+        }
+
+        return {
+          ...formatUser(u),
+          totalNcCount,
+          createdNcCount,
+          assignedNcCount,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      success: true,
+      count: usersWithNcStats.length,
+      users: usersWithNcStats,
+    });
+  } catch (error) {
+    console.error('[getArchivedUsers] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve archived users.',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Admin: Get all preserved NC/CAP records associated with a user (as creator or assignee)
+// @route   GET /api/users/:id/nc-history
+// @access  Private (Admin Only)
+const getUserNcHistory = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    let targetUser = null;
+    if (isMongoConnected()) {
+      try {
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
+        };
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
+        targetUser = await User.findOne(query).lean();
+      } catch (e) {}
+    }
+
+    if (!targetUser) {
+      targetUser = mockStore.findUserById(userId);
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User account not found.',
+      });
+    }
+
+    const uId = String(targetUser._id || targetUser.id || '');
+    const uEmp = String(targetUser.employeeId || '').toUpperCase();
+
+    let complaints = [];
+    if (isMongoConnected()) {
+      try {
+        complaints = await Complaint.find({
+          $or: [
+            { 'createdBy.userId': uId },
+            { 'createdBy.employeeId': uEmp },
+            { 'assignedTo.userId': uId },
+            { 'assignedTo.employeeId': uEmp },
+          ],
+        })
+          .sort({ createdAt: -1 })
+          .lean();
+      } catch (dbErr) {
+        console.warn('[getUserNcHistory] Mongo query notice:', dbErr.message);
+      }
+    }
+
+    if (!complaints || complaints.length === 0) {
+      const allComplaints = mockStore.getComplaints({});
+      complaints = allComplaints.filter((c) => {
+        const isCr = (c.createdBy?.userId && String(c.createdBy.userId) === uId) ||
+                     (c.createdBy?.employeeId && String(c.createdBy.employeeId).toUpperCase() === uEmp);
+        const isAs = (c.assignedTo?.userId && String(c.assignedTo.userId) === uId) ||
+                     (c.assignedTo?.employeeId && String(c.assignedTo.employeeId).toUpperCase() === uEmp);
+        return isCr || isAs;
+      });
+    }
+
+    const { formatComplaintOutput } = require('./complaintController');
+
+    const formattedRecords = complaints.map((c) => {
+      const isCreator = (c.createdBy?.userId && String(c.createdBy.userId) === uId) ||
+                        (c.createdBy?.employeeId && String(c.createdBy.employeeId).toUpperCase() === uEmp);
+      const isAssignee = (c.assignedTo?.userId && String(c.assignedTo.userId) === uId) ||
+                         (c.assignedTo?.employeeId && String(c.assignedTo.employeeId).toUpperCase() === uEmp);
+
+      const base = formatComplaintOutput ? formatComplaintOutput(c) : c;
+      return {
+        ...base,
+        userRelationship: isCreator && isAssignee ? 'Creator & Assignee' : isCreator ? 'Created By User' : 'Assigned To User',
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      user: formatUser(targetUser),
+      count: formattedRecords.length,
+      records: formattedRecords,
+    });
+  } catch (error) {
+    console.error('[getUserNcHistory] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve user NC/CAP history.',
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Admin: Restore a soft-deleted / archived user account
+// @route   PATCH /api/users/:id/restore
+// @access  Private (Admin Only)
+const restoreUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    let targetUser = null;
+    if (isMongoConnected()) {
+      try {
+        const query = {
+          $or: [{ employeeId: userId }, { email: userId }],
+        };
+        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.unshift({ _id: userId });
+        }
+        targetUser = await User.findOne(query);
+        if (targetUser) {
+          targetUser.isDeleted = false;
+          targetUser.isActive = true;
+          targetUser.deletedAt = null;
+          targetUser.deletedBy = null;
+          await targetUser.save();
+        }
+      } catch (e) {}
+    }
+
+    const restoredMock = mockStore.restoreUser(userId);
+    if (!targetUser && !restoredMock) {
+      return res.status(404).json({
+        success: false,
+        message: 'Archived user not found.',
+      });
+    }
+
+    const actorName = req.user?.name || 'Administrator';
+    const actorEmpId = req.user?.employeeId || 'ADMIN';
+    const actorRole = req.user?.role || 'ADMIN';
+    const restored = targetUser || restoredMock;
+
+    await logEvent({
+      req,
+      userId: actorEmpId,
+      userName: actorName,
+      userRole: actorRole,
+      action: 'USER_RESTORED',
+      actionLabel: 'User Account Restored',
+      category: 'USER_MGMT',
+      severity: 'SUCCESS',
+      entityType: 'USER',
+      entityId: restored.employeeId,
+      entityName: restored.name,
+      details: `User account '${restored.name}' (${restored.employeeId}) was restored from archive by ${actorName}.`,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Account '${restored.name}' (${restored.employeeId}) has been successfully restored.`,
+      user: formatUser(restored),
+    });
+  } catch (error) {
+    console.error('[restoreUser] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to restore user account.',
       error: error.message,
     });
   }
@@ -909,14 +1158,16 @@ const getTodayAttendance = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const dbUsers = await User.find({ isActive: true }).sort({ department: 1, name: 1 }).lean();
+        const dbUsers = await User.find({ isActive: true, isDeleted: { $ne: true } })
+          .sort({ department: 1, name: 1 })
+          .lean();
         if (dbUsers) users = dbUsers;
       } catch (e) {
         console.warn('[UserController:getTodayAttendance] MongoDB query notice:', e.message);
       }
     }
     if (!users || users.length === 0) {
-      users = mockStore.getUsers().filter((u) => u.isActive !== false);
+      users = mockStore.getUsers(false).filter((u) => u.isActive !== false && !u.isDeleted);
     }
 
     const formattedUsers = users.map((u) => formatUser(u, attendanceMap, todayDate));
@@ -955,4 +1206,7 @@ module.exports = {
   toggleUserStatus,
   checkUserDependencies,
   deleteUser,
+  getArchivedUsers,
+  getUserNcHistory,
+  restoreUser,
 };

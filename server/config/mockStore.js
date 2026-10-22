@@ -24,7 +24,8 @@ let mockComplaints = [...initialComplaints];
 
 
 module.exports = {
-  getUsers: () => [...mockUsers],
+  getUsers: (includeDeleted = false) =>
+    includeDeleted ? [...mockUsers] : mockUsers.filter((u) => !u.isDeleted),
   findUserById: (id) => mockUsers.find((u) => u._id === id || u.id === id || u.employeeId === id),
   findUserByIdentifier: (identifier) => {
     const term = (identifier || '').trim().toLowerCase();
@@ -49,6 +50,7 @@ module.exports = {
       ...userData,
       password: safePassword,
       isActive: true,
+      isDeleted: false,
     };
     mockUsers.unshift(newUser);
     return newUser;
@@ -65,11 +67,32 @@ module.exports = {
     }
     return null;
   },
-  deleteUser: (id) => {
+  deleteUser: (id, extra = {}) => {
     const idx = mockUsers.findIndex((u) => u._id === id || u.id === id || u.employeeId === id);
     if (idx !== -1) {
-      const removed = mockUsers.splice(idx, 1)[0];
-      return removed;
+      mockUsers[idx] = {
+        ...mockUsers[idx],
+        isDeleted: true,
+        isActive: false,
+        isPresent: false,
+        deletedAt: extra.deletedAt || new Date(),
+        deletedBy: extra.deletedBy || null,
+      };
+      return mockUsers[idx];
+    }
+    return null;
+  },
+  restoreUser: (id) => {
+    const idx = mockUsers.findIndex((u) => u._id === id || u.id === id || u.employeeId === id);
+    if (idx !== -1) {
+      mockUsers[idx] = {
+        ...mockUsers[idx],
+        isDeleted: false,
+        isActive: true,
+        deletedAt: null,
+        deletedBy: null,
+      };
+      return mockUsers[idx];
     }
     return null;
   },

@@ -2600,4 +2600,5 @@ module.exports = {
   getAudits,
   updateAuditChecklist,
   createAuditRound,
+  formatComplaintOutput,
 };

@@ -107,6 +107,13 @@ const login = async (req, res) => {
             });
           }
 
+          if (user.isDeleted) {
+            return res.status(403).json({
+              success: false,
+              message: 'This account has been deleted / archived. Access is disabled.',
+            });
+          }
+
           if (user.isActive === false) {
             return res.status(403).json({
               success: false,
@@ -183,6 +190,13 @@ const login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials. Incorrect password.',
+      });
+    }
+
+    if (user.isDeleted) {
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been deleted / archived. Access is disabled.',
       });
     }
 

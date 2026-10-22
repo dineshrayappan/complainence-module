@@ -31,6 +31,13 @@ import {
   Clock,
   History,
   LogIn,
+  Archive,
+  RotateCcw,
+  FileText,
+  Image as ImageIcon,
+  ExternalLink,
+  Calendar,
+  CheckSquare,
 } from 'lucide-react';
 import { userService, departmentService } from '../services/api';
 import UserLoginTrackerPanel from './UserLoginTrackerPanel';
@@ -76,10 +83,12 @@ export const AdminUserManagement = () => {
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [archivedUsers, setArchivedUsers] = useState([]);
+  const [archivedLoading, setArchivedLoading] = useState(false);
   const [departmentsList, setDepartmentsList] = useState([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL', 'AUDITOR', 'SUPERVISOR', 'DEPARTMENTS', 'ADMIN', 'INACTIVE'
+  const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL', 'AUDITOR', 'SUPERVISOR', 'DEPARTMENTS', 'ADMIN', 'INACTIVE', 'ARCHIVED'
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modal States
@@ -87,6 +96,13 @@ export const AdminUserManagement = () => {
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+
+  // NC History Modal State
+  const [isNcHistoryModalOpen, setIsNcHistoryModalOpen] = useState(false);
+  const [ncHistoryUser, setNcHistoryUser] = useState(null);
+  const [ncHistoryRecords, setNcHistoryRecords] = useState([]);
+  const [ncHistoryLoading, setNcHistoryLoading] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
 
   // Delete Confirmation Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -176,10 +192,65 @@ export const AdminUserManagement = () => {
     }
   };
 
+  const loadArchivedUsers = async () => {
+    try {
+      setArchivedLoading(true);
+      const res = await userService.getArchivedUsers();
+      if (res.data?.success && Array.isArray(res.data.users)) {
+        setArchivedUsers(res.data.users);
+      }
+    } catch (err) {
+      console.warn('Failed to load archived users:', err);
+    } finally {
+      setArchivedLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadDepartments();
+    loadArchivedUsers();
   }, []);
+
+  const handleOpenNcHistory = async (user) => {
+    setNcHistoryUser(user);
+    setNcHistoryRecords([]);
+    setNcHistoryLoading(true);
+    setIsNcHistoryModalOpen(true);
+    try {
+      const res = await userService.getUserNcHistory(user._id || user.id || user.employeeId);
+      if (res.data?.success && Array.isArray(res.data.records)) {
+        setNcHistoryRecords(res.data.records);
+      }
+    } catch (err) {
+      console.error('Failed to load NC history:', err);
+      showToast('Failed to retrieve NC history records for this user.');
+    } finally {
+      setNcHistoryLoading(false);
+    }
+  };
+
+  const handleRestoreUser = async (user) => {
+    if (
+      !window.confirm(
+        `Restore account for ${user.name} (${user.employeeId})?\n\nThis will restore login privileges and return the account to the active Personnel Directory.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await userService.restoreUser(user._id || user.id || user.employeeId);
+      if (res.data?.success) {
+        showToast(res.data.message || `Account for ${user.name} restored successfully.`);
+        loadUsers();
+        loadArchivedUsers();
+        loadDepartments();
+      }
+    } catch (err) {
+      console.error('Failed to restore user:', err);
+      showToast(err.response?.data?.message || 'Failed to restore user account.');
+    }
+  };
 
   const availableDepartmentNames = departmentsList.length > 0
     ? departmentsList.map((d) => d.name)
@@ -195,7 +266,7 @@ export const AdminUserManagement = () => {
 
     try {
       if (type === 'USER') {
-        const res = await userService.checkUserDependencies(item._id || item.id);
+        const res = await userService.checkUserDependencies(item._id || item.id || item.employeeId);
         if (res.data?.success) {
           setDependencyData(res.data.dependencies);
         }
@@ -215,7 +286,7 @@ export const AdminUserManagement = () => {
     }
   };
 
-  // Submit Deletion
+  // Submit Deletion / Archival
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     setDeleteLoading(true);
@@ -224,12 +295,13 @@ export const AdminUserManagement = () => {
     try {
       if (deleteTarget.type === 'USER') {
         const u = deleteTarget.item;
-        const res = await userService.deleteUser(u._id || u.id);
+        const res = await userService.deleteUser(u._id || u.id || u.employeeId);
         if (res.data?.success) {
-          showToast(res.data.message || `Account for ${u.name} deleted successfully.`);
+          showToast(res.data.message || `Account for ${u.name} archived successfully. Records preserved.`);
           setIsDeleteModalOpen(false);
           setDeleteTarget(null);
           loadUsers();
+          loadArchivedUsers();
           loadDepartments();
         }
       } else {
@@ -241,10 +313,11 @@ export const AdminUserManagement = () => {
           setDeleteTarget(null);
           loadDepartments();
           loadUsers();
+          loadArchivedUsers();
         }
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to delete. Please verify all active tasks and NCs are closed.';
+      const msg = err.response?.data?.message || 'Failed to delete. Please verify requirements.';
       setDeleteError(msg);
     } finally {
       setDeleteLoading(false);
@@ -315,6 +388,19 @@ export const AdminUserManagement = () => {
     }
 
     return true;
+  });
+
+  // Filtered archived users list
+  const filteredArchivedUsers = archivedUsers.filter((u) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      u.name?.toLowerCase().includes(q) ||
+      u.employeeId?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.department?.toLowerCase().includes(q) ||
+      u.designation?.toLowerCase().includes(q)
+    );
   });
 
   // Filtered departments list
@@ -889,20 +975,164 @@ export const AdminUserManagement = () => {
               </button>
 
               <button
+                onClick={() => setRoleFilter('ARCHIVED')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                  roleFilter === 'ARCHIVED'
+                    ? 'bg-slate-800 text-white dark:bg-slate-700 shadow-xs ring-2 ring-slate-400/50'
+                    : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                <Archive className="w-3.5 h-3.5 text-slate-500" />
+                <span>Archived / Deleted ({archivedUsers.length})</span>
+              </button>
+
+              <button
                 onClick={() => {
                   loadUsers();
                   loadDepartments();
+                  loadArchivedUsers();
                 }}
                 title="Refresh Personnel & Departments"
                 className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors shrink-0"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading || departmentsLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${loading || departmentsLoading || archivedLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
           </div>
 
-          {/* Personnel Directory View */}
-          {loading && users.length === 0 ? (
+          {/* Archived Users Grid or Active Personnel Directory View */}
+          {roleFilter === 'ARCHIVED' ? (
+            archivedLoading && archivedUsers.length === 0 ? (
+              <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
+                <div className="w-8 h-8 rounded-full border-2 border-slate-500 border-t-transparent animate-spin mb-3" />
+                <span>Loading Archived & Deleted Users Directory...</span>
+              </div>
+            ) : filteredArchivedUsers.length === 0 ? (
+              <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 font-mono text-xs space-y-2">
+                <Archive className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+                <p>No archived or soft-deleted user accounts found.</p>
+                <p className="text-[11px] text-slate-500">
+                  When personnel accounts are removed, they will appear here with full NC/CAP record history preserved.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <Archive className="w-4 h-4 text-slate-500" />
+                    <span>
+                      Showing <strong>{filteredArchivedUsers.length}</strong> archived account(s). All associated NC/CAP records, attachments, evidence photos, and audit logs are permanently preserved.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredArchivedUsers.map((u) => {
+                    const isAud = u.role === 'AUDITOR';
+                    return (
+                      <div
+                        key={u._id || u.id}
+                        className="p-5 rounded-2xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs relative flex flex-col justify-between"
+                      >
+                        <div>
+                          {/* Top Row: Avatar & Badges */}
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center font-black text-sm text-white shadow-xs relative">
+                                {u.name?.charAt(0).toUpperCase()}
+                                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-500 border-2 border-white dark:border-slate-900" title="Archived Account" />
+                              </div>
+
+                              <div>
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                                  {u.name}
+                                </h3>
+                                <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[11px]">
+                                  <span className="font-bold text-slate-600 dark:text-slate-400">
+                                    {u.employeeId}
+                                  </span>
+                                  <span className="text-slate-400">•</span>
+                                  <span className="text-slate-500 dark:text-slate-400 truncate max-w-[130px]">
+                                    {u.designation || (isAud ? 'Internal Auditor' : 'Line Supervisor')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 flex items-center gap-1">
+                              <Archive className="w-3 h-3" />
+                              <span>{isAud ? 'Auditor' : 'Supervisor'}</span>
+                            </span>
+                          </div>
+
+                          {/* Deletion & Preservation Notice */}
+                          <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 text-[11px] space-y-1 mb-3">
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span>Archived Date:</span>
+                              <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+                                {u.deletedAt ? new Date(u.deletedAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recorded'}
+                              </span>
+                            </div>
+                            {u.deletedBy?.name && (
+                              <div className="flex items-center justify-between text-slate-500">
+                                <span>Archived By:</span>
+                                <span className="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
+                                  {u.deletedBy.name}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span>Department:</span>
+                              <strong className="text-slate-700 dark:text-slate-200">{u.department}</strong>
+                            </div>
+                          </div>
+
+                          {/* Preserved NC Records Statistics Bar */}
+                          <div className="p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs text-indigo-950 dark:text-indigo-200 mb-4 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-[11px] flex items-center gap-1.5 text-indigo-700 dark:text-indigo-300">
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Preserved NC Records:</span>
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-mono font-bold text-xs">
+                                {u.totalNcCount || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono pt-1 border-t border-indigo-200/50 dark:border-indigo-900/50">
+                              <span>Created: {u.createdNcCount || 0}</span>
+                              <span>•</span>
+                              <span>Assigned: {u.assignedNcCount || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <button
+                            onClick={() => handleOpenNcHistory(u)}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
+                            title="View all preserved NC/CAP records, attachments, and photos"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>View NC History</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleRestoreUser(u)}
+                            className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
+                            title="Restore this user account"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Restore</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )
+          ) : loading && users.length === 0 ? (
         <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
           <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin mb-3" />
           <span>Scanning Factory Personnel Directory...</span>
@@ -1765,7 +1995,44 @@ export const AdminUserManagement = () => {
               {dependencyLoading ? (
                 <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center justify-center py-6 text-slate-500 font-mono text-xs">
                   <RefreshCw className="w-5 h-5 animate-spin text-amber-500 mb-2" />
-                  <span>Verifying active tasks, NCs, and audit dependencies...</span>
+                  <span>Verifying active tasks, NCs, and record archives...</span>
+                </div>
+              ) : deleteTarget.type === 'USER' ? (
+                <div className="space-y-3">
+                  <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/70 text-amber-900 dark:text-amber-200 space-y-2">
+                    <div className="flex items-center gap-2 font-bold text-xs text-amber-700 dark:text-amber-400">
+                      <Archive className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Safe Soft-Delete & Record Preservation</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                      Deleting this account performs a <strong>safe soft-delete</strong>. The user's login access will be revoked and they will not receive new assignments.
+                    </p>
+                    <div className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-100/70 dark:bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-300 dark:border-emerald-800/60">
+                      ✅ <strong>100% Data Preservation Guaranteed:</strong>
+                      <ul className="list-disc list-inside mt-1 font-normal text-[10px] space-y-0.5">
+                        <li>All NC findings, defect descriptions, and before/after photos remain permanently intact.</li>
+                        <li>Complete CAP submissions, root cause analyses, and action plans are preserved.</li>
+                        <li>Historical audit reports, exports, and dashboards will continue displaying {deleteTarget.item.name}'s original name and department.</li>
+                        <li>This account will move to the <strong>Archived / Deleted</strong> tab and can be restored anytime by Admin.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {dependencyData && (dependencyData.openNCs > 0 || dependencyData.activeTasks > 0) && (
+                    <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] space-y-1">
+                      <div className="font-bold flex items-center gap-1.5 text-slate-900 dark:text-white">
+                        <Activity className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Associated Work Orders:</span>
+                      </div>
+                      <div className="font-mono text-[10px] text-slate-600 dark:text-slate-400">
+                        {dependencyData.openNCs > 0 && `• ${dependencyData.openNCs} Open NC(s)`}
+                        {dependencyData.activeTasks > 0 && ` • ${dependencyData.activeTasks} Active Task(s)`}
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        These records will remain assigned and preserved in the NC register.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : dependencyData ? (
                 dependencyData.hasActiveDependencies ? (
@@ -1775,7 +2042,7 @@ export const AdminUserManagement = () => {
                       <span>Deletion Blocked: Active Operational Records Found</span>
                     </div>
                     <p className="text-[11px] leading-relaxed text-rose-800/90 dark:text-rose-300/90">
-                      This {deleteTarget.type === 'DEPARTMENT' ? 'department' : 'account'} currently has active work assigned:
+                      This department currently has active work assigned:
                     </p>
                     <ul className="list-disc list-inside space-y-1 font-mono text-[11px] text-rose-800 dark:text-rose-300 pl-1">
                       {dependencyData.openNCs > 0 && (
@@ -1802,7 +2069,7 @@ export const AdminUserManagement = () => {
                       <span>Zero Active Dependencies: Safe to Delete</span>
                     </div>
                     <p className="text-[11px] leading-relaxed text-emerald-800/90 dark:text-emerald-300/90">
-                      No active open tasks or unresolved non-conformances are assigned to this {deleteTarget.type === 'DEPARTMENT' ? 'department' : 'account'}.
+                      No active open tasks or unresolved non-conformances are assigned to this department.
                     </p>
                     <div className="text-[10px] bg-emerald-100/60 dark:bg-emerald-900/40 p-2 rounded-xl text-emerald-800 dark:text-emerald-300">
                       🔒 <strong>Historical Data Integrity:</strong> All historical closed NCs, verified CAPs, and audit trail logs will be permanently retained in the compliance database.
@@ -1831,7 +2098,11 @@ export const AdminUserManagement = () => {
 
               <button
                 onClick={handleConfirmDelete}
-                disabled={deleteLoading || dependencyLoading || dependencyData?.hasActiveDependencies}
+                disabled={
+                  deleteLoading ||
+                  dependencyLoading ||
+                  (deleteTarget.type === 'DEPARTMENT' && dependencyData?.hasActiveDependencies)
+                }
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-rose-600/20 transition-all cursor-pointer"
               >
                 {deleteLoading ? (
@@ -1843,8 +2114,8 @@ export const AdminUserManagement = () => {
                   {deleteTarget.type === 'DEPARTMENT'
                     ? 'Confirm Delete Department'
                     : deleteTarget.item.role === 'AUDITOR'
-                    ? 'Confirm Delete Auditor'
-                    : 'Confirm Delete Account'}
+                    ? 'Confirm Archive Auditor'
+                    : 'Confirm Archive Account'}
                 </span>
               </button>
             </div>
@@ -1967,6 +2238,254 @@ export const AdminUserManagement = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 6: PRESERVED NC/CAP RECORD HISTORY ================= */}
+      {isNcHistoryModalOpen && ncHistoryUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                      Preserved NC / CAP Records History
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-mono">
+                      {ncHistoryRecords.length} Records
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    User: <strong className="text-slate-900 dark:text-white">{ncHistoryUser.name}</strong> ({ncHistoryUser.employeeId}) • {ncHistoryUser.role} • {ncHistoryUser.department}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsNcHistoryModalOpen(false)}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sub-header Banner: Reassurance */}
+            <div className="px-5 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-100 dark:border-emerald-900/50 flex items-center justify-between text-xs text-emerald-800 dark:text-emerald-300 shrink-0">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  <strong>Full Data Integrity:</strong> All finding descriptions, requirements, root causes, corrective/preventive actions, assignees, and before/after evidence photos are permanently preserved in the compliance register.
+                </span>
+              </div>
+            </div>
+
+            {/* Modal Body: Records List */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+              {ncHistoryLoading ? (
+                <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
+                  <RefreshCw className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
+                  <span>Loading preserved non-conformance records and attachments...</span>
+                </div>
+              ) : ncHistoryRecords.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-slate-500 font-mono text-xs">
+                  No Non-Conformance or CAP records were logged by or assigned to this user.
+                </div>
+              ) : (
+                ncHistoryRecords.map((rec) => (
+                  <div
+                    key={rec.complaintId || rec.id || rec._id}
+                    className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 shadow-xs space-y-3"
+                  >
+                    {/* Top Row */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono font-black text-sm text-indigo-600 dark:text-indigo-400">
+                          {rec.complaintId}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
+                            ['Closed', 'Verified'].includes(rec.status)
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : ['CAP Submitted', 'Under Verification', 'Under Review'].includes(rec.status)
+                              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300'
+                              : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+                          }`}
+                        >
+                          {rec.status}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {rec.userRelationship || 'Related Record'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Logged: {new Date(rec.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </div>
+                    </div>
+
+                    {/* Defect Finding & Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-[11px] text-slate-400 block font-semibold mb-0.5">Finding Description</span>
+                        <p className="text-slate-800 dark:text-slate-200 font-medium">
+                          {rec.description || 'No detailed description provided.'}
+                        </p>
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap gap-2">
+                          <span><strong>Category:</strong> {rec.category}</span>
+                          <span>•</span>
+                          <span><strong>Dept:</strong> {rec.department}</span>
+                          <span>•</span>
+                          <span><strong>Severity:</strong> {rec.riskSeverity || rec.priority || 'Major'}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[11px] text-slate-400 block font-semibold mb-0.5">Personnel Involved</span>
+                        <div className="space-y-1 text-[11px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Created / Reported By:</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {rec.createdBy?.name || rec.creatorName || 'Auditor'} ({rec.createdBy?.department || rec.department})
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Assigned To:</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {rec.assignedTo?.name || rec.assignedToName || 'Supervisor'} ({rec.assignedTo?.department || rec.department})
+                            </span>
+                          </div>
+                          {rec.actualCompletedAt && (
+                            <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+                              <span>Completed / Verified:</span>
+                              <span className="font-mono">{new Date(rec.actualCompletedAt).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CAP Details (if available) */}
+                    {rec.cap && (rec.cap.rootCause || rec.cap.correctiveAction) && (
+                      <div className="p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-800/50 text-xs space-y-1.5">
+                        <div className="font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5 text-[11px]">
+                          <CheckSquare className="w-3.5 h-3.5" />
+                          <span>Corrective & Preventive Action Plan (CAP)</span>
+                        </div>
+                        {rec.cap.rootCause && (
+                          <div className="text-[11px]">
+                            <strong className="text-slate-700 dark:text-slate-300">Root Cause: </strong>
+                            <span className="text-slate-600 dark:text-slate-400">{rec.cap.rootCause}</span>
+                          </div>
+                        )}
+                        {rec.cap.correctiveAction && (
+                          <div className="text-[11px]">
+                            <strong className="text-slate-700 dark:text-slate-300">Corrective Action: </strong>
+                            <span className="text-slate-600 dark:text-slate-400">{rec.cap.correctiveAction}</span>
+                          </div>
+                        )}
+                        {rec.cap.preventiveAction && (
+                          <div className="text-[11px]">
+                            <strong className="text-slate-700 dark:text-slate-300">Preventive Action: </strong>
+                            <span className="text-slate-600 dark:text-slate-400">{rec.cap.preventiveAction}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Evidence Photos */}
+                    <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
+                      <span className="text-slate-400 font-semibold flex items-center gap-1">
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        <span>Evidence Photos:</span>
+                      </span>
+
+                      {rec.beforePhoto ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPhoto({ url: rec.beforePhoto, label: `Before Photo: ${rec.complaintId}` })}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors font-medium"
+                        >
+                          <img src={rec.beforePhoto} alt="Before" className="w-5 h-5 rounded object-cover border" />
+                          <span>View Before Photo</span>
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 italic">No Before Photo</span>
+                      )}
+
+                      {rec.afterPhoto ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPhoto({ url: rec.afterPhoto, label: `After Photo: ${rec.complaintId}` })}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 cursor-pointer transition-colors font-medium border border-emerald-200 dark:border-emerald-800"
+                        >
+                          <img src={rec.afterPhoto} alt="After" className="w-5 h-5 rounded object-cover border" />
+                          <span>View After Photo</span>
+                        </button>
+                      ) : null}
+
+                      {rec.cap?.evidence ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPhoto({ url: rec.cap.evidence, label: `CAP Evidence: ${rec.complaintId}` })}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 hover:bg-purple-100 cursor-pointer transition-colors font-medium border border-purple-200 dark:border-purple-800"
+                        >
+                          <img src={rec.cap.evidence} alt="CAP Evidence" className="w-5 h-5 rounded object-cover border" />
+                          <span>View CAP Evidence</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+              <span className="text-xs text-slate-500">
+                Preserved NC/CAP Records Archive • Read-Only Integrity Mode
+              </span>
+              <button
+                onClick={() => setIsNcHistoryModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-xs cursor-pointer shadow-xs"
+              >
+                Close Archive View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 7: EVIDENCE PHOTO LIGHTBOX ================= */}
+      {previewPhoto && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="max-w-3xl w-full max-h-[90vh] flex flex-col items-center justify-center space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between w-full text-white text-xs font-bold px-2">
+              <span>{previewPhoto.label}</span>
+              <button
+                onClick={() => setPreviewPhoto(null)}
+                className="p-1 rounded-lg bg-white/20 hover:bg-white/30 text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <img
+              src={previewPhoto.url}
+              alt={previewPhoto.label}
+              className="max-h-[80vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
+            />
           </div>
         </div>
       )}
