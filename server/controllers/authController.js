@@ -423,11 +423,8 @@ const logout = async (req, res) => {
         if (typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: userId });
         }
-        targetUser = await User.findOne(query);
-        if (targetUser) {
-          targetUser.lastLogoutAt = now;
-          await targetUser.save();
-        }
+        await User.updateOne(query, { $set: { lastLogoutAt: now } });
+        targetUser = await User.findOne(query).lean();
       } catch (e) {
         console.warn('[AuthController:logout] MongoDB logout update error:', e.message);
       }

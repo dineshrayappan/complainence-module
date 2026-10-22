@@ -34,14 +34,9 @@ const ensureDefaultAdminUser = async () => {
       console.log('   ➔ Identifier: admin (or ADMIN / admin@factory.com)');
       console.log('   ➔ Password:   admin123');
     } else {
-      // Validate password compatibility
-      const isPasswordValid = await admin.matchPassword('admin123');
+      // Administrator account already exists - strictly preserve their credentials & password!
+      // Passwords must NEVER be automatically generated, modified, or reset on restart.
       let changed = false;
-
-      if (!isPasswordValid) {
-        admin.password = 'admin123';
-        changed = true;
-      }
 
       if (!admin.isActive) {
         admin.isActive = true;
@@ -55,9 +50,9 @@ const ensureDefaultAdminUser = async () => {
 
       if (changed) {
         await admin.save();
-        console.log('👑 [Database] Default admin user synchronized with password "admin123"');
+        console.log('👑 [Database] Default admin account status verified.');
       } else {
-        console.log(`👑 [Database] Default admin user verified: ID: ${admin.employeeId} | Password: admin123`);
+        console.log(`👑 [Database] Default admin user verified: ID: ${admin.employeeId} (Credentials strictly preserved)`);
       }
     }
 

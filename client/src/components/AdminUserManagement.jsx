@@ -18,7 +18,6 @@ import {
   Mail,
   Phone,
   Building2,
-  Sparkles,
   Eye,
   EyeOff,
   Edit3,
@@ -329,16 +328,6 @@ export const AdminUserManagement = () => {
     );
   });
 
-  // Generate strong random password
-  const generateStrongPassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
-    let pwd = '';
-    for (let i = 0; i < 10; i++) {
-      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return pwd + '!';
-  };
-
   // Open Create Modal & reset form
   const handleOpenCreateModal = (defaultRole = 'AUDITOR') => {
     const nextAuditorId = `AUD-00${auditorCount + 1}`;
@@ -350,7 +339,7 @@ export const AdminUserManagement = () => {
       name: '',
       employeeId: isAud ? nextAuditorId : nextSupervisorId,
       email: '',
-      password: generateStrongPassword(),
+      password: '',
       department: isAud ? 'Quality' : 'Production',
       designation: isAud ? 'QA Quality Auditor' : 'Production Supervisor',
       mobileNumber: '+91 ',
@@ -417,7 +406,7 @@ export const AdminUserManagement = () => {
   // Open Reset Password Modal
   const handleOpenResetPassword = (user) => {
     setSelectedUser(user);
-    setNewPassword(generateStrongPassword());
+    setNewPassword('');
     setResetSuccess(false);
     setResetError('');
     setIsResetPasswordModalOpen(true);
@@ -1332,25 +1321,19 @@ export const AdminUserManagement = () => {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                        Password *
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setCreateForm({ ...createForm, password: generateStrongPassword() })}
-                        className="text-[10px] text-amber-600 dark:text-amber-400 font-bold hover:underline flex items-center gap-0.5"
-                      >
-                        <Sparkles className="w-2.5 h-2.5" />
-                        <span>Generate</span>
-                      </button>
-                    </div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Password *
+                    </label>
                     <div className="relative">
                       <input
                         type={showCreatePassword ? 'text' : 'password'}
+                        name="account_secret_password"
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-form-type="other"
                         required
                         minLength={6}
-                        placeholder="Min 6 characters"
+                        placeholder="Enter password (min 6 characters)"
                         value={createForm.password}
                         onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                         className="w-full pl-3 pr-8 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
@@ -1359,6 +1342,7 @@ export const AdminUserManagement = () => {
                         type="button"
                         onClick={() => setShowCreatePassword(!showCreatePassword)}
                         className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                        title={showCreatePassword ? 'Hide password' : 'Show password'}
                       >
                         {showCreatePassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -1524,24 +1508,19 @@ export const AdminUserManagement = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Enter New Password *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setNewPassword(generateStrongPassword())}
-                      className="text-[10px] text-amber-600 dark:text-amber-400 font-bold hover:underline flex items-center gap-0.5"
-                    >
-                      <Sparkles className="w-2.5 h-2.5" />
-                      <span>Generate Strong</span>
-                    </button>
-                  </div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Enter New Password *
+                  </label>
                   <div className="relative">
                     <input
                       type={showNewPassword ? 'text' : 'password'}
+                      name="admin_reset_user_password"
+                      autoComplete="off"
+                      data-lpignore="true"
+                      data-form-type="other"
                       required
                       minLength={6}
+                      placeholder="Enter new password (min 6 characters)"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full pl-3 pr-8 py-2 text-xs font-mono rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
@@ -1550,6 +1529,7 @@ export const AdminUserManagement = () => {
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
                       className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
                     >
                       {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>

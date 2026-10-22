@@ -277,13 +277,13 @@ const createUser = async (req, res) => {
           isActive: true,
         });
 
-        // Also sync to mockStore
+        // Also sync to mockStore with the securely hashed password
         mockStore.createUser({
           _id: inserted._id.toString(),
           employeeId: inserted.employeeId,
           name: inserted.name,
           email: inserted.email,
-          password,
+          password: inserted.password,
           role: normalizedRole,
           department: inserted.department,
           designation: inserted.designation,
@@ -471,7 +471,12 @@ const resetUserPassword = async (req, res) => {
         if (user) {
           user.password = newPassword;
           await user.save();
-          mockStore.updateUser(userId, { password: newPassword });
+          // user.password is now the freshly hashed bcrypt string from pre('save') hook
+          mockStore.updateUser(userId, { password: user.password });
+          mockStore.updateUser(user.employeeId, { password: user.password });
+          if (user._id) {
+            mockStore.updateUser(user._id.toString(), { password: user.password });
+          }
           await logEvent({
             req,
             action: 'USER_PASSWORD_RESET',
@@ -495,7 +500,9 @@ const resetUserPassword = async (req, res) => {
       }
     }
 
-    const updated = mockStore.updateUser(userId, { password: newPassword });
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    const updated = mockStore.updateUser(userId, { password: hashedPassword });
     if (!updated) {
       return res.status(404).json({
         success: false,

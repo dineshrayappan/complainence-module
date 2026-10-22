@@ -1,13 +1,15 @@
 // In-Memory state for offline development, serverless cold-starts, or cloud deployment fallback
+const bcrypt = require('bcryptjs');
 const { toBase64DataUrl } = require('../utils/base64Helper');
+
 const initialUsers = [
   {
     _id: 'admin-001',
     id: 'admin-001',
-    employeeId: 'ADMIN',
+    employeeId: 'ADM-001',
     name: 'Administrator',
     email: 'admin@factory.com',
-    password: 'admin123',
+    password: bcrypt.hashSync('admin123', 10),
     role: 'ADMIN',
     department: 'Plant Operations & Executive Oversight',
     designation: 'General Operations Director',
@@ -38,18 +40,27 @@ module.exports = {
     });
   },
   createUser: (userData) => {
+    let safePassword = userData.password;
+    if (safePassword && typeof safePassword === 'string' && !safePassword.startsWith('$2a$') && !safePassword.startsWith('$2b$')) {
+      safePassword = bcrypt.hashSync(safePassword, 10);
+    }
     const newUser = {
       _id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       ...userData,
+      password: safePassword,
       isActive: true,
     };
     mockUsers.unshift(newUser);
     return newUser;
   },
   updateUser: (id, updates) => {
-    const idx = mockUsers.findIndex((u) => u._id === id || u.employeeId === id);
+    const idx = mockUsers.findIndex((u) => u._id === id || u.id === id || u.employeeId === id);
     if (idx !== -1) {
-      mockUsers[idx] = { ...mockUsers[idx], ...updates };
+      const safeUpdates = { ...updates };
+      if (safeUpdates.password && typeof safeUpdates.password === 'string' && !safeUpdates.password.startsWith('$2a$') && !safeUpdates.password.startsWith('$2b$')) {
+        safeUpdates.password = bcrypt.hashSync(safeUpdates.password, 10);
+      }
+      mockUsers[idx] = { ...mockUsers[idx], ...safeUpdates };
       return mockUsers[idx];
     }
     return null;

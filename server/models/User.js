@@ -106,11 +106,18 @@ userSchema.pre('save', async function () {
 
 // Compare password method
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  if (!this.password) return false;
+  if (!this.password || !enteredPassword) return false;
   if (this.password.startsWith('$2a$') || this.password.startsWith('$2b$')) {
     return await bcrypt.compare(enteredPassword, this.password);
   }
-  return this.password === enteredPassword;
+  // If legacy plain-text password exists in document, upgrade immediately to bcrypt
+  if (this.password === enteredPassword) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(enteredPassword, salt);
+    await this.save();
+    return true;
+  }
+  return false;
 };
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);
