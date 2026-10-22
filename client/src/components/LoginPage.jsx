@@ -14,9 +14,9 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  // If already authenticated, redirect to root which routes to appropriate persona page
+  // If already authenticated, redirect to /compliance which routes to appropriate persona page
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/compliance" replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -38,7 +38,7 @@ export const LoginPage = () => {
         setError(res.message || 'Login failed. Please verify your credentials.');
       } else if (res && res.success) {
         const from = location.state?.from;
-        const targetPath = from?.pathname ? `${from.pathname}${from.search || ''}` : '/';
+        const targetPath = from?.pathname ? `${from.pathname}${from.search || ''}` : '/compliance';
         navigate(targetPath, { replace: true });
       }
     } catch (err) {

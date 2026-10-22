@@ -40,7 +40,7 @@ export const NotFoundPage = () => {
             </button>
 
             <Link
-              to="/"
+              to="/compliance"
               className="w-full sm:w-1/2 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
             >
               <Home className="w-4 h-4" />
@@ -50,7 +50,7 @@ export const NotFoundPage = () => {
 
           <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 w-full">
             <Link
-              to="/nc-cap"
+              to="/compliance/nc-cap"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-cyan-400 hover:underline"
             >
               <FileCheck className="w-3.5 h-3.5" />

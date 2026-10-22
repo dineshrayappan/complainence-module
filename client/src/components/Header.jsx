@@ -106,7 +106,7 @@ export const Header = ({
 
             {/* Brand Logo & Name */}
             <Link
-              to="/"
+              to="/compliance"
               className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 group cursor-pointer focus:outline-none"
               title="Go to Compliance Overview"
             >
@@ -242,7 +242,7 @@ export const Header = ({
                         onClick={() => {
                           setShowNotifications(false);
                           if (onSelectOverdue) onSelectOverdue();
-                          navigate('/nc-cap?deadline=Overdue');
+                          navigate('/compliance/nc-cap?deadline=Overdue');
                         }}
                         className="text-xs font-bold text-indigo-600 dark:text-cyan-400 hover:underline cursor-pointer"
                       >
@@ -321,7 +321,7 @@ export const Header = ({
             <button
               onClick={async () => {
                 await logout();
-                navigate('/login');
+                navigate('/compliance/login');
               }}
               id="btn-sign-out"
               title="Sign out of system"

@@ -6,7 +6,7 @@ export const RequirementsPage = () => {
   const navigate = useNavigate();
 
   const handleSelectRequirement = (clause) => {
-    navigate(`/nc-cap?search=${encodeURIComponent(clause)}`);
+    navigate(`/compliance/nc-cap?search=${encodeURIComponent(clause)}`);
   };
 
   return (

@@ -8,6 +8,8 @@ import {
   ChevronRight,
   X,
   Activity,
+  Building2,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -26,7 +28,7 @@ export const SidebarNavigation = ({
     ? [
         {
           id: 'nc-cap',
-          path: '/nc-cap',
+          path: '/compliance/nc-cap',
           label: 'NC/CAP',
           icon: FileCheck,
           badge:
@@ -38,7 +40,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'work-operations',
-          path: '/work-operations',
+          path: '/compliance/work-operations',
           label: 'Work Operations',
           icon: Activity,
           badge:
@@ -51,7 +53,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'reports',
-          path: '/reports',
+          path: '/compliance/reports',
           label: 'Reports',
           icon: BarChart3,
           badge: null,
@@ -61,7 +63,7 @@ export const SidebarNavigation = ({
     : [
         {
           id: 'dashboard',
-          path: '/dashboard',
+          path: '/compliance/dashboard',
           label: 'Dashboard',
           icon: LayoutDashboard,
           badge: null,
@@ -69,7 +71,7 @@ export const SidebarNavigation = ({
         },
         {
           id: 'nc-cap',
-          path: '/nc-cap',
+          path: '/compliance/nc-cap',
           label: 'NC/CAP',
           icon: FileCheck,
           badge:
@@ -81,7 +83,7 @@ export const SidebarNavigation = ({
         { isDivider: true },
         {
           id: 'work-operations',
-          path: '/work-operations',
+          path: '/compliance/work-operations',
           label: 'Work Operations',
           icon: Activity,
           badge:
@@ -91,10 +93,31 @@ export const SidebarNavigation = ({
           badgeColor:
             'bg-indigo-500/10 text-indigo-600 dark:text-cyan-400 border border-indigo-500/20',
         },
+        {
+          id: 'department',
+          path: '/compliance/department',
+          label: 'Departments',
+          icon: Building2,
+          badge: counts.deptCount ? String(counts.deptCount) : null,
+          badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
+        },
+        ...(isAuditor && !isAdmin
+          ? [
+              {
+                id: 'auditor',
+                path: '/compliance/auditor',
+                label: 'Auditor Oversight',
+                icon: ShieldCheck,
+                badge: 'Audit',
+                badgeColor:
+                  'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+              },
+            ]
+          : []),
         { isDivider: true },
         {
           id: 'reports',
-          path: '/reports',
+          path: '/compliance/reports',
           label: 'Reports',
           icon: BarChart3,
           badge: null,
@@ -104,9 +127,9 @@ export const SidebarNavigation = ({
           ? [
               { isDivider: true },
               {
-                id: 'settings',
-                path: '/settings',
-                label: 'Settings',
+                id: 'admin',
+                path: '/compliance/admin',
+                label: 'Admin',
                 icon: Settings,
                 badge: 'Admin',
                 badgeColor:
@@ -126,26 +149,59 @@ export const SidebarNavigation = ({
     if (!item.path) return false;
     const currentPath = location.pathname;
     if (item.id === 'dashboard') {
-      return currentPath === '/dashboard' || currentPath === '/';
+      return (
+        currentPath === '/compliance/dashboard' ||
+        currentPath === '/compliance' ||
+        currentPath === '/compliance/' ||
+        currentPath === '/dashboard' ||
+        currentPath === '/'
+      );
     }
     if (item.id === 'nc-cap') {
       return (
+        currentPath === '/compliance/nc-cap' ||
+        currentPath === '/compliance/nc' ||
+        currentPath === '/compliance/cap' ||
+        currentPath === '/compliance/tasks' ||
+        currentPath === '/compliance/complaints' ||
+        currentPath.startsWith('/compliance/nc-cap/') ||
         currentPath === '/nc-cap' ||
         currentPath === '/nc' ||
-        currentPath === '/cap' ||
-        currentPath === '/tasks' ||
-        currentPath === '/complaints' ||
-        currentPath.startsWith('/nc-cap/')
+        currentPath === '/cap'
       );
     }
     if (item.id === 'work-operations') {
-      return currentPath.startsWith('/work-operations');
+      return (
+        currentPath.startsWith('/compliance/work-operations') ||
+        currentPath.startsWith('/work-operations')
+      );
+    }
+    if (item.id === 'department' || item.id === 'departments') {
+      return (
+        currentPath.startsWith('/compliance/department') ||
+        currentPath.startsWith('/compliance/departments') ||
+        currentPath.startsWith('/departments')
+      );
     }
     if (item.id === 'reports') {
-      return currentPath.startsWith('/reports');
+      return (
+        currentPath.startsWith('/compliance/reports') ||
+        currentPath.startsWith('/reports')
+      );
     }
-    if (item.id === 'settings') {
-      return currentPath.startsWith('/settings');
+    if (item.id === 'admin' || item.id === 'settings') {
+      return (
+        currentPath.startsWith('/compliance/admin') ||
+        currentPath.startsWith('/compliance/settings') ||
+        currentPath.startsWith('/settings') ||
+        currentPath.startsWith('/admin')
+      );
+    }
+    if (item.id === 'auditor') {
+      return (
+        currentPath.startsWith('/compliance/auditor') ||
+        currentPath.startsWith('/auditor')
+      );
     }
     if (currentSection) {
       return currentSection === item.id;

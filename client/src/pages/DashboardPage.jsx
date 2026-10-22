@@ -9,21 +9,23 @@ export const DashboardPage = () => {
 
   const handleNavigateSection = (sec) => {
     if (sec === 'cap') {
-      navigate('/nc-cap?tab=cap-submitted');
+      navigate('/compliance/nc-cap?tab=cap-submitted');
     } else if (sec === 'nc' || sec === 'nc-cap') {
-      navigate('/nc-cap');
+      navigate('/compliance/nc-cap');
     } else if (sec === 'reports') {
-      navigate('/reports');
+      navigate('/compliance/reports');
     } else if (sec === 'work-operations') {
-      navigate('/work-operations');
-    } else if (sec === 'departments') {
-      navigate('/departments');
+      navigate('/compliance/work-operations');
+    } else if (sec === 'departments' || sec === 'department') {
+      navigate('/compliance/department');
     } else if (sec === 'requirements') {
-      navigate('/requirements');
-    } else if (sec === 'settings') {
-      navigate('/settings');
+      navigate('/compliance/requirements');
+    } else if (sec === 'settings' || sec === 'admin') {
+      navigate('/compliance/admin');
+    } else if (sec === 'auditor') {
+      navigate('/compliance/auditor');
     } else {
-      navigate(`/${sec}`);
+      navigate(`/compliance/${sec.replace(/^\//, '')}`);
     }
   };
 
@@ -31,7 +33,7 @@ export const DashboardPage = () => {
     if (showToast) {
       showToast(`Filtered NC register for ${deptName} department.`);
     }
-    navigate(`/nc-cap?search=${encodeURIComponent(deptName)}`);
+    navigate(`/compliance/nc-cap?search=${encodeURIComponent(deptName)}`);
   };
 
   return (

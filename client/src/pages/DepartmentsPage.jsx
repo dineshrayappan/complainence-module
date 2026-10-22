@@ -11,17 +11,17 @@ export const DepartmentsPage = () => {
     if (showToast) {
       showToast(`Filtered NC register for ${deptName} department.`);
     }
-    navigate(`/nc-cap?search=${encodeURIComponent(deptName)}`);
+    navigate(`/compliance/nc-cap?search=${encodeURIComponent(deptName)}`);
   };
 
   const handleNavigateWorkOperations = (dept) => {
-    navigate(`/work-operations?dept=${encodeURIComponent(dept || 'ALL')}`);
+    navigate(`/compliance/work-operations?dept=${encodeURIComponent(dept || 'ALL')}`);
   };
 
   return (
     <DepartmentComplianceDashboard
       onSelectDepartment={handleSelectDepartment}
-      onClose={() => navigate('/dashboard')}
+      onClose={() => navigate('/compliance/dashboard')}
       onNavigateWorkOperations={handleNavigateWorkOperations}
     />
   );

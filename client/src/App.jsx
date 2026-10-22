@@ -360,7 +360,10 @@ export const AppLayout = () => {
     };
   }, [complaints, user]);
 
-  const isAtDashboard = location.pathname === '/dashboard' || location.pathname === '/';
+  const isAtDashboard =
+    location.pathname === '/compliance/dashboard' ||
+    location.pathname === '/compliance' ||
+    location.pathname === '/compliance/';
 
   // Outlet context payload shared with all routed pages
   const outletContextValue = {
@@ -396,7 +399,7 @@ export const AppLayout = () => {
         onRefresh={() => loadData(false, true)}
         isRefreshing={isRefreshing}
         overdueCount={derivedCounts.overdueCount ?? 0}
-        onSelectOverdue={() => navigate('/nc-cap?deadline=Overdue')}
+        onSelectOverdue={() => navigate('/compliance/nc-cap?deadline=Overdue')}
       />
 
       {/* Two-Column App Shell Layout */}
@@ -446,7 +449,7 @@ export const AppLayout = () => {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => navigate('/dashboard')}
+                    onClick={() => navigate('/compliance/dashboard')}
                     className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase transition-colors bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
                   >
                     ← Factory Overview
@@ -491,16 +494,38 @@ export const AppLayout = () => {
 
 /**
  * Root Router Configuration
+ * Common base path for all application routes: /compliance
  */
 export const App = () => {
   return (
     <Routes>
-      {/* Public Login Route */}
-      <Route path="/login" element={<LoginPage />} />
+      {/* Root redirect to common /compliance base path */}
+      <Route path="/" element={<Navigate to="/compliance" replace />} />
 
-      {/* Protected Application Routes */}
+      {/* Public Login Route with /compliance base */}
+      <Route path="/compliance/login" element={<LoginPage />} />
+
+      {/* Legacy / Direct redirects to /compliance */}
+      <Route path="/login" element={<Navigate to="/compliance/login" replace />} />
+      <Route path="/admin" element={<Navigate to="/compliance/admin" replace />} />
+      <Route path="/admin/*" element={<Navigate to="/compliance/admin" replace />} />
+      <Route path="/auditor" element={<Navigate to="/compliance/auditor" replace />} />
+      <Route path="/departments" element={<Navigate to="/compliance/department" replace />} />
+      <Route path="/department" element={<Navigate to="/compliance/department" replace />} />
+      <Route path="/reports" element={<Navigate to="/compliance/reports" replace />} />
+      <Route path="/dashboard" element={<Navigate to="/compliance/dashboard" replace />} />
+      <Route path="/nc-cap" element={<Navigate to="/compliance/nc-cap" replace />} />
+      <Route path="/nc" element={<Navigate to="/compliance/nc-cap" replace />} />
+      <Route path="/cap" element={<Navigate to="/compliance/nc-cap?tab=cap-submitted" replace />} />
+      <Route path="/tasks" element={<Navigate to="/compliance/nc-cap?tab=open" replace />} />
+      <Route path="/complaints" element={<Navigate to="/compliance/nc-cap" replace />} />
+      <Route path="/work-operations" element={<Navigate to="/compliance/work-operations" replace />} />
+      <Route path="/requirements" element={<Navigate to="/compliance/requirements" replace />} />
+      <Route path="/settings" element={<Navigate to="/compliance/admin" replace />} />
+
+      {/* Protected Application Routes under /compliance Base Path */}
       <Route
-        path="/"
+        path="/compliance"
         element={
           <ProtectedRoute>
             <AppLayout />
@@ -510,7 +535,7 @@ export const App = () => {
         {/* Dynamic landing redirect based on persona */}
         <Route index element={<RoleBasedIndexRedirect />} />
 
-        {/* Dashboard (Executive / Auditor oversight) */}
+        {/* Dashboard (Executive / Plant Oversight) */}
         <Route
           path="dashboard"
           element={
@@ -520,25 +545,51 @@ export const App = () => {
           }
         />
 
-        {/* NC / CAP Defect Register and its semantic aliases */}
-        <Route path="nc-cap" element={<NcCapPage />} />
-        <Route path="nc" element={<Navigate to="/nc-cap" replace />} />
-        <Route path="cap" element={<Navigate to="/nc-cap?tab=cap-submitted" replace />} />
-        <Route path="tasks" element={<Navigate to="/nc-cap?tab=open" replace />} />
-        <Route path="complaints" element={<Navigate to="/nc-cap" replace />} />
-
-        {/* Work Operations */}
-        <Route path="work-operations" element={<WorkOperationsPage />} />
-
-        {/* Department Compliance Scorecard */}
+        {/* Admin Route: /compliance/admin (and /compliance/settings alias) */}
         <Route
-          path="departments"
+          path="admin"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN']}>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="settings" element={<Navigate to="/compliance/admin" replace />} />
+        <Route path="admin/users" element={<Navigate to="/compliance/admin" replace />} />
+
+        {/* Auditor Route: /compliance/auditor */}
+        <Route
+          path="auditor"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Department Route: /compliance/department (and /compliance/departments alias) */}
+        <Route
+          path="department"
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
               <DepartmentsPage />
             </ProtectedRoute>
           }
         />
+        <Route path="departments" element={<Navigate to="/compliance/department" replace />} />
+
+        {/* Reports Route: /compliance/reports */}
+        <Route path="reports" element={<ReportsPage />} />
+
+        {/* NC / CAP Defect Register and its semantic aliases */}
+        <Route path="nc-cap" element={<NcCapPage />} />
+        <Route path="nc" element={<Navigate to="/compliance/nc-cap" replace />} />
+        <Route path="cap" element={<Navigate to="/compliance/nc-cap?tab=cap-submitted" replace />} />
+        <Route path="tasks" element={<Navigate to="/compliance/nc-cap?tab=open" replace />} />
+        <Route path="complaints" element={<Navigate to="/compliance/nc-cap" replace />} />
+
+        {/* Work Operations */}
+        <Route path="work-operations" element={<WorkOperationsPage />} />
 
         {/* Requirements Compliance Matrix */}
         <Route
@@ -549,20 +600,6 @@ export const App = () => {
             </ProtectedRoute>
           }
         />
-
-        {/* Reports & Exports */}
-        <Route path="reports" element={<ReportsPage />} />
-
-        {/* Admin Settings & User Management */}
-        <Route
-          path="settings"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="admin/users" element={<Navigate to="/settings" replace />} />
 
         {/* 404 Inside App Shell */}
         <Route path="*" element={<NotFoundPage />} />

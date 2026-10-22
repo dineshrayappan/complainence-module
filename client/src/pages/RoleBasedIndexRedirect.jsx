@@ -7,10 +7,10 @@ export const RoleBasedIndexRedirect = () => {
   const isSupervisor = user?.role === 'SUPERVISOR' || user?.role === 'ACTION_PERSON' || (!isAdmin && !isAuditor);
 
   if (isSupervisor) {
-    return <Navigate to="/nc-cap" replace />;
+    return <Navigate to="/compliance/nc-cap" replace />;
   }
 
-  return <Navigate to="/dashboard" replace />;
+  return <Navigate to="/compliance/dashboard" replace />;
 };
 
 export default RoleBasedIndexRedirect;

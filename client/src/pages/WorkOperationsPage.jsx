@@ -13,7 +13,7 @@ export const WorkOperationsPage = () => {
   return (
     <DepartmentWorkOperations
       initialDepartment={dept}
-      onBackToScorecard={isAdmin || isAuditor ? () => navigate('/dashboard') : undefined}
+      onBackToScorecard={isAdmin || isAuditor ? () => navigate('/compliance/dashboard') : undefined}
     />
   );
 };

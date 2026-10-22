@@ -16,7 +16,7 @@ export const ProtectedRoute = ({ allowedRoles, children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/compliance/login" state={{ from: location }} replace />;
   }
 
   // If specific roles are required (e.g. ['ADMIN', 'AUDITOR'] or ['ADMIN'])
@@ -32,7 +32,7 @@ export const ProtectedRoute = ({ allowedRoles, children }) => {
 
     if (!hasAllowedRole) {
       // Redirect supervisor to nc-cap, admin/auditor to dashboard
-      const fallbackTarget = isSupervisor ? '/nc-cap' : '/dashboard';
+      const fallbackTarget = isSupervisor ? '/compliance/nc-cap' : '/compliance/dashboard';
       return <Navigate to={fallbackTarget} replace />;
     }
   }

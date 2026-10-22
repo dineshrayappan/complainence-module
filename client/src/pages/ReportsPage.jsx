@@ -14,7 +14,7 @@ export const ReportsPage = () => {
     const params = new URLSearchParams();
     if (targetTab) params.set('tab', targetTab);
     if (filterVal) params.set('search', filterVal);
-    navigate(`/nc-cap?${params.toString()}`);
+    navigate(`/compliance/nc-cap?${params.toString()}`);
   };
 
   return (
