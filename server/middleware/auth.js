@@ -127,7 +127,9 @@ const requireRole = (allowedRoles = []) => {
       });
     }
 
+    const isOwner = req.user.role === 'OWNER' || req.user.isOwner;
     const isUniversal =
+      isOwner ||
       req.user.employeeId === 'ALL-001' ||
       req.user.email === 'all@factory.com' ||
       req.user.role === 'SUPERADMIN' ||
@@ -145,4 +147,24 @@ const requireRole = (allowedRoles = []) => {
   };
 };
 
-module.exports = { verifyToken, requireRole };
+// Executive Owner Only Middleware
+const requireOwner = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required before Owner authorization check.',
+    });
+  }
+
+  const isOwner = req.user.role === 'OWNER' || req.user.isOwner;
+  if (!isOwner) {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Private Executive Owner authorization required.',
+    });
+  }
+
+  next();
+};
+
+module.exports = { verifyToken, requireRole, requireOwner };

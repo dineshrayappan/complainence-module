@@ -26,7 +26,7 @@ export const Header = ({
   overdueCount = 0,
   onSelectOverdue,
 }) => {
-  const { user, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
+  const { user, isOwner, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -271,35 +271,39 @@ export const Header = ({
             </button>
 
 
-            {/* User Profile Pill ("Admin" / Auditor / Supervisor) */}
+            {/* User Profile Pill ("Executive Owner" / "Admin" / Auditor / Supervisor) */}
             <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/90 shadow-2xs">
               <div
                 className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center font-bold text-xs text-white shadow-xs shrink-0 ${
-                  isAdmin
+                  isOwner
+                    ? 'bg-gradient-to-tr from-amber-500 via-amber-600 to-yellow-500 shadow-amber-500/20'
+                    : isAdmin
                     ? 'bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500'
                     : isAuditor
                     ? 'bg-gradient-to-tr from-purple-600 to-indigo-600'
                     : 'bg-gradient-to-tr from-emerald-600 to-teal-600'
                 }`}
               >
-                {user?.name?.charAt(0) || (isAdmin ? 'A' : 'U')}
+                {isOwner ? '👑' : user?.name?.charAt(0) || (isAdmin ? 'A' : 'U')}
               </div>
 
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
-                    {isAdmin ? 'Admin' : user?.name?.split(' ')[0] || 'User'}
+                    {isOwner ? user?.name || 'Project Owner' : isAdmin ? 'Admin' : user?.name?.split(' ')[0] || 'User'}
                   </span>
                   <span
                     className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border ${
-                      isAdmin
+                      isOwner
+                        ? 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 font-black'
+                        : isAdmin
                         ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300'
                         : isAuditor
                         ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300'
                         : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
                     }`}
                   >
-                    {isAdmin ? 'Admin' : isAuditor ? 'Auditor' : 'Department'}
+                    {isOwner ? 'Executive Owner' : isAdmin ? 'Admin' : isAuditor ? 'Auditor' : 'Department'}
                   </span>
                   {!isSupervisor && !(!isAdmin && !isAuditor) && (
                     <span

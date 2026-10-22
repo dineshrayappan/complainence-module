@@ -110,7 +110,11 @@ const getAllUsers = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const query = {};
+        const isRequestingOwner = req.user?.role === 'OWNER' || req.user?.isOwner;
+        if (!isRequestingOwner) {
+          query.role = query.role ? query.role : { $ne: 'OWNER' };
+          query.isOwner = { $ne: true };
+        }
 
         if (archived === 'true' || role === 'ARCHIVED') {
           query.isDeleted = true;
@@ -171,6 +175,10 @@ const getAllUsers = async (req, res) => {
     // Fallback store filtering
     const shouldIncludeDeleted = archived === 'true' || role === 'ARCHIVED' || includeDeleted === 'true';
     let users = mockStore.getUsers(shouldIncludeDeleted);
+    const isRequestingOwner = req.user?.role === 'OWNER' || req.user?.isOwner;
+    if (!isRequestingOwner) {
+      users = users.filter((u) => u.role !== 'OWNER' && !u.isOwner);
+    }
     if (archived === 'true' || role === 'ARCHIVED') {
       users = users.filter((u) => u.isDeleted);
     } else if (includeDeleted !== 'true') {
@@ -402,6 +410,14 @@ const updateUser = async (req, res) => {
           query.$or.unshift({ _id: userId });
         }
 
+        const targetUser = await User.findOne(query);
+        if (targetUser && (targetUser.role === 'OWNER' || targetUser.isOwner) && req.user?.role !== 'OWNER') {
+          return res.status(403).json({
+            success: false,
+            message: 'Security Violation: The Owner account is private and cannot be altered by general administrators.',
+          });
+        }
+
         const updated = await User.findOneAndUpdate(query, updateData, { new: true });
         if (updated) {
           mockStore.updateUser(userId, updateData);
@@ -486,6 +502,12 @@ const resetUserPassword = async (req, res) => {
 
         const user = await User.findOne(query);
         if (user) {
+          if ((user.role === 'OWNER' || user.isOwner) && req.user?.role !== 'OWNER') {
+            return res.status(403).json({
+              success: false,
+              message: 'Security Violation: The Owner account password cannot be reset by general administrators.',
+            });
+          }
           user.password = newPassword;
           await user.save();
           // user.password is now the freshly hashed bcrypt string from pre('save') hook
@@ -566,6 +588,12 @@ const toggleUserStatus = async (req, res) => {
 
         const current = await User.findOne(query);
         if (current) {
+          if (current.role === 'OWNER' || current.isOwner) {
+            return res.status(403).json({
+              success: false,
+              message: 'Security Violation: The Owner account is permanent and cannot be deactivated.',
+            });
+          }
           current.isActive = !current.isActive;
           await current.save();
           mockStore.updateUser(userId, { isActive: current.isActive });
@@ -645,6 +673,13 @@ const checkUserDependencies = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'User account not found.',
+      });
+    }
+
+    if ((targetUser.role === 'OWNER' || targetUser.isOwner) && req.user?.role !== 'OWNER') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Owner dependencies are private.',
       });
     }
 
@@ -799,6 +834,13 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'User account not found.',
+      });
+    }
+
+    if (targetUser.role === 'OWNER' || targetUser.isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Security Violation: The Owner account is private and cannot be deleted or archived.',
       });
     }
 

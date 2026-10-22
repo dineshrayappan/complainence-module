@@ -43,6 +43,7 @@ export const authService = {
   register: (userData) => api.post('/auth/register', userData),
   logout: (data) => api.post('/auth/logout', data),
   getMe: () => api.get('/auth/me'),
+  updateOwnerPassword: (data) => api.patch('/auth/owner/password', data),
 };
 
 export const userService = {

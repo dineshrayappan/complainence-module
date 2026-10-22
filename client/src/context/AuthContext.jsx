@@ -131,14 +131,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const isOwner = user?.role === 'OWNER' || Boolean(user?.isOwner);
   const isUniversal =
+    isOwner ||
     user?.isUniversal ||
     user?.hasAllRoles ||
     user?.employeeId === 'ALL-001' ||
     user?.email === 'all@factory.com';
-  const isAdmin = user?.role === 'ADMIN' || isUniversal;
-  const isAuditor = user?.role === 'AUDITOR' || user?.role === 'ADMIN' || isUniversal;
-  const isActionPerson = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || isUniversal;
+  const isAdmin = user?.role === 'ADMIN' || isOwner || isUniversal;
+  const isAuditor = user?.role === 'AUDITOR' || user?.role === 'ADMIN' || isOwner || isUniversal;
+  const isActionPerson = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || isOwner || isUniversal;
   const isSupervisor = isActionPerson;
 
   return (
@@ -151,6 +153,7 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         switchUser,
+        isOwner,
         isAdmin,
         isAuditor,
         isActionPerson,

@@ -40,6 +40,7 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { userService, departmentService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import UserLoginTrackerPanel from './UserLoginTrackerPanel';
 import LogHistoryPanel from './LogHistoryPanel';
 
@@ -54,6 +55,7 @@ const FACTORY_DEPARTMENTS = [
 ];
 
 export const AdminUserManagement = () => {
+  const { isOwner } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get('tab');
   const initialTab =
@@ -258,6 +260,10 @@ export const AdminUserManagement = () => {
 
   // Open Delete Confirmation Modal with automated dependency inspection
   const handleOpenDeleteModal = async (type, item) => {
+    if (type === 'USER' && (item.role === 'OWNER' || item.isOwner)) {
+      showToast('The Owner account is permanent and cannot be deleted.');
+      return;
+    }
     setDeleteTarget({ type, item });
     setDeleteError('');
     setDependencyData(null);
@@ -361,6 +367,9 @@ export const AdminUserManagement = () => {
 
   // Filtered users list
   const filteredUsers = users.filter((u) => {
+    // Hide Owner account from non-owner viewers
+    if (!isOwner && (u.role === 'OWNER' || u.isOwner)) return false;
+
     // Role filter
     if (roleFilter === 'AUDITOR' && u.role !== 'AUDITOR') return false;
     if (
@@ -392,6 +401,7 @@ export const AdminUserManagement = () => {
 
   // Filtered archived users list
   const filteredArchivedUsers = archivedUsers.filter((u) => {
+    if (!isOwner && (u.role === 'OWNER' || u.isOwner)) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (

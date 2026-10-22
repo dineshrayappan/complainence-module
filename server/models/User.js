@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['ADMIN', 'AUDITOR', 'ACTION_PERSON', 'SUPERVISOR'],
+      enum: ['OWNER', 'ADMIN', 'AUDITOR', 'ACTION_PERSON', 'SUPERVISOR'],
       required: [true, 'User role is required'],
       default: 'ACTION_PERSON',
     },
@@ -48,6 +48,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: '',
+    },
+    isOwner: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
     isActive: {
       type: Boolean,
@@ -104,6 +109,9 @@ const userSchema = new mongoose.Schema(
 
 // Hash password before saving if modified
 userSchema.pre('save', async function () {
+  if (this.role === 'OWNER') {
+    this.isOwner = true;
+  }
   if (this.role === 'SUPERVISOR') {
     this.role = 'ACTION_PERSON';
   }

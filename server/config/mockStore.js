@@ -70,6 +70,9 @@ module.exports = {
   deleteUser: (id, extra = {}) => {
     const idx = mockUsers.findIndex((u) => u._id === id || u.id === id || u.employeeId === id);
     if (idx !== -1) {
+      if (mockUsers[idx].role === 'OWNER' || mockUsers[idx].isOwner) {
+        return null; // Protected Owner account
+      }
       mockUsers[idx] = {
         ...mockUsers[idx],
         isDeleted: true,

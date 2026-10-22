@@ -24,15 +24,17 @@ const generateToken = (id) => {
 // Formats a user row for consistent API response
 const formatUserResponse = (user, expectedRole) => {
   if (!user) return null;
+  const isOwner = user.role === 'OWNER' || user.isOwner;
   const isUniversal =
+    isOwner ||
     user.employeeId === 'ALL-001' ||
     user.email === 'all@factory.com' ||
     user.role === 'SUPERADMIN' ||
     user.isUniversal ||
     user.hasAllRoles;
 
-  let activeRole = user.role === 'SUPERVISOR' ? 'ACTION_PERSON' : user.role;
-  if (isUniversal && expectedRole) {
+  let activeRole = isOwner ? 'OWNER' : user.role === 'SUPERVISOR' ? 'ACTION_PERSON' : user.role;
+  if (isUniversal && expectedRole && !isOwner) {
     activeRole =
       expectedRole === 'SUPERVISOR' || expectedRole === 'ACTION_PERSON'
         ? 'ACTION_PERSON'
@@ -48,6 +50,7 @@ const formatUserResponse = (user, expectedRole) => {
     name: user.name,
     email: user.email,
     role: activeRole,
+    isOwner: !!isOwner,
     department: user.department,
     designation: user.designation,
     mobileNumber: user.mobileNumber,
@@ -533,9 +536,79 @@ const logout = async (req, res) => {
   }
 };
 
+// @desc    Private: Owner updates their own password securely
+// @route   PATCH /api/auth/owner/password
+// @access  Private (Owner Only)
+const updateOwnerPassword = async (req, res) => {
+  try {
+    const ownerId = req.user?._id || req.user?.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 8 characters long.',
+      });
+    }
+
+    if (isMongoConnected() && ownerId) {
+      const user = await User.findById(ownerId);
+      if (!user || (!user.isOwner && user.role !== 'OWNER')) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access restricted: Executive Owner account required.',
+        });
+      }
+
+      if (currentPassword) {
+        const isMatch = await user.matchPassword(currentPassword);
+        if (!isMatch) {
+          return res.status(401).json({
+            success: false,
+            message: 'Current password does not match.',
+          });
+        }
+      }
+
+      user.password = newPassword;
+      await user.save();
+      mockStore.updateUser(ownerId.toString(), { password: user.password });
+      return res.status(200).json({
+        success: true,
+        message: 'Owner password has been updated successfully.',
+      });
+    }
+
+    const fallbackUser = mockStore.findUserById(ownerId);
+    if (!fallbackUser || (!fallbackUser.isOwner && fallbackUser.role !== 'OWNER')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access restricted: Executive Owner account required.',
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    mockStore.updateUser(ownerId, { password: hashedPassword });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Owner password has been updated successfully.',
+    });
+  } catch (error) {
+    console.error('[AuthController:updateOwnerPassword] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update owner password.',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   login,
   register,
   getMe,
   logout,
+  updateOwnerPassword,
 };

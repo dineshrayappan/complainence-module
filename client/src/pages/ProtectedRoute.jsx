@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export const ProtectedRoute = ({ allowedRoles, children }) => {
-  const { user, loading: authLoading, isAdmin, isAuditor } = useAuth();
+  const { user, loading: authLoading, isOwner, isAdmin, isAuditor } = useAuth();
   const location = useLocation();
 
   if (authLoading) {
@@ -17,6 +17,11 @@ export const ProtectedRoute = ({ allowedRoles, children }) => {
 
   if (!user) {
     return <Navigate to="/compliance/login" state={{ from: location }} replace />;
+  }
+
+  // Executive Owner has omni-access to all routes
+  if (isOwner || user.role === 'OWNER') {
+    return children;
   }
 
   // If specific roles are required (e.g. ['ADMIN', 'AUDITOR'] or ['ADMIN'])
