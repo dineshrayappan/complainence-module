@@ -129,6 +129,23 @@ const complaintSchema = new mongoose.Schema(
       default: {},
     },
     timeline: [timelineItemSchema],
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+    deletedReason: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,

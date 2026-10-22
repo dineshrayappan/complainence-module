@@ -246,6 +246,12 @@ const formatComplaintOutput = (complaint) => {
 
   obj.cap = capObj;
 
+  // Soft deletion and audit archival preservation fields
+  obj.isDeleted = Boolean(obj.isDeleted);
+  obj.deletedAt = obj.deletedAt || null;
+  obj.deletedBy = obj.deletedBy || null;
+  obj.deletedReason = obj.deletedReason || '';
+
   return obj;
 };
 
@@ -459,13 +465,18 @@ const createComplaint = async (req, res) => {
         mockStore.getUsers().find((u) => u.employeeId === lookupSupervisorId) || null;
     }
 
+    let reqAssigned = req.body.assignedTo;
+    if (typeof reqAssigned === 'string') {
+      try { reqAssigned = JSON.parse(reqAssigned); } catch (e) {}
+    }
+
     const assignedToData = {
-      userId: supervisor?.id || supervisor?._id || '',
-      employeeId: supervisor?.employeeId || '',
-      name: supervisor?.name || '',
-      department: supervisor?.department || department || '',
-      designation: supervisor?.designation || '',
-      mobileNumber: supervisor?.mobileNumber || '',
+      userId: supervisor?.id || supervisor?._id || reqAssigned?.userId || '',
+      employeeId: supervisor?.employeeId || reqAssigned?.employeeId || '',
+      name: supervisor?.name || reqAssigned?.name || '',
+      department: supervisor?.department || reqAssigned?.department || department || '',
+      designation: supervisor?.designation || reqAssigned?.designation || '',
+      mobileNumber: supervisor?.mobileNumber || reqAssigned?.mobileNumber || '',
     };
 
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
@@ -582,12 +593,24 @@ const createComplaint = async (req, res) => {
 // @access  Private
 const getComplaints = async (req, res) => {
   try {
-    const { status, category, priority, department, search, tab, deadlineCondition, deadline } = req.query;
+    const { status, category, priority, department, search, tab, deadlineCondition, deadline, recordStatus, includeDeleted } = req.query;
     const now = new Date();
 
     if (isMongoConnected()) {
       try {
         const query = {};
+
+        // Record Status filter: 'all' | 'active' | 'deleted' (Preserves deleted records in reports)
+        if (recordStatus === 'deleted') {
+          query.isDeleted = true;
+        } else if (recordStatus === 'active') {
+          query.isDeleted = { $ne: true };
+        } else if (recordStatus === 'all' || includeDeleted === 'true' || includeDeleted === true) {
+          // Keep all records including deleted for reports
+        } else if (tab && tab !== 'all') {
+          // Specific workflow queue tabs exclude deleted records by default
+          query.isDeleted = { $ne: true };
+        }
 
         // RBAC filtering for Supervisor / Action Person (Strict Personal Assignment Isolation across ALL tabs)
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
@@ -2048,7 +2071,7 @@ const reassignComplaint = async (req, res) => {
   }
 };
 
-// @desc    Delete complaint / defect log
+// @desc    Soft-delete / archive complaint defect log (preserves all historical data, CAP, photos for reports)
 // @route   DELETE /api/complaints/:id
 // @access  Private (Auditor or Admin)
 const deleteComplaint = async (req, res) => {
@@ -2056,30 +2079,53 @@ const deleteComplaint = async (req, res) => {
     const paramId = req.params.id;
     let existingComplaint = null;
 
-    // Fetch existing complaint details before deletion
+    const actorName = req.user?.name || 'Administrator';
+    const actorEmpId = req.user?.employeeId || 'ADMIN';
+    const actorRole = req.user?.role || 'ADMIN';
+    const deletedDate = new Date();
+    const deletedByInfo = {
+      name: actorName,
+      employeeId: actorEmpId,
+      role: actorRole,
+      userId: req.user?.id || req.user?._id || '',
+    };
+    const deletedReason = req.body?.reason || 'Non-conformance archived / deleted by authorized user';
+
+    // Soft-delete complaint in MongoDB while preserving all photos, CAP, root cause, and history
     if (isMongoConnected()) {
       try {
         const query = { $or: [{ complaintId: paramId }] };
         if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.push({ _id: paramId });
         }
-        existingComplaint = await Complaint.findOne(query).lean();
-        await Complaint.deleteOne(query);
+        const doc = await Complaint.findOne(query);
+        if (doc) {
+          doc.isDeleted = true;
+          doc.deletedAt = deletedDate;
+          doc.deletedBy = deletedByInfo;
+          doc.deletedReason = deletedReason;
+          if (!Array.isArray(doc.timeline)) doc.timeline = [];
+          doc.timeline.push({
+            action: 'DELETED',
+            performedBy: deletedByInfo,
+            notes: `Record archived / soft-deleted by ${actorName}. ${deletedReason}`,
+            timestamp: deletedDate,
+          });
+          await doc.save();
+          existingComplaint = doc.toObject();
+        }
       } catch (err) {
         console.error('[ComplaintController:deleteComplaint] MongoDB exception:', err.message);
       }
     }
 
     if (!existingComplaint) {
-      existingComplaint = mockStore.getComplaint(paramId);
+      existingComplaint = mockStore.getComplaintById ? mockStore.getComplaintById(paramId) : mockStore.getComplaint(paramId);
     }
 
-    // Delete from in-memory mock store
-    mockStore.deleteComplaint(paramId);
+    // Soft-delete in mock store
+    mockStore.deleteComplaint(paramId, deletedByInfo, deletedReason);
 
-    const actorName = req.user?.name || 'Administrator';
-    const actorEmpId = req.user?.employeeId || 'ADMIN';
-    const actorRole = req.user?.role || 'ADMIN';
     const ncId = existingComplaint?.complaintId || paramId;
     const ncTitle = existingComplaint?.title || 'Defect Entry';
     const ncDept = existingComplaint?.department || 'N/A';
@@ -2092,15 +2138,15 @@ const deleteComplaint = async (req, res) => {
       userName: actorName,
       userRole: actorRole,
       action: 'NC_DELETED',
-      actionLabel: 'Defect Record Deleted',
+      actionLabel: 'Defect Record Archived / Deleted',
       category: 'COMPLAINT',
       severity: 'CRITICAL',
       entityType: 'COMPLAINT',
       entityId: ncId,
       relatedNcId: ncId,
-      details: `Record ${ncId} ("${ncTitle}") was permanently deleted by ${actorName} (${actorEmpId} • ${actorRole}). Department: ${ncDept}, Buyer: ${ncBuyer}.`,
+      details: `Record ${ncId} ("${ncTitle}") was archived / soft-deleted by ${actorName} (${actorEmpId} • ${actorRole}). Department: ${ncDept}, Buyer: ${ncBuyer}. All historical photos, CAP records, and audit details permanently preserved for reporting.`,
       payload: {
-        deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
+        deletedBy: deletedByInfo,
         deletedRecord: {
           complaintId: ncId,
           title: ncTitle,
@@ -2109,15 +2155,16 @@ const deleteComplaint = async (req, res) => {
           severity: existingComplaint?.severity,
           stage: existingComplaint?.stage,
         },
-        deletedAt: new Date().toISOString(),
+        deletedAt: deletedDate.toISOString(),
       },
     });
 
     return res.status(200).json({
       success: true,
-      message: `Defect log ${paramId} deleted successfully by ${actorName}.`,
+      message: `Defect log ${paramId} archived / deleted successfully by ${actorName}. All historical details preserved in reports.`,
       id: paramId,
-      deletedBy: { name: actorName, employeeId: actorEmpId },
+      complaint: existingComplaint ? formatComplaintOutput(existingComplaint) : null,
+      deletedBy: deletedByInfo,
     });
   } catch (error) {
     console.error('[ComplaintController:deleteComplaint] Error:', error);

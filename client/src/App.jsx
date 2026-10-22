@@ -104,7 +104,7 @@ export const AppLayout = () => {
       }
 
       const [complaintsRes, metricsRes] = await Promise.all([
-        complaintService.getComplaints(),
+        complaintService.getComplaints({ includeDeleted: 'true' }),
         complaintService.getKpiStats(),
       ]);
 
@@ -242,7 +242,7 @@ export const AppLayout = () => {
     if (!complaint) return;
     const cid = complaint.complaintId || complaint._id || complaint.id;
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete defect log [${cid}]? This will remove all associated rework photos and records.`
+      `Are you sure you want to delete non-conformance [${cid}]? The record will be archived and permanently preserved in compliance audit reports.`
     );
     if (!confirmDelete) return;
 
@@ -250,16 +250,29 @@ export const AppLayout = () => {
       const targetId = complaint._id || complaint.id || complaint.complaintId;
       const res = await complaintService.deleteComplaint(targetId);
       if (res.data?.success) {
-        showToast(`NC ${cid} deleted successfully.`);
+        showToast(`NC ${cid} archived successfully. Record preserved in Reports.`);
         setComplaints((prev) => {
-          const filtered = prev.filter(
-            (c) =>
-              (c._id || c.id) !== targetId &&
-              c.complaintId !== cid &&
-              c.complaintId !== complaint.complaintId
-          );
-          safePersistCache(filtered, user);
-          return filtered;
+          const updated = prev.map((c) => {
+            if (
+              (c._id || c.id) === targetId ||
+              c.complaintId === cid ||
+              c.complaintId === complaint.complaintId
+            ) {
+              return {
+                ...c,
+                isDeleted: true,
+                deletedAt: new Date().toISOString(),
+                deletedBy: {
+                  name: user?.name || 'Administrator',
+                  employeeId: user?.employeeId || 'ADMIN',
+                  role: user?.role || 'ADMIN',
+                },
+              };
+            }
+            return c;
+          });
+          safePersistCache(updated, user);
+          return updated;
         });
 
         if (
@@ -321,19 +334,20 @@ export const AppLayout = () => {
     setIsNewModalOpen(true);
   };
 
-  // Derived real-time counts from complaints
+  // Derived real-time counts from complaints (Active tickets only for workflow badges)
   const derivedCounts = useMemo(() => {
     const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR';
     const userEmpId = (user?.employeeId || '').toUpperCase();
     const userId = String(user?.id || user?._id || '');
 
+    const activeList = complaints.filter((c) => !c.isDeleted);
     const userComplaints = isSupervisor
-      ? complaints.filter((c) => {
+      ? activeList.filter((c) => {
         const cEmp = (c.assignedTo?.employeeId || '').toUpperCase();
         const cUser = String(c.assignedTo?.userId || '');
         return (cEmp && cEmp === userEmpId) || (cUser && cUser === userId);
       })
-      : complaints;
+      : activeList;
 
     const now = Date.now();
     return {

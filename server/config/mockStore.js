@@ -99,6 +99,18 @@ module.exports = {
   getComplaints: (params = {}, user = null) => {
     let result = [...mockComplaints];
 
+    // Record Status filter: 'all' | 'active' | 'deleted' (Preserves deleted records in reports)
+    if (params.recordStatus === 'deleted') {
+      result = result.filter((c) => Boolean(c.isDeleted));
+    } else if (params.recordStatus === 'active') {
+      result = result.filter((c) => !c.isDeleted);
+    } else if (params.recordStatus === 'all' || params.includeDeleted === 'true' || params.includeDeleted === true) {
+      // Keep all records including deleted for reports
+    } else if (params.tab && params.tab !== 'all') {
+      // Specific workflow queue tabs exclude deleted records by default
+      result = result.filter((c) => !c.isDeleted);
+    }
+
     // Role-based filtering for Supervisor / Action Person (Strict Personal Assignment Isolation across ALL tabs)
     if (user && (user.role === 'ACTION_PERSON' || user.role === 'SUPERVISOR')) {
       const uEmp = (user.employeeId || '').toUpperCase();
@@ -226,7 +238,7 @@ module.exports = {
     }
     return null;
   },
-  deleteComplaint: (id) => {
+  deleteComplaint: (id, deletedBy = null, reason = '') => {
     const paramStr = String(id);
     const idx = mockComplaints.findIndex(
       (c) =>
@@ -235,8 +247,26 @@ module.exports = {
         c.complaintId === paramStr
     );
     if (idx !== -1) {
-      const removed = mockComplaints.splice(idx, 1)[0];
-      return removed;
+      const now = new Date();
+      const current = mockComplaints[idx];
+      const defaultDeletedBy = deletedBy || { name: 'Administrator', employeeId: 'ADMIN', role: 'ADMIN' };
+      const updatedTimeline = Array.isArray(current.timeline) ? [...current.timeline] : [];
+      updatedTimeline.push({
+        action: 'DELETED',
+        performedBy: defaultDeletedBy,
+        notes: `Record archived / soft-deleted. ${reason || ''}`.trim(),
+        timestamp: now,
+      });
+
+      mockComplaints[idx] = {
+        ...current,
+        isDeleted: true,
+        deletedAt: now.toISOString(),
+        deletedBy: defaultDeletedBy,
+        deletedReason: reason || 'Deleted by authorized user',
+        timeline: updatedTimeline,
+      };
+      return mockComplaints[idx];
     }
     return null;
   },
@@ -246,6 +276,10 @@ module.exports = {
         ...t,
         _id: t.id || t._id,
         complaintId: t.complaintId,
+        isDeleted: Boolean(t.isDeleted),
+        deletedAt: t.deletedAt || null,
+        deletedBy: t.deletedBy || null,
+        deletedReason: t.deletedReason || '',
         beforePhoto: toBase64DataUrl(t.beforePhoto),
         afterPhoto: toBase64DataUrl(t.afterPhoto),
       }));

@@ -119,7 +119,10 @@ export const ReportsView = ({
   // 10. Reject & Rework Filter
   const [reworkFilter, setReworkFilter] = useState('ALL'); // 'ALL' | 'REWORK_ONLY' | 'AWAITING_REWORK' | 'REWORK_IN_REVIEW' | 'REWORK_RESOLVED' | 'NO_REWORK'
 
-  // 11. Export Scope & Drill-Down Modal State
+  // 11. Record Status Filter ('ALL' | 'ACTIVE' | 'DELETED')
+  const [recordStatusFilter, setRecordStatusFilter] = useState('ALL');
+
+  // 12. Export Scope & Drill-Down Modal State
   const [exportScope, setExportScope] = useState('FILTERED'); // 'FILTERED' | 'ALL'
   const [drilldownComplaint, setDrilldownComplaint] = useState(null);
   const [showFiltersExpanded, setShowFiltersExpanded] = useState(true);
@@ -486,6 +489,10 @@ export const ReportsView = ({
   // ---------------------------------------------------------------------------
   const filteredComplaints = useMemo(() => {
     return complaints.filter((c) => {
+      // 0. Record Status Filter (All Records / Active NC / Deleted NC)
+      if (recordStatusFilter === 'ACTIVE' && c.isDeleted) return false;
+      if (recordStatusFilter === 'DELETED' && !c.isDeleted) return false;
+
       // 1. Status Filter
       if (statusFilter !== 'ALL') {
         if (
@@ -686,6 +693,7 @@ export const ReportsView = ({
     agingFilter,
     repeatFilter,
     reworkFilter,
+    recordStatusFilter,
     datePreset,
     startDate,
     endDate,
@@ -708,6 +716,7 @@ export const ReportsView = ({
     if (agingFilter !== 'ALL') count++;
     if (repeatFilter !== 'ALL') count++;
     if (reworkFilter !== 'ALL') count++;
+    if (recordStatusFilter !== 'ALL') count++;
     return count;
   }, [
     searchTerm,
@@ -724,6 +733,7 @@ export const ReportsView = ({
     agingFilter,
     repeatFilter,
     reworkFilter,
+    recordStatusFilter,
   ]);
 
   const hasActiveFilters = activeFilterCount > 0;
@@ -743,6 +753,7 @@ export const ReportsView = ({
     setAgingFilter('ALL');
     setRepeatFilter('ALL');
     setReworkFilter('ALL');
+    setRecordStatusFilter('ALL');
   };
 
   const datasetToExport =
@@ -755,6 +766,8 @@ export const ReportsView = ({
   // ---------------------------------------------------------------------------
   const totalNC = complaints.length;
   const filteredCount = filteredComplaints.length;
+  const activeCount = complaints.filter((c) => !c.isDeleted).length;
+  const deletedCount = complaints.filter((c) => c.isDeleted).length;
   const openCount = filteredComplaints.filter((c) =>
     ['Open', 'Assigned', 'In Progress'].includes(c.status)
   ).length;
@@ -1300,7 +1313,7 @@ export const ReportsView = ({
             c.complaintId || 'NC-N/A',
             c.department || '—',
             cRisk,
-            c.status,
+            c.isDeleted ? `Deleted (${c.status})` : c.status,
             findingSummary,
             getAssignedToName(c),
             c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A',
@@ -1503,12 +1516,15 @@ export const ReportsView = ({
         filename = `Garment_QMS_Master_Register_${new Date().toISOString().slice(0, 10)}.csv`;
         headers = [
           'Non-Conformance ID',
+          'Record Status',
           'Lifecycle Status',
           'Risk Severity / Priority',
           'Department',
           'Plant Location / Station',
           'Defect Category',
           'Creation Timestamp',
+          'Deleted Timestamp',
+          'Deleted By',
           'Auditor Name',
           'Auditor Employee ID',
           'Defect Finding Description',
@@ -1540,14 +1556,19 @@ export const ReportsView = ({
             c.deadlineTimestamp &&
             Date.now() > new Date(c.deadlineTimestamp).getTime();
 
+          const deletedByName = typeof c.deletedBy === 'object' ? c.deletedBy?.name : (c.deletedBy || '');
+
           return [
             `"${c.complaintId || ''}"`,
+            `"${c.isDeleted ? 'Deleted NC' : 'Active NC'}"`,
             `"${c.status || 'Open'}"`,
             `"${c.priority || c.riskSeverity || 'Medium'}"`,
             `"${c.department || ''}"`,
             `"${c.location || ''}"`,
             `"${c.category || ''}"`,
             `"${c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}"`,
+            `"${c.deletedAt ? new Date(c.deletedAt).toLocaleString() : ''}"`,
+            `"${(deletedByName || '').replace(/"/g, '""')}"`,
             `"${getAuditorName(c).replace(/"/g, '""')}"`,
             `"${c.createdBy?.employeeId || ''}"`,
             `"${getFindingText(c).replace(/"/g, '""')}"`,
@@ -1782,6 +1803,23 @@ export const ReportsView = ({
               </button>
             )}
           </div>
+
+          {/* Record Status Filter */}
+          <select
+            id="filter-record-status"
+            value={recordStatusFilter}
+            onChange={(e) => setRecordStatusFilter(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              recordStatusFilter !== 'ALL'
+                ? 'bg-rose-50/90 border-rose-300 text-rose-900 dark:bg-rose-950/70 dark:border-rose-700 dark:text-rose-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+            title="Filter by Record Status (All Records, Active NC, Deleted NC)"
+          >
+            <option value="ALL">Record Status: All Records ({complaints.length})</option>
+            <option value="ACTIVE">Record Status: Active NC ({activeCount})</option>
+            <option value="DELETED">Record Status: Deleted NC ({deletedCount})</option>
+          </select>
 
           {/* Department Filter */}
           <select
@@ -2195,7 +2233,11 @@ export const ReportsView = ({
                       return (
                         <tr
                           key={c._id || c.id || c.complaintId || idx}
-                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group"
+                          className={`transition-colors group ${
+                            c.isDeleted
+                              ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40'
+                              : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                          }`}
                         >
                           {/* 1. # */}
                           <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
@@ -2207,8 +2249,13 @@ export const ReportsView = ({
                             <span className="font-mono font-bold text-indigo-600 dark:text-cyan-400 block">
                               {c.complaintId || 'NC-N/A'}
                             </span>
+                            {c.isDeleted && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 mt-0.5">
+                                Deleted Record
+                              </span>
+                            )}
                             {freq > 1 && (
-                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-purple-600 dark:text-purple-400 mt-0.5">
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-purple-600 dark:text-purple-400 mt-0.5 block">
                                 <Repeat className="w-2.5 h-2.5" />
                                 <span>Repeat ({freq}x)</span>
                               </span>
@@ -2217,7 +2264,15 @@ export const ReportsView = ({
 
                           {/* 3. Date Logged */}
                           <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
-                            {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                            <div>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}</div>
+                            {c.isDeleted && (
+                              <div className="mt-1 pt-1 border-t border-rose-200/60 dark:border-rose-900/40 text-[10px] text-rose-600 dark:text-rose-400">
+                                <div className="font-semibold">Deleted: {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : 'N/A'}</div>
+                                <div className="truncate max-w-[120px]" title={typeof c.deletedBy === 'object' ? c.deletedBy?.name : (c.deletedBy || 'System')}>
+                                  By: {typeof c.deletedBy === 'object' ? c.deletedBy?.name : (c.deletedBy || 'System')}
+                                </div>
+                              </div>
+                            )}
                           </td>
 
                           {/* 4. Department & Line */}
@@ -2291,17 +2346,23 @@ export const ReportsView = ({
 
                           {/* 10. Status */}
                           <td className="py-3 px-3 align-top text-center whitespace-nowrap">
-                            <span
-                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                c.status === 'Closed' || c.status === 'Verified'
-                                  ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                  : c.status === 'CAP Submitted'
-                                  ? 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                                  : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                              }`}
-                            >
-                              {c.status}
-                            </span>
+                            {c.isDeleted ? (
+                              <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800">
+                                Deleted ({c.status})
+                              </span>
+                            ) : (
+                              <span
+                                className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                  c.status === 'Closed' || c.status === 'Verified'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                    : c.status === 'CAP Submitted'
+                                    ? 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                    : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                }`}
+                              >
+                                {c.status}
+                              </span>
+                            )}
                           </td>
 
                           {/* 11. Risk */}
@@ -2438,16 +2499,30 @@ export const ReportsView = ({
                             {deptComplaints.map((c, idx) => (
                               <tr
                                 key={c._id || c.id || c.complaintId || idx}
-                                className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                                className={`transition-colors ${
+                                  c.isDeleted
+                                    ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40'
+                                    : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                                }`}
                               >
                                 <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
                                   {idx + 1}
                                 </td>
                                 <td className="py-3 px-3 align-top font-mono font-bold text-indigo-600 dark:text-cyan-400 whitespace-nowrap">
-                                  {c.complaintId || 'NC-N/A'}
+                                  <div>{c.complaintId || 'NC-N/A'}</div>
+                                  {c.isDeleted && (
+                                    <span className="inline-block text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 mt-0.5">
+                                      Deleted
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
-                                  {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                                  <div>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}</div>
+                                  {c.isDeleted && (
+                                    <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5">
+                                      Del: {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : 'N/A'}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="py-3 px-3 align-top whitespace-nowrap text-slate-700 dark:text-slate-300">
                                   {c.location || '—'}
@@ -2472,15 +2547,21 @@ export const ReportsView = ({
                                   {c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A'}
                                 </td>
                                 <td className="py-3 px-3 align-top text-center whitespace-nowrap">
-                                  <span
-                                    className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                      c.status === 'Closed' || c.status === 'Verified'
-                                        ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                        : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                    }`}
-                                  >
-                                    {c.status}
-                                  </span>
+                                  {c.isDeleted ? (
+                                    <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800">
+                                      Deleted ({c.status})
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                        c.status === 'Closed' || c.status === 'Verified'
+                                          ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                          : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                      }`}
+                                    >
+                                      {c.status}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="py-3 px-3 align-top text-center whitespace-nowrap">
                                   <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -2977,18 +3058,32 @@ export const ReportsView = ({
                     {activeMemberComplaints.map((c, idx) => (
                       <tr
                         key={c._id || c.id || c.complaintId || idx}
-                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        className={`transition-colors ${
+                          c.isDeleted
+                            ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40'
+                            : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                        }`}
                       >
                         <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
                           {idx + 1}
                         </td>
 
                         <td className="py-3 px-3 align-top font-mono font-bold text-indigo-600 dark:text-cyan-400 whitespace-nowrap">
-                          {c.complaintId || 'NC-N/A'}
+                          <div>{c.complaintId || 'NC-N/A'}</div>
+                          {c.isDeleted && (
+                            <span className="inline-block text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 mt-0.5">
+                              Deleted
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                          <div>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}</div>
+                          {c.isDeleted && (
+                            <div className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5">
+                              Del: {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : 'N/A'}
+                            </div>
+                          )}
                         </td>
 
                         <td className="py-3 px-3 align-top whitespace-nowrap text-slate-700 dark:text-slate-300">
@@ -3027,15 +3122,21 @@ export const ReportsView = ({
                         </td>
 
                         <td className="py-3 px-3 align-top text-center whitespace-nowrap">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                              c.status === 'Closed' || c.status === 'Verified'
-                                ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                            }`}
-                          >
-                            {c.status}
-                          </span>
+                          {c.isDeleted ? (
+                            <span className="inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800">
+                              Deleted ({c.status})
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                c.status === 'Closed' || c.status === 'Verified'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                  : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                              }`}
+                            >
+                              {c.status}
+                            </span>
+                          )}
                         </td>
 
                         <td className="py-3 px-3 align-top text-center whitespace-nowrap">
@@ -3169,13 +3270,17 @@ export const ReportsView = ({
                   </span>
                   <span
                     className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      drilldownComplaint.status === 'Closed' ||
-                      drilldownComplaint.status === 'Verified'
+                      drilldownComplaint.isDeleted
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-200 border border-rose-300 dark:border-rose-800'
+                        : drilldownComplaint.status === 'Closed' ||
+                          drilldownComplaint.status === 'Verified'
                         ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-amber-100 text-amber-700'
                     }`}
                   >
-                    {drilldownComplaint.status}
+                    {drilldownComplaint.isDeleted
+                      ? `Deleted (${drilldownComplaint.status})`
+                      : drilldownComplaint.status}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700">
                     Risk: {(drilldownComplaint.priority || drilldownComplaint.riskSeverity || 'MEDIUM').toUpperCase()}
@@ -3197,6 +3302,30 @@ export const ReportsView = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Archived Alert Banner if Deleted */}
+            {drilldownComplaint.isDeleted && (
+              <div className="p-4 rounded-2xl bg-rose-50/90 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-800 text-xs text-rose-900 dark:text-rose-200 space-y-1.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-rose-800 dark:text-rose-200 text-sm">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                  <span>ARCHIVED RECORD • SOFT-DELETED NON-CONFORMANCE</span>
+                </div>
+                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                  Deleted on{' '}
+                  <strong className="font-mono text-slate-900 dark:text-white">
+                    {drilldownComplaint.deletedAt ? new Date(drilldownComplaint.deletedAt).toLocaleString() : 'N/A'}
+                  </strong>{' '}
+                  by{' '}
+                  <strong className="text-slate-900 dark:text-white">
+                    {typeof drilldownComplaint.deletedBy === 'object'
+                      ? drilldownComplaint.deletedBy?.name
+                      : (drilldownComplaint.deletedBy || 'System')}
+                  </strong>
+                  {drilldownComplaint.deletedReason ? ` • Reason: "${drilldownComplaint.deletedReason}"` : ''}.
+                  All non-conformance details, photos, department info, assigned employee, root cause, and CAP details are permanently preserved.
+                </p>
+              </div>
+            )}
 
             {/* Stage 1: Finding & Occurrence Frequency */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

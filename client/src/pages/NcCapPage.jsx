@@ -98,7 +98,10 @@ export const NcCapPage = () => {
     const cleanSearch = searchTerm.trim().toLowerCase();
 
     return complaints.filter((c) => {
-      // 0. Strict Personal Assignment Isolation for Supervisor
+      // 0. Exclude archived / soft-deleted records from active NC/CAP workflow page
+      if (c.isDeleted) return false;
+
+      // Strict Personal Assignment Isolation for Supervisor
       if (isSupervisor) {
         const cEmp = (c.assignedTo?.employeeId || '').toUpperCase();
         const cUser = String(c.assignedTo?.userId || '');

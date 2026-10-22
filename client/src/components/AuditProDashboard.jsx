@@ -105,9 +105,14 @@ export const AuditProDashboard = ({
     return 'All Time History (Live)';
   }, [dateRangePreset]);
 
+  // Active Floor Complaints (excludes archived / soft-deleted records)
+  const activeComplaints = useMemo(() => {
+    return (complaints || []).filter((c) => !c.isDeleted);
+  }, [complaints]);
+
   // Filtered Complaints based on Date Range and Search Query
   const filteredComplaints = useMemo(() => {
-    let list = complaints;
+    let list = activeComplaints;
     const now = new Date();
 
     if (dateRangePreset === 'THIS_MONTH') {
@@ -135,7 +140,7 @@ export const AuditProDashboard = ({
     }
 
     return list;
-  }, [complaints, dateRangePreset, searchQuery]);
+  }, [activeComplaints, dateRangePreset, searchQuery]);
 
   // ---------------------------------------------------------------------------
   // 1. TOP 8 NC & CAP METRICS (100% Dynamic from live records)
@@ -193,7 +198,7 @@ export const AuditProDashboard = ({
       const year = d.getFullYear();
       const monthIndex = d.getMonth();
 
-      const monthComplaints = complaints.filter((c) => {
+      const monthComplaints = activeComplaints.filter((c) => {
         const date = new Date(c.createdAt || now);
         return date.getFullYear() === year && date.getMonth() === monthIndex;
       });
@@ -215,7 +220,7 @@ export const AuditProDashboard = ({
     }
 
     return months;
-  }, [complaints]);
+  }, [activeComplaints]);
 
   // ---------------------------------------------------------------------------
   // 3. NC SEVERITY BREAKDOWN (Dynamically computed from complaints)
@@ -375,7 +380,7 @@ export const AuditProDashboard = ({
     const list = [];
     const today = new Date();
 
-    complaints.forEach((c) => {
+    activeComplaints.forEach((c) => {
       const isClosed = ['Closed', 'Verified'].includes(c.status);
       const isPendingCAP = ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework'].includes(c.status);
       const deadline = c.deadlineTimestamp ? new Date(c.deadlineTimestamp) : c.dueDate ? new Date(c.dueDate) : null;
@@ -427,7 +432,7 @@ export const AuditProDashboard = ({
         item.type.toLowerCase().includes(q) ||
         item.title.toLowerCase().includes(q)
     );
-  }, [complaints, searchQuery]);
+  }, [activeComplaints, searchQuery]);
 
   // ---------------------------------------------------------------------------
   // 7. DEPARTMENT-WISE NCs HORIZONTAL BARS (Dynamic from live complaints)
@@ -467,7 +472,7 @@ export const AuditProDashboard = ({
   const recentActivities = useMemo(() => {
     const activities = [];
 
-    complaints.forEach((c) => {
+    activeComplaints.forEach((c) => {
       const createdDate = c.createdAt ? new Date(c.createdAt) : null;
       if (createdDate) {
         activities.push({
@@ -525,7 +530,7 @@ export const AuditProDashboard = ({
 
     activities.sort((a, b) => b.timestamp - a.timestamp);
     return activities.slice(0, 5);
-  }, [complaints]);
+  }, [activeComplaints]);
 
   // Format relative timestamp
   const formatRelativeTime = (date) => {
@@ -568,7 +573,7 @@ export const AuditProDashboard = ({
 
     // 2. Highest NC department
     const deptCounts = {};
-    complaints.forEach((c) => {
+    activeComplaints.forEach((c) => {
       const dept = c.department || 'General';
       deptCounts[dept] = (deptCounts[dept] || 0) + 1;
     });
@@ -576,7 +581,7 @@ export const AuditProDashboard = ({
 
     if (sortedDepts.length > 0 && sortedDepts[0][1] > 0) {
       const [topDept, topCount] = sortedDepts[0];
-      const pct = complaints.length > 0 ? Math.round((topCount / complaints.length) * 100) : 0;
+      const pct = activeComplaints.length > 0 ? Math.round((topCount / activeComplaints.length) * 100) : 0;
       insights.push({
         id: 'ins-2',
         title: `${topDept} has highest NC volume`,
