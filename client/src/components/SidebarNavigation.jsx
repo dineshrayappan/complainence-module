@@ -9,7 +9,6 @@ import {
   X,
   Activity,
   Building2,
-  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -101,19 +100,6 @@ export const SidebarNavigation = ({
           badge: counts.deptCount ? String(counts.deptCount) : null,
           badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
         },
-        ...(isAuditor && !isAdmin
-          ? [
-              {
-                id: 'auditor',
-                path: '/compliance/auditor',
-                label: 'Auditor Oversight',
-                icon: ShieldCheck,
-                badge: 'Audit',
-                badgeColor:
-                  'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
-              },
-            ]
-          : []),
         { isDivider: true },
         {
           id: 'reports',
@@ -195,12 +181,6 @@ export const SidebarNavigation = ({
         currentPath.startsWith('/compliance/settings') ||
         currentPath.startsWith('/settings') ||
         currentPath.startsWith('/admin')
-      );
-    }
-    if (item.id === 'auditor') {
-      return (
-        currentPath.startsWith('/compliance/auditor') ||
-        currentPath.startsWith('/auditor')
       );
     }
     if (currentSection) {

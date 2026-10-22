@@ -23,7 +23,7 @@ export const DashboardPage = () => {
     } else if (sec === 'settings' || sec === 'admin') {
       navigate('/compliance/admin');
     } else if (sec === 'auditor') {
-      navigate('/compliance/auditor');
+      navigate('/compliance/dashboard');
     } else {
       navigate(`/compliance/${sec.replace(/^\//, '')}`);
     }

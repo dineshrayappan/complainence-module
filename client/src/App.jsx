@@ -509,7 +509,7 @@ export const App = () => {
       <Route path="/login" element={<Navigate to="/compliance/login" replace />} />
       <Route path="/admin" element={<Navigate to="/compliance/admin" replace />} />
       <Route path="/admin/*" element={<Navigate to="/compliance/admin" replace />} />
-      <Route path="/auditor" element={<Navigate to="/compliance/auditor" replace />} />
+      <Route path="/auditor" element={<Navigate to="/compliance/dashboard" replace />} />
       <Route path="/departments" element={<Navigate to="/compliance/department" replace />} />
       <Route path="/department" element={<Navigate to="/compliance/department" replace />} />
       <Route path="/reports" element={<Navigate to="/compliance/reports" replace />} />
@@ -557,15 +557,8 @@ export const App = () => {
         <Route path="settings" element={<Navigate to="/compliance/admin" replace />} />
         <Route path="admin/users" element={<Navigate to="/compliance/admin" replace />} />
 
-        {/* Auditor Route: /compliance/auditor */}
-        <Route
-          path="auditor"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
+        {/* Auditor Route alias -> Dashboard */}
+        <Route path="auditor" element={<Navigate to="/compliance/dashboard" replace />} />
 
         {/* Department Route: /compliance/department (and /compliance/departments alias) */}
         <Route
