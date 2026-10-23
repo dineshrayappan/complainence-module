@@ -20,7 +20,7 @@ const getDepartments = async (req, res) => {
     if (isMongoConnected()) {
       try {
         const dbDepts = await Department.find().sort({ name: 1 }).lean();
-        if (Array.isArray(dbDepts) && dbDepts.length > 0) {
+        if (Array.isArray(dbDepts)) {
           departments = dbDepts.map((d) => ({
             ...d,
             id: d._id.toString(),
@@ -29,9 +29,7 @@ const getDepartments = async (req, res) => {
       } catch (err) {
         console.warn('[getDepartments] MongoDB query notice:', err.message);
       }
-    }
-
-    if (departments.length === 0) {
+    } else {
       departments = mockStore.getDepartments();
     }
 

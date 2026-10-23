@@ -243,8 +243,7 @@ const getTasks = async (req, res) => {
         const cData = await Complaint.find().sort({ createdAt: -1 }).lean();
         if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {}
-    }
-    if (!complaints || complaints.length === 0) {
+    } else {
       complaints = mockStore.getComplaints();
     }
 

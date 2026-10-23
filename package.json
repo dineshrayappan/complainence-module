@@ -12,7 +12,6 @@
     "server": "npm --prefix server run dev",
     "client": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
-    "seed": "npm --prefix server run seed",
     "setup:owner": "npm --prefix server run setup:owner",
     "docs:pdf": "node scripts/generate_project_documentation_pdf.js",
     "install:all": "npm install"

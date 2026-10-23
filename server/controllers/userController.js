@@ -64,7 +64,7 @@ const getLineSupervisors = async (req, res) => {
           .sort({ department: 1, name: 1 })
           .lean();
 
-        if (data && data.length > 0) {
+        if (data) {
           const supervisors = data.map((u) => formatUser(u, attendanceMap, todayDate));
           return res.status(200).json({
             success: true,
@@ -110,6 +110,7 @@ const getAllUsers = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
+        const query = {};
         const isRequestingOwner = req.user?.role === 'OWNER' || req.user?.isOwner;
         if (!isRequestingOwner) {
           query.role = query.role ? query.role : { $ne: 'OWNER' };
@@ -955,7 +956,7 @@ const getArchivedUsers = async (req, res) => {
       }
     }
 
-    if (!archivedUsers || archivedUsers.length === 0) {
+    if (!isMongoConnected() && (!archivedUsers || archivedUsers.length === 0)) {
       archivedUsers = mockStore.getUsers(true).filter((u) => u.isDeleted);
     }
 

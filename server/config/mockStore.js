@@ -2,25 +2,11 @@
 const bcrypt = require('bcryptjs');
 const { toBase64DataUrl } = require('../utils/base64Helper');
 
-const initialUsers = [
-  {
-    _id: 'admin-001',
-    id: 'admin-001',
-    employeeId: 'ADM-001',
-    name: 'Administrator',
-    email: 'admin@factory.com',
-    password: bcrypt.hashSync('admin123', 10),
-    role: 'ADMIN',
-    department: 'Plant Operations & Executive Oversight',
-    designation: 'General Operations Director',
-    mobileNumber: '+91 98000 11223',
-    isActive: true,
-  },
-];
+const initialUsers = [];
 const initialComplaints = [];
 
-let mockUsers = [...initialUsers];
-let mockComplaints = [...initialComplaints];
+let mockUsers = [];
+let mockComplaints = [];
 
 
 module.exports = {
@@ -580,15 +566,7 @@ module.exports = {
   },
 };
 
-let mockDepartments = [
-  { id: 'dept-01', name: 'Production', code: 'PROD', manager: 'Rajesh Kumar', headcount: 280 },
-  { id: 'dept-02', name: 'Quality', code: 'QA', manager: 'Kavita Nair', headcount: 35 },
-  { id: 'dept-03', name: 'Maintenance', code: 'MAINT', manager: 'Vikram Singh', headcount: 22 },
-  { id: 'dept-04', name: 'Store', code: 'STORE', manager: 'Ramesh Patel', headcount: 18 },
-  { id: 'dept-05', name: 'EHS', code: 'EHS', manager: 'Sunil Verma', headcount: 12 },
-  { id: 'dept-06', name: 'EDP', code: 'EDP', manager: 'Deepak Joshi', headcount: 8 },
-  { id: 'dept-07', name: 'HR', code: 'HR', manager: 'Meera Swaminathan', headcount: 15 },
-];
+let mockDepartments = [];
 
 let mockAttendance = [];
 
@@ -596,211 +574,7 @@ let mockTasks = [];
 
 let mockAudits = [];
 
-const seedTime = Date.now();
-let mockAuditLogs = [
-  {
-    id: 'evt-seed-01',
-    user_id: 'ADMIN',
-    user_name: 'Administrator',
-    user_role: 'ADMIN',
-    action: 'AUTH_LOGIN_SUCCESS',
-    action_label: 'User Sign In',
-    category: 'AUTH',
-    severity: 'SUCCESS',
-    entity_type: 'USER',
-    entity_id: 'ADMIN',
-    entity_name: 'Administrator',
-    details: 'Administrator (ADMIN - Operations Director) authenticated successfully via Web Console.',
-    ip_address: '192.168.1.100',
-    is_immutable: true,
-    created_at: new Date(seedTime - 12 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-02',
-    user_id: 'AUD-001',
-    user_name: 'Kavita Nair',
-    user_role: 'AUDITOR',
-    action: 'AUTH_LOGIN_SUCCESS',
-    action_label: 'User Sign In',
-    category: 'AUTH',
-    severity: 'SUCCESS',
-    entity_type: 'USER',
-    entity_id: 'AUD-001',
-    entity_name: 'Kavita Nair',
-    details: 'QA Lead Auditor Kavita Nair signed in to conduct daily floor audits.',
-    ip_address: '192.168.1.104',
-    is_immutable: true,
-    created_at: new Date(seedTime - 45 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-03',
-    user_id: 'AUD-001',
-    user_name: 'Kavita Nair',
-    user_role: 'AUDITOR',
-    action: 'NC_CREATED',
-    action_label: 'Non-Conformance Raised',
-    category: 'NC_DEFECT',
-    severity: 'WARNING',
-    entity_type: 'NC',
-    entity_id: 'NC-2026-001',
-    entity_name: 'Skipped Stitches on Hemline',
-    related_nc_id: 'NC-2026-001',
-    details: 'Critical seam slippage detected at Line 2 Sewing section during pre-final audit inspection.',
-    ip_address: '192.168.1.104',
-    is_immutable: true,
-    created_at: new Date(seedTime - 38 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-04',
-    user_id: 'SUP-101',
-    user_name: 'Rajesh Kumar',
-    user_role: 'ACTION_PERSON',
-    action: 'AUTH_LOGIN_SUCCESS',
-    action_label: 'User Sign In',
-    category: 'AUTH',
-    severity: 'SUCCESS',
-    entity_type: 'USER',
-    entity_id: 'SUP-101',
-    entity_name: 'Rajesh Kumar',
-    details: 'Line Supervisor Rajesh Kumar logged in from Sewing floor terminal.',
-    ip_address: '192.168.1.112',
-    is_immutable: true,
-    created_at: new Date(seedTime - 35 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-05',
-    user_id: 'SUP-101',
-    user_name: 'Rajesh Kumar',
-    user_role: 'ACTION_PERSON',
-    action: 'NC_IN_PROGRESS',
-    action_label: 'Rework Started',
-    category: 'NC_DEFECT',
-    severity: 'INFO',
-    entity_type: 'NC',
-    entity_id: 'NC-2026-001',
-    related_nc_id: 'NC-2026-001',
-    details: 'Rework initiated: Needle replacement and tension gauge calibration started on machine SN-402.',
-    ip_address: '192.168.1.112',
-    is_immutable: true,
-    created_at: new Date(seedTime - 25 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-06',
-    user_id: 'ADMIN',
-    user_name: 'Administrator',
-    user_role: 'ADMIN',
-    action: 'USER_CREATED',
-    action_label: 'Personnel Onboarded',
-    category: 'USER_MGMT',
-    severity: 'SUCCESS',
-    entity_type: 'USER',
-    entity_id: 'SUP-102',
-    entity_name: 'Anand Verma',
-    details: 'New Line Supervisor Anand Verma onboarded for Cutting department.',
-    ip_address: '192.168.1.100',
-    is_immutable: true,
-    created_at: new Date(seedTime - 180 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-07',
-    user_id: 'SYSTEM',
-    user_name: 'QMS Engine',
-    user_role: 'SYSTEM',
-    action: 'SYSTEM_STARTUP',
-    action_label: 'System Initialized',
-    category: 'SYSTEM',
-    severity: 'INFO',
-    entity_type: 'SYSTEM',
-    details: 'Textile QMS Engine online. SLA deadline monitors and audit ledger active.',
-    ip_address: '127.0.0.1',
-    is_immutable: true,
-    created_at: new Date(seedTime - 360 * 60 * 1000),
-  },
-  {
-    id: 'evt-seed-08',
-    user_id: 'ADMIN',
-    user_name: 'Administrator',
-    user_role: 'ADMIN',
-    action: 'NC_DELETED',
-    action_label: 'Defect Record Deleted',
-    category: 'COMPLAINT',
-    severity: 'CRITICAL',
-    entity_type: 'COMPLAINT',
-    entity_id: 'NC-2026-0042',
-    entity_name: 'Broken Needle In Hemline',
-    related_nc_id: 'NC-2026-0042',
-    details: 'Record NC-2026-0042 ("Broken Needle In Hemline") was permanently deleted by Administrator (ADMIN • General Operations Director). Department: Sewing, Buyer: Zara. Reason: Duplicate log submitted during shift handover.',
-    ip_address: '192.168.1.100',
-    is_immutable: true,
-    created_at: new Date(seedTime - 95 * 60 * 1000),
-    payload: {
-      deletedBy: { name: 'Administrator', employeeId: 'ADMIN', role: 'ADMIN' },
-      deletedRecord: {
-        complaintId: 'NC-2026-0042',
-        title: 'Broken Needle In Hemline',
-        department: 'Sewing',
-        buyer: 'Zara',
-        severity: 'Major',
-        stage: 'Sewing Line 3',
-      },
-      reason: 'Duplicate log submitted during shift handover',
-    },
-  },
-  {
-    id: 'evt-seed-09',
-    user_id: 'ADMIN',
-    user_name: 'Administrator',
-    user_role: 'ADMIN',
-    action: 'USER_DELETED',
-    action_label: 'User Account Deleted',
-    category: 'USER_MGMT',
-    severity: 'CRITICAL',
-    entity_type: 'USER',
-    entity_id: 'SUP-099',
-    entity_name: 'Vikram Joshi',
-    details: 'User account \'Vikram Joshi\' (SUP-099 • Line Supervisor • Finishing) was permanently deleted by Administrator (ADMIN • Operations Director). Notice: Employee resigned, pending responsibilities handed over to Rajesh Kumar.',
-    ip_address: '192.168.1.100',
-    is_immutable: true,
-    created_at: new Date(seedTime - 140 * 60 * 1000),
-    payload: {
-      deletedBy: { name: 'Administrator', employeeId: 'ADMIN', role: 'ADMIN' },
-      deletedUser: {
-        name: 'Vikram Joshi',
-        employeeId: 'SUP-099',
-        role: 'ACTION_PERSON',
-        department: 'Finishing',
-        designation: 'Finishing Line Supervisor',
-      },
-      reason: 'Resignation & Department Handover',
-    },
-  },
-  {
-    id: 'evt-seed-10',
-    user_id: 'AUD-001',
-    user_name: 'Kavita Nair',
-    user_role: 'AUDITOR',
-    action: 'AUTH_LOGOUT',
-    action_label: 'User Sign Out',
-    category: 'AUTH',
-    severity: 'INFO',
-    entity_type: 'USER',
-    entity_id: 'AUD-001',
-    entity_name: 'Kavita Nair',
-    details: 'User Kavita Nair (AUD-001) signed out at 01:30 PM. (Login Time: 09:15 AM • Logout Time: 01:30 PM • Session Duration: 4h 15m). Morning shift quality audit complete.',
-    ip_address: '192.168.1.104',
-    is_immutable: true,
-    created_at: new Date(seedTime - 18 * 60 * 1000),
-    payload: {
-      loginTimestamp: new Date(seedTime - 273 * 60 * 1000).toISOString(),
-      logoutTimestamp: new Date(seedTime - 18 * 60 * 1000).toISOString(),
-      loginTimeIST: '09:15 AM',
-      logoutTimeIST: '01:30 PM',
-      sessionDuration: '4h 15m',
-      department: 'Quality',
-      designation: 'QA Lead Auditor',
-    },
-  },
-];
+let mockAuditLogs = [];
 
 let complianceThresholds = {
   highThreshold: 90,     // >= 90% is Green

@@ -8,7 +8,9 @@ const api = axios.create({
 // Attach JWT token automatically to every outgoing request
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('garment_qms_token');
+    const token =
+      (typeof window !== 'undefined' && window.sessionStorage?.getItem('garment_qms_token')) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('garment_qms_token'));
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

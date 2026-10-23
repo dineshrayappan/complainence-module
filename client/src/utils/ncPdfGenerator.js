@@ -205,8 +205,8 @@ export const getPdfImageSafe = async (rawSrc) => {
 
   // B. HTTP/HTTPS or relative URLs: Retrieve via fetch with auth headers or fallback to Image element
   const authHeader = {};
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const token = localStorage.getItem('garment_qms_token');
+  if (typeof window !== 'undefined') {
+    const token = window.sessionStorage?.getItem('garment_qms_token') || window.localStorage?.getItem('garment_qms_token');
     if (token) {
       authHeader['Authorization'] = `Bearer ${token}`;
     }
