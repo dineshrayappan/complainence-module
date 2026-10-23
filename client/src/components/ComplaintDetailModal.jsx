@@ -580,7 +580,7 @@ export const ComplaintDetailModal = ({
                       value={reassignSearch}
                       onChange={(e) => setReassignSearch(e.target.value)}
                       placeholder="Search supervisor by name, line, or ID..."
-                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     />
                   </div>
 

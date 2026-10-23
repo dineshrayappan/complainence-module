@@ -34,10 +34,13 @@
     --text-muted: #94a3b8;
   }
 
-  *,
-  ::before,
-  ::after {
-    font-family: 'Calibri', 'Carlito', Candara, 'Segoe UI', Optima, Arial, sans-serif;
+  .dark {
+    --bg-page: #0b1120;
+    --bg-card: #0f172a;
+    --border-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
   }
 
   html,
@@ -58,7 +61,7 @@
   optgroup,
   select,
   textarea {
-    font-family: 'Calibri', 'Carlito', Candara, 'Segoe UI', Optima, Arial, sans-serif;
+    font-family: inherit;
   }
 
   .font-mono,
@@ -66,7 +69,7 @@
   kbd,
   samp,
   pre {
-    font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace !important;
+    font-family: 'JetBrains Mono', Consolas, 'Courier New', monospace;
   }
 }
 
@@ -117,6 +120,11 @@
 .qms-card:hover {
   border-color: #cbd5e1;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+}
+
+.dark .qms-card:hover {
+  border-color: #334155;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
 }
 
 /* Ensure mobile touch targets */
