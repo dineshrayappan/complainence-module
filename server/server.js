@@ -17,6 +17,9 @@ const auditLogRoutes = require('./routes/auditLogRoutes');
 
 const app = express();
 
+// Disable ETag generation so browser always receives 200 OK with fresh data instead of 304 Not Modified
+app.set('etag', false);
+
 // Enable CORS for frontend
 app.use(
   cors({
@@ -75,8 +78,11 @@ const ensureDBConnected = async () => {
   return connectingPromise;
 };
 
-// Ensure DB is ready on incoming API requests
+// Ensure DB is ready on incoming API requests and prevent browser 304 caching
 app.use('/api', async (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   try {
     await ensureDBConnected();
     next();
