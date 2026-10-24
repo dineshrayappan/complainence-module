@@ -42,7 +42,7 @@ const getDepartments = async (req, res) => {
       try {
         const [uRes, cRes, tRes] = await Promise.all([
           User.find({ isActive: true }).select('department').lean(),
-          Complaint.find({ status: { $nin: ['Closed', 'Verified'] } }).select('department status').lean(),
+          Complaint.find({ status: { $nin: ['Closed', 'Verified'] }, isDeleted: { $ne: true } }).select('department status').lean(),
           ComplianceTask.find({ status: { $ne: 'Completed' } }).select('department status').lean(),
         ]);
         usersList = uRes || [];
@@ -149,6 +149,7 @@ const checkDepartmentDependencies = async (req, res) => {
 
         const complaints = await Complaint.find({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
+          isDeleted: { $ne: true },
         }).lean();
         complaints.forEach((c) => {
           if (c.status === 'Closed' || c.status === 'Verified') historicalNCs++;

@@ -68,6 +68,7 @@ export const ComplaintDetailModal = ({
   // Live work operations state
   const [startingWork, setStartingWork] = useState(false);
   const [pausingWork, setPausingWork] = useState(false);
+  const [workFeedback, setWorkFeedback] = useState(null);
   // PDF Export state
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 

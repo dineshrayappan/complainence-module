@@ -715,6 +715,7 @@ const checkUserDependencies = async (req, res) => {
             { 'assignedTo.userId': uId },
             { 'assignedTo.employeeId': uEmp },
           ],
+          isDeleted: { $ne: true },
         }).lean();
         complaints.forEach((c) => {
           if (['Closed', 'Verified'].includes(c.status)) historicalNCs++;

@@ -240,11 +240,11 @@ const getTasks = async (req, res) => {
     let complaints = [];
     if (isMongoConnected()) {
       try {
-        const cData = await Complaint.find().sort({ createdAt: -1 }).lean();
+        const cData = await Complaint.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
         if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {}
     } else {
-      complaints = mockStore.getComplaints();
+      complaints = mockStore.getComplaints().filter((c) => !c.isDeleted);
     }
 
     const ncTasks = complaints.map((c) => {
@@ -1046,14 +1046,14 @@ const getEmployeeWorkStatus = async (req, res) => {
     let allComplaints = [];
     if (isMongoConnected()) {
       try {
-        const dbComplaints = await Complaint.find().lean();
+        const dbComplaints = await Complaint.find({ isDeleted: { $ne: true } }).lean();
         if (dbComplaints) allComplaints = dbComplaints.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] complaints fetch fallback:', e.message);
       }
     }
     if (!allComplaints || allComplaints.length === 0) {
-      allComplaints = mockStore.getComplaints();
+      allComplaints = mockStore.getComplaints().filter((c) => !c.isDeleted);
     }
 
     // Filter by department if specified

@@ -1577,7 +1577,7 @@ const getKpiStats = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        const query = {};
+        const query = { isDeleted: { $ne: true } };
 
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
           const userEmpId = (req.user.employeeId || '').toUpperCase();
@@ -1594,7 +1594,7 @@ const getKpiStats = async (req, res) => {
           }
         }
 
-        const allComplaints = await Complaint.find(query).select('status deadlineTimestamp assignedTo department').lean();
+        const allComplaints = await Complaint.find(query).select('status deadlineTimestamp assignedTo department isDeleted').lean();
 
         if (allComplaints) {
           const draftTickets = allComplaints.filter((c) => c.status === 'Draft').length;
@@ -1645,7 +1645,7 @@ const getKpiStats = async (req, res) => {
       }
     }
 
-    const allComplaints = mockStore.getComplaints();
+    const allComplaints = mockStore.getComplaints().filter((c) => !c.isDeleted);
     const draftTickets = allComplaints.filter((c) => c.status === 'Draft').length;
     const openTickets = allComplaints.filter((c) => ['Open', 'Assigned', 'In Progress'].includes(c.status)).length;
     const capSubmitted = allComplaints.filter((c) => ['CAP Submitted', 'Under Verification'].includes(c.status)).length;
@@ -1717,7 +1717,7 @@ const getAdminOversightStats = async (req, res) => {
     if (isMongoConnected()) {
       try {
         const [complaintsDocs, usersDocs] = await Promise.all([
-          Complaint.find().sort({ createdAt: -1 }).lean(),
+          Complaint.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
           User.find({ isActive: true }).lean(),
         ]);
 
@@ -2183,7 +2183,7 @@ const getDepartmentComplianceStats = async (req, res) => {
     // Fetch complaints from MongoDB if connected
     if (isMongoConnected()) {
       try {
-        const dbTickets = await Complaint.find().sort({ createdAt: -1 }).lean();
+        const dbTickets = await Complaint.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
         if (Array.isArray(dbTickets)) {
           allComplaints = dbTickets.map(formatComplaintOutput);
         }
@@ -2504,7 +2504,7 @@ const getAudits = async (req, res) => {
       try {
         const [auditsDocs, complaintsDocs] = await Promise.all([
           Audit.find().sort({ createdAt: -1 }).lean(),
-          Complaint.find().select('status').lean(),
+          Complaint.find({ isDeleted: { $ne: true } }).select('status').lean(),
         ]);
         if (auditsDocs) {
           audits = auditsDocs.map((a) => ({ ...a, id: a._id.toString(), _id: a._id.toString() }));

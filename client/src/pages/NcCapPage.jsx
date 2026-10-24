@@ -90,6 +90,20 @@ export const NcCapPage = () => {
     updateQueryParam('view', mode);
   };
 
+  // Synchronized active metrics prioritizing derivedCounts so KPI cards match displayed NC defects exactly
+  const activeMetrics = useMemo(() => {
+    return {
+      ...metrics,
+      ...derivedCounts,
+      open: derivedCounts?.open ?? metrics?.open ?? 0,
+      capSubmitted: derivedCounts?.capSubmitted ?? metrics?.capSubmitted ?? 0,
+      underReview: derivedCounts?.underReview ?? metrics?.underReview ?? 0,
+      overdueCount: derivedCounts?.overdueCount ?? metrics?.overdueCount ?? 0,
+      closed: derivedCounts?.closed ?? metrics?.closed ?? 0,
+      verified: derivedCounts?.verified ?? metrics?.verified ?? 0,
+    };
+  }, [metrics, derivedCounts]);
+
   // Instant client-side filtering matching existing business logic
   const displayedComplaints = useMemo(() => {
     const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR';
@@ -230,7 +244,7 @@ export const NcCapPage = () => {
       </div>
 
       {/* KPI Metric Cards */}
-      <KpiMetrics metrics={metrics} onSelectTab={handleTabChange} />
+      <KpiMetrics metrics={activeMetrics} onSelectTab={handleTabChange} />
 
       {/* Filters & Search Navigation */}
       <ComplaintFilters

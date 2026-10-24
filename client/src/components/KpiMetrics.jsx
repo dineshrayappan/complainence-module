@@ -21,33 +21,44 @@ export const KpiMetrics = ({ metrics, onSelectTab }) => {
     },
     {
       title: 'CAP Submitted / Review',
-      value: (metrics?.capSubmitted ?? 0) + (metrics?.underReview ?? 0) || (metrics?.underVerification ?? 0),
+      value:
+        (metrics?.capSubmitted !== undefined || metrics?.underReview !== undefined)
+          ? (Number(metrics?.capSubmitted) || 0) + (Number(metrics?.underReview) || 0)
+          : (Number(metrics?.underVerification) || 0),
       subtext: 'Awaiting Audit Review & Verification',
       icon: ClipboardCheck,
       tabKey: 'cap-submitted',
       iconBg: 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
-      badgeText: ((metrics?.capSubmitted ?? 0) + (metrics?.underReview ?? 0) || (metrics?.underVerification ?? 0)) > 0 ? 'Action Req' : null,
+      badgeText:
+        ((metrics?.capSubmitted !== undefined || metrics?.underReview !== undefined)
+          ? (Number(metrics?.capSubmitted) || 0) + (Number(metrics?.underReview) || 0)
+          : (Number(metrics?.underVerification) || 0)) > 0
+          ? 'Action Req'
+          : null,
       badgeColor: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
       borderStyle: 'border-slate-200 dark:border-slate-800 hover:border-amber-400 dark:hover:border-amber-500',
     },
     {
       title: 'Overdue Deadline Alerts',
-      value: metrics?.overdueCount ?? 0,
+      value: Number(metrics?.overdueCount) || 0,
       subtext: 'Exceeded SLA Window (Any Status)',
       icon: Flame,
       tabKey: 'all',
-      iconBg: metrics?.overdueCount > 0
+      iconBg: (Number(metrics?.overdueCount) || 0) > 0
         ? 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400'
         : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
-      badgeText: metrics?.overdueCount > 0 ? 'CRITICAL' : null,
+      badgeText: (Number(metrics?.overdueCount) || 0) > 0 ? 'CRITICAL' : null,
       badgeColor: 'bg-rose-600 text-white animate-pulse',
-      borderStyle: metrics?.overdueCount > 0
+      borderStyle: (Number(metrics?.overdueCount) || 0) > 0
         ? 'border-rose-300 dark:border-rose-600 bg-rose-50/40 dark:bg-rose-950/20'
         : 'border-slate-200 dark:border-slate-800',
     },
     {
       title: 'Verified & Closed NCs',
-      value: (metrics?.closed ?? 0) + (metrics?.verified ?? 0) || (metrics?.closedTickets ?? 0),
+      value:
+        (metrics?.closed !== undefined || metrics?.verified !== undefined)
+          ? (Number(metrics?.closed) || 0) + (Number(metrics?.verified) || 0)
+          : (Number(metrics?.closedTickets) || 0),
       subtext: 'Verified Effective & Sealed',
       icon: CheckCircle2,
       tabKey: 'closed',
