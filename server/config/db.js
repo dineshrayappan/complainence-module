@@ -51,6 +51,22 @@ const connectDB = async () => {
       console.warn('⚠️ [Database] Default admin user initialization notice:', adminErr.message);
     }
 
+    // Automatically ensure legacy unique index on email is dropped to permit duplicate email accounts
+    try {
+      const usersCol = mongoose.connection.db.collection('users');
+      const userIndexes = await usersCol.indexes();
+      const emailUniqueIdx = userIndexes.find(
+        (idx) => idx.name === 'email_1' && idx.unique === true
+      );
+      if (emailUniqueIdx) {
+        await usersCol.dropIndex('email_1');
+        console.log('✅ [Database] Dropped legacy unique index on email_1 to support duplicate emails');
+        await usersCol.createIndex({ email: 1 }, { background: true });
+      }
+    } catch (idxErr) {
+      console.warn('⚠️ [Database] Email index migration notice:', idxErr.message);
+    }
+
     // Automatically convert any legacy disk or non-base64 complaint photos to Base64 data URLs in database
     try {
       const Complaint = require('../models/Complaint');

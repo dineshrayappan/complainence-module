@@ -281,16 +281,6 @@ const createUser = async (req, res) => {
           });
         }
 
-        const existingEmail = await User.findOne({
-          email: new RegExp(`^${email.trim()}$`, 'i'),
-        });
-        if (existingEmail) {
-          return res.status(400).json({
-            success: false,
-            message: `Email address '${email.toLowerCase()}' is already registered in the system.`,
-          });
-        }
-
         const inserted = await User.create({
           employeeId: employeeId.trim().toUpperCase(),
           name: name.trim(),
@@ -346,14 +336,12 @@ const createUser = async (req, res) => {
 
     // Fallback in-memory
     const existing = mockStore.getUsers().find(
-      (u) =>
-        u.employeeId.toUpperCase() === employeeId.trim().toUpperCase() ||
-        u.email.toLowerCase() === email.trim().toLowerCase()
+      (u) => u.employeeId.toUpperCase() === employeeId.trim().toUpperCase()
     );
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: 'A user with this Employee ID or Email already exists.',
+        message: `A user with Employee ID '${employeeId.toUpperCase()}' already exists.`,
       });
     }
 

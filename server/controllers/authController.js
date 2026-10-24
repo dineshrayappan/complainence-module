@@ -99,7 +99,38 @@ const login = async (req, res) => {
           { employeeId: { $regex: new RegExp(`^${term}$`, 'i') } },
         ]);
 
-        const user = await User.findOne({ $or: orFilters });
+        const candidateUsers = await User.find({ $or: orFilters });
+        let user = null;
+
+        if (candidateUsers && candidateUsers.length > 0) {
+          // Sort candidates: prioritize matching expectedRole, non-deleted, and active users
+          const sorted = [...candidateUsers].sort((a, b) => {
+            if (expectedRole) {
+              const aMatch = a.role === expectedRole || (expectedRole === 'SUPERVISOR' && a.role === 'ACTION_PERSON');
+              const bMatch = b.role === expectedRole || (expectedRole === 'SUPERVISOR' && b.role === 'ACTION_PERSON');
+              if (aMatch && !bMatch) return -1;
+              if (!aMatch && bMatch) return 1;
+            }
+            if (a.isDeleted !== b.isDeleted) return a.isDeleted ? 1 : -1;
+            if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+            return 0;
+          });
+
+          // Test password against candidates to select the authentic user (supports duplicate email accounts)
+          for (const cand of sorted) {
+            if (cand.isDeleted) continue;
+            const isMatch = await cand.matchPassword(password);
+            if (isMatch) {
+              user = cand;
+              break;
+            }
+          }
+
+          // If no candidate matched password, pick first to produce accurate password rejection
+          if (!user && sorted.length > 0) {
+            user = sorted[0];
+          }
+        }
 
         if (user) {
           const isMatch = await user.matchPassword(password);
@@ -171,25 +202,36 @@ const login = async (req, res) => {
       }
     }
 
-    // 2. Fallback to mockStore
-    const user = mockStore.findUserByIdentifier(queryIdentifier);
-    if (!user) {
+    // 2. Fallback to mockStore (supporting candidate lookup for duplicate emails)
+    const candidateMockUsers = mockStore.findUsersByIdentifier
+      ? mockStore.findUsersByIdentifier(queryIdentifier)
+      : [mockStore.findUserByIdentifier(queryIdentifier)].filter(Boolean);
+
+    if (!candidateMockUsers || candidateMockUsers.length === 0) {
       return res.status(401).json({
         success: false,
         message: `Account '${queryIdentifier}' not found. Please check your credentials.`,
       });
     }
 
-    let isMatch = false;
-    if (user.password) {
-      if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
-        isMatch = await bcrypt.compare(password, user.password);
-      } else {
-        isMatch = user.password === password;
+    let user = null;
+    for (const cand of candidateMockUsers) {
+      if (cand.isDeleted) continue;
+      let isMatch = false;
+      if (cand.password) {
+        if (cand.password.startsWith('$2a$') || cand.password.startsWith('$2b$')) {
+          isMatch = await bcrypt.compare(password, cand.password);
+        } else {
+          isMatch = cand.password === password;
+        }
+      }
+      if (isMatch) {
+        user = cand;
+        break;
       }
     }
 
-    if (!isMatch) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials. Incorrect password.',
@@ -296,19 +338,13 @@ const register = async (req, res) => {
     if (isMongoConnected()) {
       try {
         const existing = await User.findOne({
-          $or: [
-            { email: email.trim().toLowerCase() },
-            { employeeId: employeeId.trim().toUpperCase() },
-          ],
+          employeeId: employeeId.trim().toUpperCase(),
         });
 
         if (existing) {
-          const isEmailMatch = existing.email.toLowerCase() === email.trim().toLowerCase();
           return res.status(400).json({
             success: false,
-            message: isEmailMatch
-              ? 'An account with this email address already exists.'
-              : 'An account with this Employee ID already exists.',
+            message: 'An account with this Employee ID already exists.',
           });
         }
 

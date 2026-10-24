@@ -424,20 +424,28 @@ export const AdminUserManagement = () => {
     );
   });
 
-  // Open Create Modal & reset form
+  // Open Create Modal & reset form (supports Auditor, Supervisor, and Administrator)
   const handleOpenCreateModal = (defaultRole = 'AUDITOR') => {
     const nextAuditorId = `AUD-00${auditorCount + 1}`;
     const nextSupervisorId = `SUP-10${supervisorCount + 1}`;
+    const nextAdminId = `ADM-00${adminCount + 1}`;
 
     const isAud = defaultRole === 'AUDITOR';
+    const isSup = defaultRole === 'SUPERVISOR';
+    const defaultDept = isAud
+      ? (availableDepartmentNames.includes('Quality') ? 'Quality' : availableDepartmentNames[0] || 'Quality')
+      : isSup
+      ? (availableDepartmentNames.includes('Production') ? 'Production' : availableDepartmentNames[0] || 'Production')
+      : (availableDepartmentNames.includes('EDP') ? 'EDP' : availableDepartmentNames[0] || 'EDP');
+
     setCreateForm({
       role: defaultRole,
       name: '',
-      employeeId: isAud ? nextAuditorId : nextSupervisorId,
+      employeeId: isAud ? nextAuditorId : isSup ? nextSupervisorId : nextAdminId,
       email: '',
       password: '',
-      department: isAud ? 'Quality' : 'Production',
-      designation: isAud ? 'QA Quality Auditor' : 'Production Supervisor',
+      department: defaultDept,
+      designation: isAud ? 'QA Quality Auditor' : isSup ? 'Production Supervisor' : 'System Administrator',
       mobileNumber: '+91 ',
     });
     setCreatedCredentials(null);
@@ -458,15 +466,15 @@ export const AdminUserManagement = () => {
         ? `SUP-10${supervisorCount + 1}`
         : `ADM-00${adminCount + 1}`,
       department: isAud
-        ? 'Quality'
+        ? (availableDepartmentNames.includes('Quality') ? 'Quality' : prev.department)
         : isSup
-        ? 'Production'
-        : 'Quality',
+        ? (availableDepartmentNames.includes('Production') ? 'Production' : prev.department)
+        : (availableDepartmentNames.includes('EDP') ? 'EDP' : prev.department),
       designation: isAud
         ? 'QA Quality Auditor'
         : isSup
         ? 'Production Supervisor'
-        : 'Operations Director',
+        : 'System Administrator',
     }));
   };
 
@@ -613,11 +621,19 @@ export const AdminUserManagement = () => {
             </h1>
           </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
-            Onboard new <strong>Internal Auditors</strong> and <strong>Line Supervisors</strong>, manage credentials, reset passwords, and control department assignments.
+            Onboard new <strong>Administrators</strong>, <strong>Internal Auditors</strong>, and <strong>Line Supervisors</strong>, manage credentials, reset passwords, and control department assignments.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <button
+            onClick={() => handleOpenCreateModal('ADMIN')}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition-all hover:scale-102 cursor-pointer whitespace-nowrap"
+          >
+            <UserCog className="w-4 h-4" />
+            <span>+ Add Admin</span>
+          </button>
+
           <button
             onClick={() => handleOpenCreateModal('AUDITOR')}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-purple-600/20 transition-all hover:scale-102 cursor-pointer whitespace-nowrap"
@@ -1388,7 +1404,7 @@ export const AdminUserManagement = () => {
                     Onboard Factory Personnel
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Create credentials for newly joined Auditor or Supervisor
+                    Create credentials for newly joined Administrator, Auditor, or Supervisor
                   </p>
                 </div>
               </div>
@@ -1479,36 +1495,49 @@ export const AdminUserManagement = () => {
                   </div>
                 )}
 
-                {/* Role Selector Tabs */}
+                {/* Role Selector Tabs (Auditor, Supervisor, Administrator) */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                     Select Role & Authority Level *
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => handleRoleChangeInCreate('AUDITOR')}
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all ${
+                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                         createForm.role === 'AUDITOR'
                           ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-500 text-purple-700 dark:text-purple-300 shadow-xs'
                           : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
                       }`}
                     >
-                      <ShieldCheck className="w-4 h-4 text-purple-600" />
-                      <span>Internal Auditor</span>
+                      <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>Auditor</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleRoleChangeInCreate('SUPERVISOR')}
-                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all ${
+                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                         createForm.role === 'SUPERVISOR'
                           ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
                           : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
                       }`}
                     >
-                      <Wrench className="w-4 h-4 text-emerald-600" />
-                      <span>Line Supervisor</span>
+                      <Wrench className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Supervisor</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRoleChangeInCreate('ADMIN')}
+                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        createForm.role === 'ADMIN'
+                          ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 text-amber-700 dark:text-amber-300 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                      }`}
+                    >
+                      <UserCog className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Administrator</span>
                     </button>
                   </div>
                 </div>
@@ -1548,7 +1577,10 @@ export const AdminUserManagement = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Email Address (Login ID) *
+                      <span>Email Address (Login ID) *</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
+                        (Duplicate emails permitted)
+                      </span>
                     </label>
                     <input
                       type="email"
@@ -1851,7 +1883,10 @@ export const AdminUserManagement = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Email Address
+                  <span>Email Address</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
+                    (Duplicate emails permitted)
+                  </span>
                 </label>
                 <input
                   type="email"
@@ -1860,6 +1895,25 @@ export const AdminUserManagement = () => {
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Role / Access Authority Level
+                </label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  disabled={selectedUser.role === 'OWNER' || selectedUser.isOwner}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 cursor-pointer"
+                >
+                  <option value="ADMIN">Administrator (Full Admin Access & Oversight)</option>
+                  <option value="AUDITOR">Internal Auditor (Defect Audit & Verification)</option>
+                  <option value="SUPERVISOR">Line Supervisor (Task Action & CAP Execution)</option>
+                  {(selectedUser.role === 'OWNER' || selectedUser.isOwner) && (
+                    <option value="OWNER">Owner (Protected Master Account)</option>
+                  )}
+                </select>
               </div>
 
               <div>

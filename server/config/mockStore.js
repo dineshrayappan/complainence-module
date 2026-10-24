@@ -13,6 +13,19 @@ module.exports = {
   getUsers: (includeDeleted = false) =>
     includeDeleted ? [...mockUsers] : mockUsers.filter((u) => !u.isDeleted),
   findUserById: (id) => mockUsers.find((u) => u._id === id || u.id === id || u.employeeId === id),
+  findUsersByIdentifier: (identifier) => {
+    const term = (identifier || '').trim().toLowerCase();
+    if (!term) return [];
+    return mockUsers.filter((u) => {
+      const uEmail = (u.email || '').toLowerCase();
+      const uEmp = (u.employeeId || '').toLowerCase();
+      const uRole = (u.role || '').toLowerCase();
+
+      if (uEmail === term || uEmp === term) return true;
+      if (term === 'admin' && (uEmp === 'admin' || uEmp === 'adm-001' || uRole === 'admin' || uEmail.startsWith('admin@'))) return true;
+      return false;
+    });
+  },
   findUserByIdentifier: (identifier) => {
     const term = (identifier || '').trim().toLowerCase();
     if (!term) return null;
