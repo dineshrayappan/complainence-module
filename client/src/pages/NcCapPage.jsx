@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
+import { departmentService } from '../services/api';
 import KpiMetrics from '../components/KpiMetrics';
 import ComplaintFilters from '../components/ComplaintFilters';
 import ComplaintCard from '../components/ComplaintCard';
@@ -40,6 +41,26 @@ export const NcCapPage = () => {
   const priorityFilter = searchParams.get('priority') || '';
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [viewMode, setViewMode] = useState(searchParams.get('view') || 'cards');
+  const [dbDepartments, setDbDepartments] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    departmentService
+      .getDepartments()
+      .then((res) => {
+        if (isMounted && res.data?.success && Array.isArray(res.data.departments)) {
+          setDbDepartments(res.data.departments.map((d) => d.name).filter(Boolean));
+        }
+      })
+      .catch((err) => console.warn('Could not load departments for filters:', err.message));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const availableDeptList = useMemo(() => {
+    return Array.from(new Set([...dbDepartments, ...complaints.map((c) => c.department).filter(Boolean)])).sort();
+  }, [dbDepartments, complaints]);
 
   // Keep local search in sync if URL search param changes from outside (e.g. drilldown)
   useEffect(() => {
@@ -255,7 +276,7 @@ export const NcCapPage = () => {
         onDeadlineFilterChange={handleDeadlineChange}
         departmentFilter={departmentFilter}
         onDepartmentChange={handleDepartmentChange}
-        departments={Array.from(new Set(complaints.map((c) => c.department).filter(Boolean))).sort()}
+        departments={availableDeptList}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
         categoryFilter={categoryFilter}

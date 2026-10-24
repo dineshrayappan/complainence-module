@@ -14,41 +14,46 @@ import {
   UploadCloud,
   Check,
 } from 'lucide-react';
-import { userService, complaintService, taskService } from '../services/api';
+import { userService, complaintService, taskService, departmentService } from '../services/api';
 import { compressImage } from '../utils/imageCompressor';
 
-// Exact department matching helper ensuring strict department isolation
+// Exact and fuzzy department matching helper ensuring department isolation
 const isDeptMatch = (userDept, targetDept) => {
   if (!userDept || !targetDept) return false;
   const u = userDept.trim().toLowerCase();
   const t = targetDept.trim().toLowerCase();
   if (u === t) return true;
 
-  if (t === 'quality' || t === 'qa') {
-    return u === 'quality' || u === 'qa' || u === 'quality assurance' || u === 'quality control';
+  const uClean = u.replace(/[^a-z0-9]/g, '');
+  const tClean = t.replace(/[^a-z0-9]/g, '');
+  if (uClean && tClean && uClean === tClean) return true;
+
+  if (t === 'quality' || t === 'qa' || t.includes('quality')) {
+    return u.includes('quality') || u === 'qa' || u === 'cqa';
   }
-  if (t === 'production' || t === 'prd') {
-    return u === 'production' || u === 'prd' || u.startsWith('production ');
+  if (t === 'production' || t === 'prd' || t.includes('production')) {
+    return u.includes('production') || u === 'prd';
   }
-  if (t === 'maintenance' || t === 'mnt') {
-    return u === 'maintenance' || u === 'mnt' || u.startsWith('maintenance ');
+  if (t.includes('maintenance') || t === 'mnt') {
+    return u.includes('maintenance') || u.includes('mnt') || u === t;
   }
-  if (t === 'store' || t === 'str') {
-    return u === 'store' || u === 'str' || u === 'stores' || u.startsWith('store ');
+  if (t.includes('store') || t === 'str') {
+    return u.includes('store') || u === 'str' || u.startsWith('store');
   }
-  if (t === 'ehs') {
-    return u === 'ehs' || u === 'environment, health & safety' || u.startsWith('ehs ');
+  if (t === 'ehs' || t.includes('safety')) {
+    return u.includes('ehs') || u.includes('safety');
   }
-  if (t === 'edp') {
-    return u === 'edp' || u === 'it' || u === 'electronic data processing' || u.startsWith('edp ');
+  if (t === 'edp' || t === 'it') {
+    return u.includes('edp') || u.includes('it');
   }
-  if (t === 'hr') {
-    return u === 'hr' || u === 'human resources' || u.startsWith('hr ');
+  if (t === 'hr' || t.includes('human')) {
+    return u.includes('hr') || u.includes('human');
   }
-  if (t === 'central quality audit' || t === 'cqa') {
-    return u === 'central quality audit' || u === 'cqa' || u === 'quality audit';
+  if (t.includes('compliance')) {
+    return u.includes('compliance');
   }
-  return false;
+
+  return u.includes(t) || t.includes(u);
 };
 
 // Specific Factory Departments
@@ -135,16 +140,39 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   const [supervisors, setSupervisors] = useState([]);
   const [liveEmployees, setLiveEmployees] = useState([]);
   const [loadingSupervisors, setLoadingSupervisors] = useState(false);
+  const [availableDepartments, setAvailableDepartments] = useState(AUDIT_DEPARTMENTS);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load supervisors & employees from database
+  // Load available departments, supervisors & employees from database
   useEffect(() => {
     if (isOpen) {
       setError(null);
-      const loadSupervisors = async () => {
+      const loadInitialData = async () => {
         setLoadingSupervisors(true);
+        setLoadingDepartments(true);
         try {
+          // 1. Fetch live departments from database
+          let deptList = AUDIT_DEPARTMENTS;
+          try {
+            const deptRes = await departmentService.getDepartments();
+            if (deptRes.data?.success && Array.isArray(deptRes.data.departments) && deptRes.data.departments.length > 0) {
+              const formatted = deptRes.data.departments.map((d) => ({
+                id: d.name,
+                name: d.name,
+                code: d.code || (d.name ? d.name.slice(0, 4).toUpperCase() : 'DEPT'),
+                defaultLocation: d.location || `${d.name} Floor Section`,
+              }));
+              formatted.sort((a, b) => a.name.localeCompare(b.name));
+              deptList = formatted;
+              setAvailableDepartments(formatted);
+            }
+          } catch (deptErr) {
+            console.warn('Could not load departments from API, using default list:', deptErr.message);
+          }
+
+          // 2. Fetch supervisors / all active users
           let list = [];
           try {
             const allRes = await userService.getAllUsers();
@@ -162,7 +190,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
           }
           setSupervisors(list);
 
-          // Fetch live employee status
+          // 3. Fetch live employee status
           try {
             const liveRes = await taskService.getLiveStatus();
             if (liveRes.data?.success && Array.isArray(liveRes.data.employees)) {
@@ -172,10 +200,22 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             console.warn('Could not load live employee statuses:', e.message);
           }
 
-          // Initial matching supervisor strictly for default department
-          const deptMatches = list.filter((s) => isDeptMatch(s.department, department));
+          // Initial selected department and matching supervisor
+          const targetDept = prefillData?.department || (deptList.some((d) => d.name === department) ? department : deptList[0]?.name || 'Production');
+          setDepartment(targetDept);
+
+          const matchedDeptObj = deptList.find((d) => d.name === targetDept || d.id === targetDept);
+          if (matchedDeptObj?.defaultLocation) {
+            setLocation(matchedDeptObj.defaultLocation);
+          } else {
+            setLocation(`${targetDept} - Floor Section`);
+          }
+
+          const deptMatches = list.filter((s) => isDeptMatch(s.department, targetDept));
           if (deptMatches.length > 0) {
             setAssignedToUserId(deptMatches[0]._id || deptMatches[0].id);
+          } else if (list.length > 0) {
+            setAssignedToUserId(list[0]._id || list[0].id);
           } else {
             setAssignedToUserId('');
           }
@@ -183,9 +223,10 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
           console.warn('Failed to load line supervisors:', err.message);
         } finally {
           setLoadingSupervisors(false);
+          setLoadingDepartments(false);
         }
       };
-      loadSupervisors();
+      loadInitialData();
     }
   }, [isOpen]);
 
@@ -205,7 +246,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   // Handle department change: updates default location and dynamically filters Responsible Person
   const handleDepartmentChange = (deptId) => {
     setDepartment(deptId);
-    const targetDept = AUDIT_DEPARTMENTS.find((d) => d.id === deptId);
+    const targetDept = availableDepartments.find((d) => d.name === deptId || d.id === deptId);
     if (targetDept?.defaultLocation) {
       setLocation(targetDept.defaultLocation);
     } else {
@@ -218,7 +259,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       if (match) {
         setAssignedToUserId(match._id || match.id);
       } else {
-        setAssignedToUserId('');
+        setAssignedToUserId(supervisors[0]?._id || supervisors[0]?.id || '');
       }
     }
   };
@@ -273,15 +314,17 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   // Filter employees strictly belonging to the currently selected department
   const departmentEmployees = (supervisors || []).filter((s) => isDeptMatch(s.department, department));
+  const otherEmployees = (supervisors || []).filter((s) => !isDeptMatch(s.department, department));
 
   const effectiveAssignedId =
-    assignedToUserId && departmentEmployees.some((s) => (s._id || s.id) === assignedToUserId)
+    assignedToUserId && supervisors.some((s) => (s._id || s.id) === assignedToUserId)
       ? assignedToUserId
-      : departmentEmployees[0]?._id || departmentEmployees[0]?.id || '';
+      : departmentEmployees[0]?._id || departmentEmployees[0]?.id || supervisors[0]?._id || supervisors[0]?.id || '';
 
   const selectedSupervisor =
-    departmentEmployees.find((s) => (s._id || s.id) === effectiveAssignedId) ||
+    supervisors.find((s) => (s._id || s.id) === effectiveAssignedId) ||
     departmentEmployees[0] ||
+    supervisors[0] ||
     null;
 
   // Form Submission
@@ -425,9 +468,9 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   onChange={(e) => handleDepartmentChange(e.target.value)}
                   className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {AUDIT_DEPARTMENTS.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({d.code})
+                  {availableDepartments.map((d) => (
+                    <option key={d.id || d.name} value={d.name}>
+                      {d.name} {d.code ? `(${d.code})` : ''}
                     </option>
                   ))}
                 </select>
@@ -634,23 +677,46 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   onChange={(e) => setAssignedToUserId(e.target.value)}
                   className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {departmentEmployees.length === 0 ? (
-                    <option value="">No employees found for {department}</option>
-                  ) : (
-                    departmentEmployees.map((emp) => {
-                      const empId = (emp.employeeId || '').toUpperCase();
-                      const sId = String(emp._id || emp.id || '');
-                      const live = liveEmployees.find(
-                        (e) => (e.employeeId && e.employeeId.toUpperCase() === empId) || (e.userId && String(e.userId) === sId)
-                      );
-                      const isBusy = live?.status === 'In Progress / Busy';
+                  {departmentEmployees.length > 0 && (
+                    <optgroup label={`⭐ ${department} Personnel (${departmentEmployees.length})`}>
+                      {departmentEmployees.map((emp) => {
+                        const empId = (emp.employeeId || '').toUpperCase();
+                        const sId = String(emp._id || emp.id || '');
+                        const live = liveEmployees.find(
+                          (e) => (e.employeeId && e.employeeId.toUpperCase() === empId) || (e.userId && String(e.userId) === sId)
+                        );
+                        const isBusy = live?.status === 'In Progress / Busy';
 
-                      return (
-                        <option key={emp._id || emp.id} value={emp._id || emp.id}>
-                          {emp.name} ({emp.employeeId}) — {emp.designation || 'Supervisor'} {isBusy ? '🔴 (Busy)' : '🟢 (Available)'}
-                        </option>
-                      );
-                    })
+                        return (
+                          <option key={emp._id || emp.id} value={emp._id || emp.id}>
+                            {emp.name} ({emp.employeeId || 'ID'}) — {emp.designation || emp.role || 'Supervisor'} {isBusy ? '🔴 (Busy)' : '🟢 (Available)'}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+
+                  {otherEmployees.length > 0 && (
+                    <optgroup label={departmentEmployees.length > 0 ? "Other Line Supervisors & Personnel" : "All Available Factory Personnel"}>
+                      {otherEmployees.map((emp) => {
+                        const empId = (emp.employeeId || '').toUpperCase();
+                        const sId = String(emp._id || emp.id || '');
+                        const live = liveEmployees.find(
+                          (e) => (e.employeeId && e.employeeId.toUpperCase() === empId) || (e.userId && String(e.userId) === sId)
+                        );
+                        const isBusy = live?.status === 'In Progress / Busy';
+
+                        return (
+                          <option key={emp._id || emp.id} value={emp._id || emp.id}>
+                            {emp.name} ({emp.department || 'General'}) — {emp.designation || emp.role || 'Supervisor'} {isBusy ? '🔴 (Busy)' : '🟢 (Available)'}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+
+                  {supervisors.length === 0 && (
+                    <option value="">{loadingSupervisors ? 'Loading factory personnel...' : 'No personnel found'}</option>
                   )}
                 </select>
 
