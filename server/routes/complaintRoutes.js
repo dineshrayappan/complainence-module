@@ -24,10 +24,10 @@ const upload = require('../middleware/upload');
 
 // Safe Multer upload handlers that catch errors and allow base64 fallback
 const safeUploadBeforePhoto = (req, res, next) => {
-  upload.single('beforePhoto')(req, res, (err) => {
+  upload.any()(req, res, (err) => {
     if (err) {
       console.warn('[Multer:uploadBeforePhoto] Warning:', err.message);
-      if (req.body && (req.body.beforePhoto || req.body.beforePhotoUrl || req.body.beforePhotoBase64)) {
+      if (req.body && (req.body.beforePhoto || req.body.beforePhotoUrl || req.body.beforePhotoBase64 || req.body.beforePhotoFile)) {
         return next();
       }
       return res.status(400).json({
@@ -35,21 +35,31 @@ const safeUploadBeforePhoto = (req, res, next) => {
         message: `Photo upload error: ${err.message}`,
       });
     }
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      req.file =
+        req.files.find((f) => f.fieldname === 'beforePhoto' || f.fieldname === 'beforePhotoFile') ||
+        req.files[0];
+    }
     next();
   });
 };
 
 const safeUploadAfterPhoto = (req, res, next) => {
-  upload.single('afterPhoto')(req, res, (err) => {
+  upload.any()(req, res, (err) => {
     if (err) {
       console.warn('[Multer:uploadAfterPhoto] Warning:', err.message);
-      if (req.body && (req.body.afterPhoto || req.body.afterPhotoUrl || req.body.afterPhotoBase64)) {
+      if (req.body && (req.body.afterPhoto || req.body.afterPhotoUrl || req.body.afterPhotoBase64 || req.body.afterPhotoFile)) {
         return next();
       }
       return res.status(400).json({
         success: false,
         message: `Photo upload error: ${err.message}`,
       });
+    }
+    if (Array.isArray(req.files) && req.files.length > 0) {
+      req.file =
+        req.files.find((f) => f.fieldname === 'afterPhoto' || f.fieldname === 'afterPhotoFile') ||
+        req.files[0];
     }
     next();
   });

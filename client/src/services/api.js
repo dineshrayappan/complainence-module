@@ -78,28 +78,14 @@ export const complaintService = {
   getComplaints: (params) => api.get('/complaints', { params }),
   getComplaintById: (id) => api.get(`/complaints/${id}`),
   getKpiStats: () => api.get('/complaints/stats/kpi'),
-  createComplaint: (data) => {
-    if (typeof FormData !== 'undefined' && data instanceof FormData) {
-      return api.post('/complaints', data, {
-        headers: { 'Content-Type': undefined },
-      });
-    }
-    return api.post('/complaints', data);
-  },
+  createComplaint: (data) => api.post('/complaints', data),
   reassignComplaint: (id, assignedToUserId, notes) =>
     api.patch(`/complaints/${id}/reassign`, { assignedToUserId, notes }),
   markInProgress: (id, notes) =>
     api.patch(`/complaints/${id}/in-progress`, { notes }),
   stopWork: (id, reason) =>
     api.patch(`/complaints/${id}/stop-work`, { reason }),
-  submitAction: (id, data) => {
-    if (typeof FormData !== 'undefined' && data instanceof FormData) {
-      return api.post(`/complaints/${id}/submit-action`, data, {
-        headers: { 'Content-Type': undefined },
-      });
-    }
-    return api.post(`/complaints/${id}/submit-action`, data);
-  },
+  submitAction: (id, data) => api.post(`/complaints/${id}/submit-action`, data),
   verifyComplaint: (id, payload) =>
     api.post(`/complaints/${id}/verify`, payload),
   addTimelineComment: (id, comment) =>

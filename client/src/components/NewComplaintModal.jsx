@@ -391,7 +391,14 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       formData.append('deadlineHours', deadlineHours.toString());
 
       if (dueDate) {
-        formData.append('dueDate', new Date(dueDate).toISOString());
+        try {
+          const parsed = new Date(dueDate);
+          if (!isNaN(parsed.getTime())) {
+            formData.append('dueDate', parsed.toISOString());
+          }
+        } catch (dErr) {
+          console.warn('Invalid dueDate format:', dueDate, dErr);
+        }
       }
 
       // Attach photo evidence strictly encoded as Base64 Data URL or fallback SVG
@@ -411,8 +418,10 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
         effectiveBase64 = generateDefaultAuditPhoto(department, priority, description);
       }
 
-      formData.append('beforePhotoBase64', effectiveBase64);
-      formData.append('beforePhoto', effectiveBase64);
+      if (effectiveBase64) {
+        formData.append('beforePhotoBase64', effectiveBase64);
+        formData.append('beforePhoto', effectiveBase64);
+      }
       if (beforeFile) {
         formData.append('beforePhotoFile', beforeFile);
       }
@@ -422,13 +431,16 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
         onSuccess(res.data.complaint);
         onClose();
       } else {
-        setError(res.data?.message || 'Failed to create NC defect.');
+        setError(res.data?.message || res.data?.error || 'Failed to create NC defect.');
       }
     } catch (err) {
       console.error('Error creating NC:', err);
-      setError(
-        err.response?.data?.message || 'Failed to submit NC. Please verify required fields.'
-      );
+      const serverMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        (typeof err.response?.data === 'string' && !err.response.data.includes('<!DOCTYPE') ? err.response.data : null) ||
+        err.message;
+      setError(serverMsg || 'Failed to submit NC. Please verify required fields.');
     } finally {
       setSubmitting(false);
     }
