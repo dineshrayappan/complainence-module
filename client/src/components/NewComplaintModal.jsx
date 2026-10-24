@@ -56,17 +56,7 @@ const isDeptMatch = (userDept, targetDept) => {
   return u.includes(t) || t.includes(u);
 };
 
-// Specific Factory Departments
-const AUDIT_DEPARTMENTS = [
-  { id: 'Production', name: 'Production', code: 'PRD', defaultLocation: 'Production Floor - Sewing Section' },
-  { id: 'Quality', name: 'Quality', code: 'QA', defaultLocation: 'QA Inspection Table - Inspection Room' },
-  { id: 'Maintenance', name: 'Maintenance', code: 'MNT', defaultLocation: 'Maintenance Workshop & Compressor Bay' },
-  { id: 'Store', name: 'Store', code: 'STR', defaultLocation: 'Fabric & Raw Materials Store Bay' },
-  { id: 'EHS', name: 'EHS', code: 'EHS', defaultLocation: 'EHS & Plant Safety Station' },
-  { id: 'EDP', name: 'EDP', code: 'EDP', defaultLocation: 'IT & Data Processing Center' },
-  { id: 'HR', name: 'HR', code: 'HR', defaultLocation: 'HR & Compliance Office' },
-  { id: 'Central Quality Audit', name: 'Central Quality Audit', code: 'CQA', defaultLocation: 'QA Audit Office & Standards Room' },
-];
+
 
 // Risk / Severity Levels
 const RISK_LEVELS = [
@@ -140,10 +130,41 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   const [supervisors, setSupervisors] = useState([]);
   const [liveEmployees, setLiveEmployees] = useState([]);
   const [loadingSupervisors, setLoadingSupervisors] = useState(false);
-  const [availableDepartments, setAvailableDepartments] = useState(AUDIT_DEPARTMENTS);
+  const [availableDepartments, setAvailableDepartments] = useState([]);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Pre-fetch live departments on mount so they are instantly available when modal opens
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAvailableDepts = async () => {
+      try {
+        setLoadingDepartments(true);
+        const deptRes = await departmentService.getDepartments();
+        if (isMounted && deptRes.data?.success && Array.isArray(deptRes.data.departments) && deptRes.data.departments.length > 0) {
+          const formatted = deptRes.data.departments
+            .filter((d) => d && d.name)
+            .map((d) => ({
+              id: d.id || d._id || d.name,
+              name: d.name.trim(),
+              code: d.code || '',
+              defaultLocation: d.location || `${d.name.trim()} Floor Section`,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          setAvailableDepartments(formatted);
+        }
+      } catch (err) {
+        console.warn('Could not prefetch departments:', err.message);
+      } finally {
+        if (isMounted) setLoadingDepartments(false);
+      }
+    };
+    fetchAvailableDepts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Load available departments, supervisors & employees from database
   useEffect(() => {
@@ -154,22 +175,24 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
         setLoadingDepartments(true);
         try {
           // 1. Fetch live departments from database
-          let deptList = AUDIT_DEPARTMENTS;
+          let deptList = availableDepartments;
           try {
             const deptRes = await departmentService.getDepartments();
             if (deptRes.data?.success && Array.isArray(deptRes.data.departments) && deptRes.data.departments.length > 0) {
-              const formatted = deptRes.data.departments.map((d) => ({
-                id: d.name,
-                name: d.name,
-                code: d.code || (d.name ? d.name.slice(0, 4).toUpperCase() : 'DEPT'),
-                defaultLocation: d.location || `${d.name} Floor Section`,
-              }));
-              formatted.sort((a, b) => a.name.localeCompare(b.name));
+              const formatted = deptRes.data.departments
+                .filter((d) => d && d.name)
+                .map((d) => ({
+                  id: d.id || d._id || d.name,
+                  name: d.name.trim(),
+                  code: d.code || '',
+                  defaultLocation: d.location || `${d.name.trim()} Floor Section`,
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
               deptList = formatted;
               setAvailableDepartments(formatted);
             }
           } catch (deptErr) {
-            console.warn('Could not load departments from API, using default list:', deptErr.message);
+            console.warn('Could not load departments from API:', deptErr.message);
           }
 
           // 2. Fetch supervisors / all active users
@@ -468,11 +491,15 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   onChange={(e) => handleDepartmentChange(e.target.value)}
                   className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  {availableDepartments.map((d) => (
-                    <option key={d.id || d.name} value={d.name}>
-                      {d.name} {d.code ? `(${d.code})` : ''}
-                    </option>
-                  ))}
+                  {availableDepartments.length === 0 ? (
+                    <option value="">{loadingDepartments ? 'Loading departments...' : 'No departments available'}</option>
+                  ) : (
+                    availableDepartments.map((d) => (
+                      <option key={d.id || d.name} value={d.name}>
+                        {d.name}
+                      </option>
+                    ))
+                  )}
                 </select>
 
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between pt-0.5">
