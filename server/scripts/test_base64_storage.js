@@ -91,7 +91,6 @@ async function runTests() {
       headers: authHeaders,
       body: {
         department: 'Production',
-        category: 'Stitching Fault',
         location: 'Line 2 - Production Floor',
         priority: 'HIGH',
         description: 'Needle break defect observed during inline audit',

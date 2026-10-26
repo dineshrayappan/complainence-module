@@ -403,7 +403,6 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       formData.append('unitName', finalUnitName);
 
       formData.append('department', department);
-      formData.append('category', 'Quality');
       formData.append('location', location.trim() || `${department} Floor`);
       formData.append('priority', priority || 'HIGH');
       formData.append('riskSeverity', priority || 'HIGH');

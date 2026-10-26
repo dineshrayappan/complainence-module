@@ -135,7 +135,6 @@ export const AuditProDashboard = ({
           (c.complaintId && c.complaintId.toLowerCase().includes(q)) ||
           (c.title && c.title.toLowerCase().includes(q)) ||
           (c.department && c.department.toLowerCase().includes(q)) ||
-          (c.category && c.category.toLowerCase().includes(q)) ||
           (c.location && c.location.toLowerCase().includes(q)) ||
           (c.description && c.description.toLowerCase().includes(q))
       );
@@ -740,7 +739,7 @@ export const AuditProDashboard = ({
             )}
           </div>
 
-          {/* Search by NC ID, Department, Category */}
+          {/* Search by NC ID, Department, Location */}
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
             <input

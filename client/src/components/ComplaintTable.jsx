@@ -103,7 +103,7 @@ export const ComplaintTable = ({
                   </span>
                 </td>
 
-                {/* Category & Location */}
+                {/* Department & Location */}
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">
                     {c.afterPhoto ? (

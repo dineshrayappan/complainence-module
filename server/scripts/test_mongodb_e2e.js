@@ -94,7 +94,6 @@ async function main() {
     method: 'POST',
     headers: authHeaders,
     body: {
-      category: 'Fabric Defect',
       department: 'Production',
       location: 'Sewing Line 1',
       priority: 'Major',

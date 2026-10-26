@@ -149,7 +149,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"category\": \"Stitching Fault\",\n  \"department\": \"Production\",\n  \"location\": \"Sewing Line 1\",\n  \"priority\": \"Major\",\n  \"description\": \"Broken stitch detected on collar seam during roving quality audit\",\n  \"requirement\": \"ISO 9001 Clause 8.7 Nonconforming Outputs\",\n  \"capRequired\": true,\n  \"verificationMethod\": \"Physical Floor Re-inspection\",\n  \"targetSupervisorId\": \"SUP-001\",\n  \"beforePhoto\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
+              "raw": "{\n  \"department\": \"Production\",\n  \"location\": \"Sewing Line 1\",\n  \"priority\": \"Major\",\n  \"description\": \"Broken stitch detected on collar seam during roving quality audit\",\n  \"requirement\": \"ISO 9001 Clause 8.7 Nonconforming Outputs\",\n  \"capRequired\": true,\n  \"verificationMethod\": \"Physical Floor Re-inspection\",\n  \"targetSupervisorId\": \"SUP-001\",\n  \"beforePhoto\": \"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/complaints",

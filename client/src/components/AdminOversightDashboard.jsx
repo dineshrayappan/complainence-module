@@ -1432,8 +1432,12 @@ export const AdminOversightDashboard = ({ onViewComplaint }) => {
                       </button>
                       <span>•</span>
                       <span>{event.department}</span>
-                      <span>•</span>
-                      <span>{event.category}</span>
+                      {event.location && (
+                        <>
+                          <span>•</span>
+                          <span>{event.location}</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

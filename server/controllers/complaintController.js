@@ -450,7 +450,6 @@ const getFileUrl = (req, filename) => {
 const createComplaint = async (req, res) => {
   try {
     const {
-      category = 'Quality Defect',
       department,
       location = 'Production Floor',
       priority = 'HIGH',
@@ -626,7 +625,6 @@ const createComplaint = async (req, res) => {
         const ComplaintModel = getComplaintModel(targetUnitId);
         const mongoPayload = {
           complaintId,
-          category: category || 'Quality Defect',
           department: department || supervisor?.department || 'Production',
           location: location || 'Production Floor',
           priority: effectivePriority,
@@ -683,7 +681,6 @@ const createComplaint = async (req, res) => {
 
     // Fallback when MongoDB is not connected
     const fallbackTicket = mockStore.createComplaint({
-      category: category || 'Quality Defect',
       department: department || supervisor.department || 'Production',
       location: location || 'Production Floor',
       priority: effectivePriority,
@@ -723,7 +720,7 @@ const createComplaint = async (req, res) => {
 // @access  Private
 const getComplaints = async (req, res) => {
   try {
-    const { status, category, priority, department, search, tab, deadlineCondition, deadline, recordStatus, includeDeleted, unitId } = req.query;
+    const { status, priority, department, search, tab, deadlineCondition, deadline, recordStatus, includeDeleted, unitId } = req.query;
     const now = new Date();
 
     if (isMongoConnected()) {
@@ -807,7 +804,6 @@ const getComplaints = async (req, res) => {
           }
         }
 
-        if (category) query.category = category;
         if (priority) query.priority = priority;
         if (department) query.department = department;
 
@@ -817,7 +813,6 @@ const getComplaints = async (req, res) => {
             { complaintId: s },
             { location: s },
             { description: s },
-            { category: s },
             { 'assignedTo.name': s },
           ];
           if (query.$or) {
@@ -1975,7 +1970,6 @@ const getAdminOversightStats = async (req, res) => {
           recentActivityStream.push({
             id: tl._id || tl.id || `${complaint.complaintId}-${tl.timestamp}`,
             complaintId: complaint.complaintId,
-            category: complaint.category,
             department: complaint.department,
             location: complaint.location,
             priority: complaint.priority,
@@ -2003,7 +1997,6 @@ const getAdminOversightStats = async (req, res) => {
         breachedTickets: breachedTickets.map((c) => ({
           _id: c._id || c.id,
           complaintId: c.complaintId,
-          category: c.category,
           department: c.department,
           location: c.location,
           priority: c.priority,
@@ -2014,7 +2007,6 @@ const getAdminOversightStats = async (req, res) => {
         unstartedTickets: unstartedTickets.map((c) => ({
           _id: c._id || c.id,
           complaintId: c.complaintId,
-          category: c.category,
           department: c.department,
           location: c.location,
           priority: c.priority,
@@ -2025,7 +2017,6 @@ const getAdminOversightStats = async (req, res) => {
         pendingVerificationTickets: pendingVerificationTickets.map((c) => ({
           _id: c._id || c.id,
           complaintId: c.complaintId,
-          category: c.category,
           department: c.department,
           assignedTo: c.assignedTo?.name,
           updatedAt: c.updatedAt,

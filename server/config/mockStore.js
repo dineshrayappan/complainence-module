@@ -176,9 +176,6 @@ module.exports = {
       }
     }
 
-    if (params.category) {
-      result = result.filter((c) => c.category === params.category);
-    }
     if (params.priority) {
       result = result.filter((c) => c.priority === params.priority);
     }

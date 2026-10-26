@@ -110,10 +110,9 @@ export const RequirementsComplianceView = ({ complaints = [], onSelectRequiremen
       // Find NCs matching this standard
       const allMatching = complaints.filter((c) => {
         const reqStr = (c.requirement || '').toLowerCase();
-        const catStr = (c.category || '').toLowerCase();
         const deptStr = (c.department || '').toLowerCase();
         const kw = std.keyword.toLowerCase();
-        return reqStr.includes(std.code.toLowerCase()) || catStr.includes(kw) || deptStr.includes(kw);
+        return reqStr.includes(std.code.toLowerCase()) || deptStr.includes(kw);
       });
 
       const openCount = allMatching.filter((c) => !['Closed', 'Verified'].includes(c.status)).length;

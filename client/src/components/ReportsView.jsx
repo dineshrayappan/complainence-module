@@ -171,7 +171,7 @@ export const ReportsView = ({
       .trim()
       .toLowerCase();
     if (finding && finding !== 'no defect description logged.') return finding;
-    return (c.category || 'General Quality Defect').trim().toLowerCase();
+    return (c.department ? `${c.department} Non-Conformance` : 'Quality Defect').trim().toLowerCase();
   };
 
   const issueFrequencyMap = useMemo(() => {
@@ -680,7 +680,6 @@ export const ReportsView = ({
           (c.complaintId || '').toLowerCase().includes(term) ||
           (c.department || '').toLowerCase().includes(term) ||
           (c.location || '').toLowerCase().includes(term) ||
-          (c.category || '').toLowerCase().includes(term) ||
           (c.requirement || '').toLowerCase().includes(term) ||
           getFindingText(c).toLowerCase().includes(term) ||
           getAssignedToName(c).toLowerCase().includes(term) ||
