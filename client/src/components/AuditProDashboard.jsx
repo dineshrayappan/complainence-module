@@ -656,11 +656,11 @@ export const AuditProDashboard = ({
               NC &amp; CAP Dashboard
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              {activeUnit ? activeUnit.name : 'All Units (Company-Wide)'}
+              📍 {activeUnit ? activeUnit.name : 'Unit 1'}
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {activeUnit ? `Isolated metrics, overdue SLA analysis & CAP progress for ${activeUnit.name}` : 'Aggregated factory oversight across all production units'}
+            Isolated quality metrics, overdue SLA analysis &amp; CAP progress for {activeUnit ? activeUnit.name : 'Unit 1'}
           </p>
         </div>
 

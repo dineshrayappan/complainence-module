@@ -64,10 +64,9 @@ export const DepartmentWorkOperations = ({
   const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || (!isAdmin && !isAuditor);
 
   const getDefaultUnitId = useCallback(() => {
-    if (user?.unitId && user?.unitId !== 'ALL') return user.unitId;
-    if (activeUnitId && activeUnitId !== 'ALL') return activeUnitId;
-    return units[0]?.unitId || 'UNIT-1';
-  }, [user, activeUnitId, units]);
+    if (user?.unitId === 'UNIT-2' || activeUnitId === 'UNIT-2') return 'UNIT-2';
+    return 'UNIT-1';
+  }, [user, activeUnitId]);
 
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1660,9 +1659,9 @@ export const DepartmentWorkOperations = ({
                     onChange={(e) => setScheduleForm({ ...scheduleForm, unitId: e.target.value, assignedToUserId: 'DEPT_POOL' })}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
-                    {units.map((u) => (
+                    {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
                       <option key={u.unitId} value={u.unitId}>
-                        {u.name} ({u.unitId})
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -1725,12 +1724,8 @@ export const DepartmentWorkOperations = ({
                       const deptMatch = (u.department || '').toLowerCase() === (scheduleForm.department || '').toLowerCase();
                       if (!deptMatch) return false;
                       const targetUnit = scheduleForm.unitId || getDefaultUnitId();
-                      if (targetUnit && targetUnit !== 'ALL') {
-                        if (u.unitId && u.unitId !== 'ALL' && u.unitId !== targetUnit) {
-                          return false;
-                        }
-                      }
-                      return true;
+                      const uUnit = u.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
+                      return uUnit === targetUnit;
                     })
                     .map((u) => {
                       const empStatus = (liveStatusData?.employees || []).find(

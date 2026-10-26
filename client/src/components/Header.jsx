@@ -127,7 +127,7 @@ export const Header = ({
                   </span>
                   <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                    {activeUnit ? activeUnit.name : 'Company-Wide'}
+                    {activeUnit ? activeUnit.name : 'Unit 1'}
                   </span>
                 </div>
                 <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block truncate">
@@ -147,11 +147,11 @@ export const Header = ({
                   id="btn-unit-switcher"
                   onClick={() => setIsUnitMenuOpen((prev) => !prev)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 transition-all text-xs font-bold cursor-pointer shadow-xs"
-                  title="Switch Active Factory Unit"
+                  title="Switch Active Plant Unit"
                 >
                   <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400 shrink-0" />
                   <span className="truncate max-w-[110px] sm:max-w-[150px]">
-                    {activeUnit ? activeUnit.name : 'All Units'}
+                    {activeUnit ? activeUnit.name : 'Unit 1'}
                   </span>
                   <ChevronDown className={`w-3 h-3 text-indigo-500 dark:text-indigo-400 transition-transform ${isUnitMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -159,33 +159,13 @@ export const Header = ({
                 {isUnitMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setIsUnitMenuOpen(false)} />
-                    <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
+                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
                       <div className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <span>Select Unit Scope</span>
-                        <span className="text-indigo-600 dark:text-cyan-400">Admin</span>
+                        <span>Select Factory Unit</span>
+                        <span className="text-indigo-600 dark:text-cyan-400 font-bold">Plant Scope</span>
                       </div>
 
                       <div className="space-y-1 mt-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            switchUnit('ALL');
-                            setIsUnitMenuOpen(false);
-                            if (onRefresh) onRefresh();
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
-                            activeUnitId === 'ALL'
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                          }`}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Layers className="w-3.5 h-3.5" />
-                            <span>All Units (Company-Wide)</span>
-                          </span>
-                          {activeUnitId === 'ALL' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                        </button>
-
                         {units.map((u) => (
                           <button
                             key={u.unitId}
@@ -203,7 +183,7 @@ export const Header = ({
                           >
                             <span className="flex items-center gap-2 truncate">
                               <Building2 className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{u.name} ({u.unitId})</span>
+                              <span className="truncate">{u.name}</span>
                             </span>
                             {activeUnitId === u.unitId && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
                           </button>

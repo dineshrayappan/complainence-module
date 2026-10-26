@@ -6,6 +6,14 @@ const ComplianceTask = require('../models/ComplianceTask');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
 const {
+  getUserModel,
+  getComplaintModel,
+  getTaskModel,
+  getAuditModel,
+  getCanonicalUnitId,
+  getCanonicalUnitName,
+} = require('../models/unitModels');
+const {
   getDailyAttendanceMap,
   evaluateUserDailyAttendance,
   getTodayISTString,
@@ -17,6 +25,9 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
   const att = evaluateUserDailyAttendance(u, attendanceMap, dateString);
   const isPresent = att.isPresent;
 
+  const canonicalUnit = getCanonicalUnitId(u.unitId || 'UNIT-1');
+  const canonicalUnitName = getCanonicalUnitName(canonicalUnit);
+
   return {
     _id: u._id ? u._id.toString() : u.id,
     id: u._id ? u._id.toString() : u.id,
@@ -25,9 +36,9 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
     email: u.email,
     role: u.role === 'SUPERVISOR' ? 'ACTION_PERSON' : u.role,
     department: u.department,
-    unitId: u.unitId || null,
-    unitName: u.unitName || '',
-    assignedUnits: Array.isArray(u.assignedUnits) ? u.assignedUnits : (u.unitId ? [u.unitId] : []),
+    unitId: canonicalUnit,
+    unitName: u.unitName || canonicalUnitName,
+    assignedUnits: Array.isArray(u.assignedUnits) && u.assignedUnits.length > 0 ? u.assignedUnits : [canonicalUnit],
     designation: u.designation,
     mobileNumber: u.mobileNumber,
     isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
@@ -46,6 +57,62 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
   };
 };
 
+// Helper: resolve active unit strictly to UNIT-1 or UNIT-2
+const resolveUserRequestUnit = (req, explicitUnit) => {
+  const candidate = explicitUnit || req.query?.unitId || req.body?.unitId || req.activeUnitId || req.user?.unitId || 'UNIT-1';
+  return getCanonicalUnitId(candidate);
+};
+
+// Helper to find a user document across unit collections (prefers targetUnit)
+const findUserInUnitOrAny = async (userId, preferredUnit = 'UNIT-1') => {
+  const normPref = getCanonicalUnitId(preferredUnit);
+  const otherUnit = normPref === 'UNIT-1' ? 'UNIT-2' : 'UNIT-1';
+  const unitsToTry = [normPref, otherUnit];
+
+  const query = {
+    $or: [{ employeeId: userId }, { email: userId }],
+  };
+  if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+    query.$or.unshift({ _id: userId });
+  }
+
+  for (const u of unitsToTry) {
+    try {
+      const Model = getUserModel(u);
+      const user = await Model.findOne(query);
+      if (user) {
+        return { userDoc: user, UserModel: Model, unitId: u };
+      }
+    } catch (e) {}
+  }
+  return { userDoc: null, UserModel: getUserModel(normPref), unitId: normPref };
+};
+
+// Helper to find lean user document across unit collections
+const findUserLeanInUnitOrAny = async (userId, preferredUnit = 'UNIT-1') => {
+  const normPref = getCanonicalUnitId(preferredUnit);
+  const otherUnit = normPref === 'UNIT-1' ? 'UNIT-2' : 'UNIT-1';
+  const unitsToTry = [normPref, otherUnit];
+
+  const query = {
+    $or: [{ employeeId: userId }, { email: userId }],
+  };
+  if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
+    query.$or.unshift({ _id: userId });
+  }
+
+  for (const u of unitsToTry) {
+    try {
+      const Model = getUserModel(u);
+      const user = await Model.findOne(query).lean();
+      if (user) {
+        return { userDoc: user, UserModel: Model, unitId: u };
+      }
+    } catch (e) {}
+  }
+  return { userDoc: null, UserModel: getUserModel(normPref), unitId: normPref };
+};
+
 // @desc    Get Master Contact List of Line In-Charges for assignment
 // @route   GET /api/users/line-supervisors
 // @access  Private (Auditor or Authenticated)
@@ -59,23 +126,16 @@ const getLineSupervisors = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const activeUnit = (req.query?.unitId || req.activeUnitId || '').toString().trim().toUpperCase();
+        const activeUnit = resolveUserRequestUnit(req);
+        const UserModel = getUserModel(activeUnit);
+
         const supervisorFilter = {
           role: { $in: ['ACTION_PERSON', 'SUPERVISOR'] },
           isActive: true,
           isDeleted: { $ne: true },
         };
 
-        if (activeUnit && activeUnit !== 'ALL') {
-          supervisorFilter.$or = [
-            { unitId: activeUnit },
-            { assignedUnits: activeUnit },
-            { unitId: null },
-            { unitId: '' },
-          ];
-        }
-
-        const data = await User.find(supervisorFilter)
+        const data = await UserModel.find(supervisorFilter)
           .sort({ department: 1, name: 1 })
           .lean();
 
@@ -84,6 +144,8 @@ const getLineSupervisors = async (req, res) => {
           return res.status(200).json({
             success: true,
             count: supervisors.length,
+            unitId: activeUnit,
+            unitName: getCanonicalUnitName(activeUnit),
             supervisors,
           });
         }
@@ -125,6 +187,9 @@ const getAllUsers = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
+        const targetUnit = resolveUserRequestUnit(req, unitId);
+        const UserModel = getUserModel(targetUnit);
+
         const query = {};
         const isRequestingOwner = req.user?.role === 'OWNER' || req.user?.isOwner;
         if (!isRequestingOwner) {
@@ -154,47 +219,18 @@ const getAllUsers = async (req, res) => {
           query.isActive = isActive === 'true';
         }
 
-        const conditions = [];
-        const targetUnit = (unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
-
-        if (targetUnit && targetUnit !== 'ALL') {
-          if (targetUnit === 'UNASSIGNED') {
-            conditions.push({
-              $or: [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }],
-            });
-          } else if (req.isCompanyAdmin && unitId) {
-            conditions.push({
-              $or: [{ unitId: targetUnit }, { assignedUnits: targetUnit }],
-            });
-          } else {
-            const unitOr = [{ unitId: targetUnit }, { assignedUnits: targetUnit }];
-            if (!req.isCompanyAdmin) {
-              unitOr.push({ unitId: null }, { unitId: '' });
-            }
-            conditions.push({ $or: unitOr });
-          }
-        }
-
         if (search) {
           const regex = new RegExp(search, 'i');
-          conditions.push({
-            $or: [
-              { name: regex },
-              { employeeId: regex },
-              { email: regex },
-              { department: regex },
-              { designation: regex },
-            ],
-          });
+          query.$or = [
+            { name: regex },
+            { employeeId: regex },
+            { email: regex },
+            { department: regex },
+            { designation: regex },
+          ];
         }
 
-        if (conditions.length === 1) {
-          Object.assign(query, conditions[0]);
-        } else if (conditions.length > 1) {
-          query.$and = conditions;
-        }
-
-        const data = await User.find(query).sort({ role: 1, name: 1 }).lean();
+        const data = await UserModel.find(query).sort({ role: 1, name: 1 }).lean();
 
         if (data) {
           let users = data.map((u) => formatUser(u, attendanceMap, todayDate));
@@ -208,6 +244,8 @@ const getAllUsers = async (req, res) => {
           return res.status(200).json({
             success: true,
             count: users.length,
+            unitId: targetUnit,
+            unitName: getCanonicalUnitName(targetUnit),
             date: todayDate,
             users,
           });
@@ -278,7 +316,7 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Admin: Create new user (Auditor, Supervisor, Admin)
+// @desc    Admin: Create new user (Auditor, Supervisor, Admin) - Mandatory Unit 1 or Unit 2
 // @route   POST /api/users
 // @access  Private (Admin Only)
 const createUser = async (req, res) => {
@@ -310,32 +348,41 @@ const createUser = async (req, res) => {
       });
     }
 
+    // Mandatory Unit 1 or Unit 2 validation
+    const candidateUnit = (unitId || req.body.unit || req.activeUnitId || '').toString().trim().toUpperCase();
+    if (!candidateUnit || (candidateUnit !== 'UNIT-1' && candidateUnit !== 'UNIT-2' && candidateUnit !== 'UNIT 1' && candidateUnit !== 'UNIT 2')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mandatory unit assignment required: Please select either Unit 1 or Unit 2.',
+      });
+    }
+
+    const cleanUnitId = getCanonicalUnitId(candidateUnit);
+    const cleanUnitName = getCanonicalUnitName(cleanUnitId);
     const normalizedRole = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
-    const cleanUnitId = unitId ? unitId.trim().toUpperCase() : null;
-    const cleanUnitName = unitName
-      ? unitName.trim()
-      : cleanUnitId === 'UNIT-1'
-      ? 'Unit 1'
-      : cleanUnitId === 'UNIT-2'
-      ? 'Unit 2'
-      : cleanUnitId || '';
 
     if (!isMongoConnected()) {
       await connectDB();
     }
     if (isMongoConnected()) {
       try {
-        const existingEmp = await User.findOne({
-          employeeId: new RegExp(`^${employeeId.trim()}$`, 'i'),
+        const TargetUserModel = getUserModel(cleanUnitId);
+
+        // Check if employeeId or email already exists in target unit
+        const existingEmp = await TargetUserModel.findOne({
+          $or: [
+            { employeeId: new RegExp(`^${employeeId.trim()}$`, 'i') },
+            { email: email.trim().toLowerCase() },
+          ],
         });
         if (existingEmp) {
           return res.status(400).json({
             success: false,
-            message: `Employee ID '${employeeId.toUpperCase()}' is already registered to ${existingEmp.name}.`,
+            message: `Employee ID '${employeeId.toUpperCase()}' or email '${email}' is already registered in ${cleanUnitName}.`,
           });
         }
 
-        const inserted = await User.create({
+        const inserted = await TargetUserModel.create({
           employeeId: employeeId.trim().toUpperCase(),
           name: name.trim(),
           email: email.trim().toLowerCase(),
@@ -346,11 +393,11 @@ const createUser = async (req, res) => {
           mobileNumber: mobileNumber.trim(),
           unitId: cleanUnitId,
           unitName: cleanUnitName,
-          assignedUnits: cleanUnitId ? [cleanUnitId] : [],
+          assignedUnits: [cleanUnitId],
           isActive: true,
         });
 
-        // Also sync to mockStore with the securely hashed password
+        // Sync to mockStore with the securely hashed password
         mockStore.createUser({
           _id: inserted._id.toString(),
           employeeId: inserted.employeeId,
@@ -363,7 +410,7 @@ const createUser = async (req, res) => {
           mobileNumber: inserted.mobileNumber,
           unitId: cleanUnitId,
           unitName: cleanUnitName,
-          assignedUnits: cleanUnitId ? [cleanUnitId] : [],
+          assignedUnits: [cleanUnitId],
         });
 
         // Record audit event
@@ -376,13 +423,13 @@ const createUser = async (req, res) => {
           entityType: 'USER',
           entityId: inserted.employeeId,
           entityName: inserted.name,
-          details: `Administrator created ${inserted.role} account for ${inserted.name} (${inserted.employeeId} • ${inserted.department}).`,
-          payload: { role: inserted.role, department: inserted.department, designation: inserted.designation },
+          details: `Administrator created ${inserted.role} account for ${inserted.name} (${inserted.employeeId} • ${inserted.department} • ${cleanUnitName}).`,
+          payload: { role: inserted.role, department: inserted.department, designation: inserted.designation, unitId: cleanUnitId },
         });
 
         return res.status(201).json({
           success: true,
-          message: `User '${inserted.name}' (${inserted.employeeId}) created successfully.`,
+          message: `User '${inserted.name}' (${inserted.employeeId}) created successfully in ${cleanUnitName}.`,
           user: formatUser(inserted),
         });
       } catch (dbErr) {
@@ -414,12 +461,15 @@ const createUser = async (req, res) => {
       department: department.trim(),
       designation: designation.trim(),
       mobileNumber: mobileNumber.trim(),
+      unitId: cleanUnitId,
+      unitName: cleanUnitName,
+      assignedUnits: [cleanUnitId],
       isActive: true,
     });
 
     res.status(201).json({
       success: true,
-      message: `User '${newUser.name}' created successfully.`,
+      message: `User '${newUser.name}' created successfully in ${cleanUnitName}.`,
       user: formatUser(newUser),
     });
   } catch (error) {
@@ -431,7 +481,7 @@ const createUser = async (req, res) => {
   }
 };
 
-// @desc    Admin: Update user details (name, email, department, designation, mobile)
+// @desc    Admin: Update user details (name, email, department, designation, mobile, unit)
 // @route   PUT /api/users/:id
 // @access  Private (Admin Only)
 const updateUser = async (req, res) => {
@@ -444,62 +494,72 @@ const updateUser = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const updateData = {};
-        if (name) updateData.name = name.trim();
-        if (email) updateData.email = email.trim().toLowerCase();
-        if (department) updateData.department = department.trim();
-        if (designation) updateData.designation = designation.trim();
-        if (typeof mobileNumber !== 'undefined') updateData.mobileNumber = mobileNumber.trim();
-        if (role) updateData.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
-        if (typeof unitId !== 'undefined') {
-          const cleanUnitId = unitId ? unitId.trim().toUpperCase() : null;
-          updateData.unitId = cleanUnitId;
-          updateData.unitName = unitName
-            ? unitName.trim()
-            : cleanUnitId === 'UNIT-1'
-            ? 'Unit 1'
-            : cleanUnitId === 'UNIT-2'
-            ? 'Unit 2'
-            : cleanUnitId || '';
-          updateData.assignedUnits = cleanUnitId ? [cleanUnitId] : [];
-        }
+        const activeUnit = resolveUserRequestUnit(req);
+        const { userDoc, UserModel, unitId: currentUnitId } = await findUserInUnitOrAny(userId, activeUnit);
 
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
-        }
+        if (userDoc) {
+          if ((userDoc.role === 'OWNER' || userDoc.isOwner) && req.user?.role !== 'OWNER') {
+            return res.status(403).json({
+              success: false,
+              message: 'Security Violation: The Owner account is private and cannot be altered by general administrators.',
+            });
+          }
 
-        const targetUser = await User.findOne(query);
-        if (targetUser && (targetUser.role === 'OWNER' || targetUser.isOwner) && req.user?.role !== 'OWNER') {
-          return res.status(403).json({
-            success: false,
-            message: 'Security Violation: The Owner account is private and cannot be altered by general administrators.',
-          });
-        }
+          const updateData = {};
+          if (name) updateData.name = name.trim();
+          if (email) updateData.email = email.trim().toLowerCase();
+          if (department) updateData.department = department.trim();
+          if (designation) updateData.designation = designation.trim();
+          if (typeof mobileNumber !== 'undefined') updateData.mobileNumber = mobileNumber.trim();
+          if (role) updateData.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
 
-        const updated = await User.findOneAndUpdate(query, updateData, { new: true });
-        if (updated) {
-          mockStore.updateUser(userId, updateData);
-          await logEvent({
-            req,
-            action: 'USER_UPDATED',
-            actionLabel: 'User Profile Updated',
-            category: 'USER_MGMT',
-            severity: 'INFO',
-            entityType: 'USER',
-            entityId: updated.employeeId || userId,
-            entityName: updated.name,
-            details: `Profile details updated for ${updated.name} (${updated.employeeId}).`,
-            payload: updateData,
-          });
+          let targetUnitChange = null;
+          if (typeof unitId !== 'undefined' && unitId) {
+            const requestedUnit = getCanonicalUnitId(unitId);
+            if (requestedUnit && (requestedUnit === 'UNIT-1' || requestedUnit === 'UNIT-2')) {
+              targetUnitChange = requestedUnit;
+              updateData.unitId = requestedUnit;
+              updateData.unitName = getCanonicalUnitName(requestedUnit);
+              updateData.assignedUnits = [requestedUnit];
+            }
+          }
 
-          return res.status(200).json({
-            success: true,
-            message: `User '${updated.name}' updated successfully.`,
-            user: formatUser(updated),
-          });
+          let updated = null;
+          // If unit has changed between UNIT-1 and UNIT-2, move document between collections
+          if (targetUnitChange && targetUnitChange !== currentUnitId) {
+            const TargetModel = getUserModel(targetUnitChange);
+            const rawUser = userDoc.toObject();
+            delete rawUser.__v;
+            Object.assign(rawUser, updateData);
+
+            await UserModel.findByIdAndDelete(userDoc._id);
+            updated = await TargetModel.create(rawUser);
+          } else {
+            Object.assign(userDoc, updateData);
+            updated = await userDoc.save();
+          }
+
+          if (updated) {
+            mockStore.updateUser(userId, updateData);
+            await logEvent({
+              req,
+              action: 'USER_UPDATED',
+              actionLabel: 'User Profile Updated',
+              category: 'USER_MGMT',
+              severity: 'INFO',
+              entityType: 'USER',
+              entityId: updated.employeeId || userId,
+              entityName: updated.name,
+              details: `Profile details updated for ${updated.name} (${updated.employeeId} • ${updated.unitName || updated.unitId}).`,
+              payload: updateData,
+            });
+
+            return res.status(200).json({
+              success: true,
+              message: `User '${updated.name}' updated successfully.`,
+              user: formatUser(updated),
+            });
+          }
         }
       } catch (dbErr) {
         console.warn('[UserController:updateUser] MongoDB notice:', dbErr.message);
@@ -521,17 +581,11 @@ const updateUser = async (req, res) => {
     if (designation) updates.designation = designation.trim();
     if (typeof mobileNumber !== 'undefined') updates.mobileNumber = mobileNumber.trim();
     if (role) updates.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
-    if (typeof unitId !== 'undefined') {
-      const cleanUnitId = unitId ? unitId.trim().toUpperCase() : null;
+    if (typeof unitId !== 'undefined' && unitId) {
+      const cleanUnitId = getCanonicalUnitId(unitId);
       updates.unitId = cleanUnitId;
-      updates.unitName = unitName
-        ? unitName.trim()
-        : cleanUnitId === 'UNIT-1'
-        ? 'Unit 1'
-        : cleanUnitId === 'UNIT-2'
-        ? 'Unit 2'
-        : cleanUnitId || '';
-      updates.assignedUnits = cleanUnitId ? [cleanUnitId] : [];
+      updates.unitName = getCanonicalUnitName(cleanUnitId);
+      updates.assignedUnits = [cleanUnitId];
     }
 
     const updated = mockStore.updateUser(userId, updates);
@@ -566,14 +620,9 @@ const resetUserPassword = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
-        }
+        const activeUnit = resolveUserRequestUnit(req);
+        const { userDoc: user } = await findUserInUnitOrAny(userId, activeUnit);
 
-        const user = await User.findOne(query);
         if (user) {
           if ((user.role === 'OWNER' || user.isOwner) && req.user?.role !== 'OWNER') {
             return res.status(403).json({
@@ -652,14 +701,9 @@ const toggleUserStatus = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
-        }
+        const activeUnit = resolveUserRequestUnit(req);
+        const { userDoc: current } = await findUserInUnitOrAny(userId, activeUnit);
 
-        const current = await User.findOne(query);
         if (current) {
           if (current.role === 'OWNER' || current.isOwner) {
             return res.status(403).json({
@@ -724,17 +768,18 @@ const toggleUserStatus = async (req, res) => {
 const checkUserDependencies = async (req, res) => {
   try {
     const userId = req.params.id;
+    const activeUnit = resolveUserRequestUnit(req);
 
     let targetUser = null;
+    let foundUnit = activeUnit;
+
     if (isMongoConnected()) {
       try {
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
+        const found = await findUserLeanInUnitOrAny(userId, activeUnit);
+        if (found.userDoc) {
+          targetUser = found.userDoc;
+          foundUnit = found.unitId;
         }
-        targetUser = await User.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -767,8 +812,12 @@ const checkUserDependencies = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        // Compliance Tasks
-        const tasks = await ComplianceTask.find({
+        const TaskModel = getTaskModel(foundUnit);
+        const ComplaintModel = getComplaintModel(foundUnit);
+        const AuditModel = getAuditModel(foundUnit);
+
+        // Compliance Tasks in user's unit
+        const tasks = await TaskModel.find({
           $or: [
             { 'assignedTo.userId': uId },
             { 'assignedTo.employeeId': uEmp },
@@ -779,8 +828,8 @@ const checkUserDependencies = async (req, res) => {
           else activeTasks++;
         });
 
-        // Complaints / NCs
-        const complaints = await Complaint.find({
+        // Complaints / NCs in user's unit
+        const complaints = await ComplaintModel.find({
           $or: [
             { 'createdBy.userId': uId },
             { 'createdBy.employeeId': uEmp },
@@ -794,8 +843,8 @@ const checkUserDependencies = async (req, res) => {
           else openNCs++;
         });
 
-        // Audits
-        scheduledAudits = await Audit.countDocuments({
+        // Audits in user's unit
+        scheduledAudits = await AuditModel.countDocuments({
           $or: [
             { 'auditor.userId': uId },
             { 'auditor.employeeId': uEmp },
@@ -852,6 +901,8 @@ const checkUserDependencies = async (req, res) => {
         name: targetUser.name,
         role: targetUser.role,
         department: targetUser.department,
+        unitId: foundUnit,
+        unitName: getCanonicalUnitName(foundUnit),
       },
       dependencies: {
         activeTasks,
@@ -887,16 +938,17 @@ const deleteUser = async (req, res) => {
       });
     }
 
+    const activeUnit = resolveUserRequestUnit(req);
     let targetUser = null;
+    let foundUnit = activeUnit;
+
     if (isMongoConnected()) {
       try {
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
+        const found = await findUserLeanInUnitOrAny(userId, activeUnit);
+        if (found.userDoc) {
+          targetUser = found.userDoc;
+          foundUnit = found.unitId;
         }
-        targetUser = await User.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -936,15 +988,16 @@ const deleteUser = async (req, res) => {
       isActive: false,
     };
 
-    // Soft delete from MongoDB (Never permanently delete records)
+    // Soft delete from MongoDB in target unit's collection
     if (isMongoConnected()) {
+      const TargetUserModel = getUserModel(foundUnit);
       const query = {
         $or: [{ employeeId: userId }, { email: userId }],
       };
       if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
         query.$or.unshift({ _id: userId });
       }
-      await User.updateOne(query, {
+      await TargetUserModel.updateOne(query, {
         $set: {
           isDeleted: true,
           isActive: false,
@@ -969,7 +1022,7 @@ const deleteUser = async (req, res) => {
       entityType: 'USER',
       entityId: targetUser.employeeId,
       entityName: targetUser.name,
-      details: `User account '${targetUser.name}' (${targetUser.employeeId} • ${targetUser.role} • ${targetUser.department}) was soft-deleted and archived by ${actorName} (${actorEmpId} • ${actorRole}). All historical NCs, CAP submissions, evidence photos, and audit logs remain permanently preserved.`,
+      details: `User account '${targetUser.name}' (${targetUser.employeeId} • ${targetUser.role} • ${targetUser.department} • ${getCanonicalUnitName(foundUnit)}) was soft-deleted and archived by ${actorName} (${actorEmpId} • ${actorRole}). All historical NCs, CAP submissions, evidence photos, and audit logs remain permanently preserved.`,
       payload: {
         deletedBy: deletedInfo.deletedBy,
         deletedUser: {
@@ -979,6 +1032,7 @@ const deleteUser = async (req, res) => {
           department: targetUser.department,
           designation: targetUser.designation,
           email: targetUser.email,
+          unitId: foundUnit,
         },
         deletedAt: deletedInfo.deletedAt.toISOString(),
       },
@@ -993,6 +1047,8 @@ const deleteUser = async (req, res) => {
         name: targetUser.name,
         role: targetUser.role,
         department: targetUser.department,
+        unitId: foundUnit,
+        unitName: getCanonicalUnitName(foundUnit),
         isDeleted: true,
         deletedAt: deletedInfo.deletedAt,
       },
@@ -1013,6 +1069,7 @@ const deleteUser = async (req, res) => {
 const getArchivedUsers = async (req, res) => {
   try {
     let archivedUsers = [];
+    const targetUnit = resolveUserRequestUnit(req);
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -1020,7 +1077,8 @@ const getArchivedUsers = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        const data = await User.find({ isDeleted: true }).sort({ deletedAt: -1 }).lean();
+        const UserModel = getUserModel(targetUnit);
+        const data = await UserModel.find({ isDeleted: true }).sort({ deletedAt: -1 }).lean();
         if (data) {
           archivedUsers = data;
         }
@@ -1033,6 +1091,8 @@ const getArchivedUsers = async (req, res) => {
       archivedUsers = mockStore.getUsers(true).filter((u) => u.isDeleted);
     }
 
+    const ComplaintModel = getComplaintModel(targetUnit);
+
     // Attach NC summary counts for each archived user
     const usersWithNcStats = await Promise.all(
       archivedUsers.map(async (u) => {
@@ -1044,13 +1104,13 @@ const getArchivedUsers = async (req, res) => {
 
         if (isMongoConnected()) {
           try {
-            createdNcCount = await Complaint.countDocuments({
+            createdNcCount = await ComplaintModel.countDocuments({
               $or: [{ 'createdBy.userId': uId }, { 'createdBy.employeeId': uEmp }],
             });
-            assignedNcCount = await Complaint.countDocuments({
+            assignedNcCount = await ComplaintModel.countDocuments({
               $or: [{ 'assignedTo.userId': uId }, { 'assignedTo.employeeId': uEmp }],
             });
-            totalNcCount = await Complaint.countDocuments({
+            totalNcCount = await ComplaintModel.countDocuments({
               $or: [
                 { 'createdBy.userId': uId },
                 { 'createdBy.employeeId': uEmp },
@@ -1084,6 +1144,8 @@ const getArchivedUsers = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: usersWithNcStats.length,
+      unitId: targetUnit,
+      unitName: getCanonicalUnitName(targetUnit),
       users: usersWithNcStats,
     });
   } catch (error) {
@@ -1102,17 +1164,18 @@ const getArchivedUsers = async (req, res) => {
 const getUserNcHistory = async (req, res) => {
   try {
     const userId = req.params.id;
+    const activeUnit = resolveUserRequestUnit(req);
 
     let targetUser = null;
+    let foundUnit = activeUnit;
+
     if (isMongoConnected()) {
       try {
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
+        const found = await findUserLeanInUnitOrAny(userId, activeUnit);
+        if (found.userDoc) {
+          targetUser = found.userDoc;
+          foundUnit = found.unitId;
         }
-        targetUser = await User.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -1133,7 +1196,8 @@ const getUserNcHistory = async (req, res) => {
     let complaints = [];
     if (isMongoConnected()) {
       try {
-        complaints = await Complaint.find({
+        const ComplaintModel = getComplaintModel(foundUnit);
+        complaints = await ComplaintModel.find({
           $or: [
             { 'createdBy.userId': uId },
             { 'createdBy.employeeId': uEmp },
@@ -1177,6 +1241,8 @@ const getUserNcHistory = async (req, res) => {
     return res.status(200).json({
       success: true,
       user: formatUser(targetUser),
+      unitId: foundUnit,
+      unitName: getCanonicalUnitName(foundUnit),
       count: formattedRecords.length,
       records: formattedRecords,
     });
@@ -1196,18 +1262,17 @@ const getUserNcHistory = async (req, res) => {
 const restoreUser = async (req, res) => {
   try {
     const userId = req.params.id;
+    const activeUnit = resolveUserRequestUnit(req);
 
     let targetUser = null;
+    let foundUnit = activeUnit;
+
     if (isMongoConnected()) {
       try {
-        const query = {
-          $or: [{ employeeId: userId }, { email: userId }],
-        };
-        if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-          query.$or.unshift({ _id: userId });
-        }
-        targetUser = await User.findOne(query);
-        if (targetUser) {
+        const found = await findUserInUnitOrAny(userId, activeUnit);
+        if (found.userDoc) {
+          targetUser = found.userDoc;
+          foundUnit = found.unitId;
           targetUser.isDeleted = false;
           targetUser.isActive = true;
           targetUser.deletedAt = null;
@@ -1242,7 +1307,7 @@ const restoreUser = async (req, res) => {
       entityType: 'USER',
       entityId: restored.employeeId,
       entityName: restored.name,
-      details: `User account '${restored.name}' (${restored.employeeId}) was restored from archive by ${actorName}.`,
+      details: `User account '${restored.name}' (${restored.employeeId} • ${getCanonicalUnitName(foundUnit)}) was restored from archive by ${actorName}.`,
     });
 
     return res.status(200).json({
@@ -1267,6 +1332,7 @@ const getTodayAttendance = async (req, res) => {
   try {
     const todayDate = req.query.date || getTodayISTString();
     const attendanceMap = await getDailyAttendanceMap(todayDate);
+    const targetUnit = resolveUserRequestUnit(req);
 
     let users = [];
     if (!isMongoConnected()) {
@@ -1274,7 +1340,8 @@ const getTodayAttendance = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const dbUsers = await User.find({ isActive: true, isDeleted: { $ne: true } })
+        const UserModel = getUserModel(targetUnit);
+        const dbUsers = await UserModel.find({ isActive: true, isDeleted: { $ne: true } })
           .sort({ department: 1, name: 1 })
           .lean();
         if (dbUsers) users = dbUsers;
@@ -1292,6 +1359,8 @@ const getTodayAttendance = async (req, res) => {
 
     res.status(200).json({
       success: true,
+      unitId: targetUnit,
+      unitName: getCanonicalUnitName(targetUnit),
       date: todayDate,
       timezone: 'Asia/Kolkata',
       summary: {

@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const mockStore = require('../config/mockStore');
+const { getUserModel, getCanonicalUnitId } = require('../models/unitModels');
+
 const isCompanyAdmin = (user) => {
   if (!user) return false;
   return Boolean(
@@ -37,6 +39,8 @@ const verifyToken = async (req, res, next) => {
           mockUser = mockStore.getUsers()[0];
         }
         req.user = mockUser;
+        req.isCompanyAdmin = isCompanyAdmin(mockUser);
+        req.activeUnitId = 'UNIT-1';
         return next();
       }
 
@@ -57,7 +61,7 @@ const verifyToken = async (req, res, next) => {
         }
       }
 
-      // Try MongoDB lookup if connected
+      // Try MongoDB lookup from unit1_users, unit2_users, or fallback User
       if (isMongoConnected()) {
         try {
           const query = {
@@ -70,7 +74,20 @@ const verifyToken = async (req, res, next) => {
             query.$or.unshift({ _id: decoded.id });
           }
 
-          const found = await User.findOne(query).select('-password').lean();
+          const User1 = getUserModel('UNIT-1');
+          const User2 = getUserModel('UNIT-2');
+          let found = null;
+          if (decoded.unitId === 'UNIT-2') {
+            found = await User2.findOne(query).select('-password').lean();
+            if (!found) found = await User1.findOne(query).select('-password').lean();
+          } else {
+            found = await User1.findOne(query).select('-password').lean();
+            if (!found) found = await User2.findOne(query).select('-password').lean();
+          }
+          if (!found) {
+            found = await User.findOne(query).select('-password').lean();
+          }
+
           if (found) {
             user = { ...found, id: found._id.toString() };
           }
@@ -113,6 +130,10 @@ const verifyToken = async (req, res, next) => {
         });
       }
 
+      // Ensure unit assignment is strictly Unit 1 or Unit 2
+      user.unitId = user.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
+      user.unitName = user.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1';
+
       req.user = user;
       req.isCompanyAdmin = isCompanyAdmin(user);
 
@@ -122,18 +143,18 @@ const verifyToken = async (req, res, next) => {
       const requestedUnit = ((rawHeaderUnit || rawQueryUnit || '').toString()).trim().toUpperCase();
 
       if (req.isCompanyAdmin) {
-        // Company Admin can switch between 'ALL', 'UNIT-1', 'UNIT-2', etc.
-        req.activeUnitId = requestedUnit || 'ALL';
+        // Company Admin can toggle strictly between Unit 1 and Unit 2 (No 'ALL')
+        req.activeUnitId = requestedUnit === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
       } else {
-        // Unit-level member is locked to their assigned unit
-        const userUnit = (user.unitId || '').toString().trim().toUpperCase();
-        req.activeUnitId = userUnit || null;
+        // Unit-level member is strictly locked to their assigned unit
+        const userUnit = user.unitId;
+        req.activeUnitId = userUnit;
 
         // Block unauthorized cross-unit requests
-        if (requestedUnit && requestedUnit !== 'ALL' && userUnit && requestedUnit !== userUnit) {
+        if (requestedUnit && requestedUnit !== userUnit) {
           return res.status(403).json({
             success: false,
-            message: `Access denied. You are assigned to unit '${user.unitName || userUnit}' and cannot access data for unit '${requestedUnit}'.`,
+            message: `Access denied. You are assigned to ${user.unitName} and cannot access data for ${requestedUnit === 'UNIT-2' ? 'Unit 2' : 'Unit 1'}.`,
           });
         }
       }

@@ -4,10 +4,22 @@ const mockStore = require('../config/mockStore');
 const { isMongoConnected, connectDB } = require('../config/db');
 const { logEvent } = require('../utils/eventLogger');
 const {
+  getAuditLogModel,
+  getUserModel,
+  getCanonicalUnitId,
+  getCanonicalUnitName,
+} = require('../models/unitModels');
+const {
   getDailyAttendanceMap,
   evaluateUserDailyAttendance,
   getTodayISTString,
 } = require('../utils/attendanceHelper');
+
+// Helper to resolve unit strictly to UNIT-1 or UNIT-2
+const resolveAuditRequestUnit = (req) => {
+  const candidate = req.query?.unitId || req.body?.unitId || req.activeUnitId || req.user?.unitId || 'UNIT-1';
+  return getCanonicalUnitId(candidate);
+};
 
 // @desc    Get audit trail & activity log history with search, category filtering & pagination
 // @route   GET /api/audit-logs
@@ -27,6 +39,7 @@ const getAuditLogs = async (req, res) => {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
     const skip = (pageNum - 1) * limitNum;
+    const targetUnit = resolveAuditRequestUnit(req);
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -34,6 +47,7 @@ const getAuditLogs = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
+        const AuditLogModel = getAuditLogModel(targetUnit);
         const query = {};
         const andConditions = [];
 
@@ -92,12 +106,14 @@ const getAuditLogs = async (req, res) => {
         }
 
         const [total, docs] = await Promise.all([
-          AuditLog.countDocuments(query),
-          AuditLog.find(query).sort({ created_at: -1 }).skip(skip).limit(limitNum).lean(),
+          AuditLogModel.countDocuments(query),
+          AuditLogModel.find(query).sort({ created_at: -1 }).skip(skip).limit(limitNum).lean(),
         ]);
 
         return res.status(200).json({
           success: true,
+          unitId: targetUnit,
+          unitName: getCanonicalUnitName(targetUnit),
           logs: docs.map((d) => ({
             ...d,
             id: d._id ? d._id.toString() : d.id,
@@ -125,6 +141,8 @@ const getAuditLogs = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      unitId: targetUnit,
+      unitName: getCanonicalUnitName(targetUnit),
       ...result,
       mode: 'IN_MEMORY',
     });
@@ -146,6 +164,7 @@ const getUserLoginTimes = async (req, res) => {
     const { timeframe = 'all', search = '', limit = 100 } = req.query;
     const todayDate = getTodayISTString();
     const attendanceMap = await getDailyAttendanceMap(todayDate);
+    const targetUnit = resolveAuditRequestUnit(req);
 
     let rawUsers = [];
     let recentLogins = [];
@@ -156,9 +175,12 @@ const getUserLoginTimes = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
+        const UserModel = getUserModel(targetUnit);
+        const AuditLogModel = getAuditLogModel(targetUnit);
+
         const [mongoUsers, mongoLogs] = await Promise.all([
-          User.find({}).sort({ role: 1, name: 1 }).lean(),
-          AuditLog.find({
+          UserModel.find({ isDeleted: { $ne: true } }).sort({ role: 1, name: 1 }).lean(),
+          AuditLogModel.find({
             $or: [
               { category: 'AUTH' },
               { action: { $regex: /^AUTH_/ } },
@@ -241,6 +263,8 @@ const getUserLoginTimes = async (req, res) => {
         role: u.role === 'SUPERVISOR' ? 'ACTION_PERSON' : u.role,
         department: u.department,
         designation: u.designation,
+        unitId: targetUnit,
+        unitName: getCanonicalUnitName(targetUnit),
         isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
         isPresent,
         attendanceStatus: isPresent ? 'Present' : 'Absent',
@@ -275,6 +299,8 @@ const getUserLoginTimes = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      unitId: targetUnit,
+      unitName: getCanonicalUnitName(targetUnit),
       stats: {
         totalUsers,
         loggedTodayCount,
@@ -302,6 +328,7 @@ const getUserLoginTimes = async (req, res) => {
 const exportAuditLogs = async (req, res) => {
   try {
     let list = [];
+    const targetUnit = resolveAuditRequestUnit(req);
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -309,7 +336,8 @@ const exportAuditLogs = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        list = await AuditLog.find().sort({ created_at: -1 }).limit(1000).lean();
+        const AuditLogModel = getAuditLogModel(targetUnit);
+        list = await AuditLogModel.find().sort({ created_at: -1 }).limit(1000).lean();
       } catch (dbErr) {
         list = mockStore.getAuditLogs({ limit: 1000 }).logs;
       }
@@ -360,7 +388,7 @@ const exportAuditLogs = async (req, res) => {
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="garment_qms_past_records_log.csv"');
+    res.setHeader('Content-Disposition', `attachment; filename="compliance_${targetUnit.toLowerCase()}_audit_log.csv"`);
     return res.status(200).send(csvContent);
   } catch (err) {
     console.error('❌ [AuditLogController:exportAuditLogs] Error:', err);
@@ -376,18 +404,22 @@ const exportAuditLogs = async (req, res) => {
 // @access  Private (ADMIN only)
 const clearAuditLogs = async (req, res) => {
   try {
+    const targetUnit = resolveAuditRequestUnit(req);
+
     await logEvent({
       req,
+      unitId: targetUnit,
       action: 'AUDIT_LOG_PURGE',
       actionLabel: 'Log History Cleared',
       category: 'SECURITY',
       severity: 'CRITICAL',
-      details: `Administrator ${req.user?.name || req.user?.employeeId || 'ADMIN'} cleared past records log history.`,
+      details: `Administrator ${req.user?.name || req.user?.employeeId || 'ADMIN'} cleared past records log history for ${getCanonicalUnitName(targetUnit)}.`,
     });
 
     if (isMongoConnected()) {
       try {
-        await AuditLog.deleteMany({});
+        const AuditLogModel = getAuditLogModel(targetUnit);
+        await AuditLogModel.deleteMany({});
       } catch (dbErr) {
         console.warn('⚠️ [AuditLogController] MongoDB clear failed:', dbErr.message);
       }
@@ -397,7 +429,7 @@ const clearAuditLogs = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Past log records cleared successfully.',
+      message: `Past log records cleared successfully for ${getCanonicalUnitName(targetUnit)}.`,
     });
   } catch (err) {
     console.error('❌ [AuditLogController:clearAuditLogs] Error:', err);

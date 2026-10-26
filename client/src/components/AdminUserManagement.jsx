@@ -449,9 +449,9 @@ export const AdminUserManagement = () => {
       ? (availableDepartmentNames.includes('Production') ? 'Production' : availableDepartmentNames[0] || 'Production')
       : (availableDepartmentNames.includes('EDP') ? 'EDP' : availableDepartmentNames[0] || 'EDP');
 
-    const defaultUnitId = activeUnitId && activeUnitId !== 'ALL' ? activeUnitId : (units[0]?.unitId || 'UNIT-1');
+    const defaultUnitId = activeUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
     const matchedUnit = units.find((u) => u.unitId === defaultUnitId);
-    const defaultUnitName = defaultRole === 'ADMIN' && activeUnitId === 'ALL' ? 'All Units' : (matchedUnit ? matchedUnit.name : 'Unit 1');
+    const defaultUnitName = matchedUnit ? matchedUnit.name : (defaultUnitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1');
 
     setCreateForm({
       role: defaultRole,
@@ -462,7 +462,7 @@ export const AdminUserManagement = () => {
       department: defaultDept,
       designation: isAud ? 'QA Quality Auditor' : isSup ? 'Production Supervisor' : 'System Administrator',
       mobileNumber: '+91 ',
-      unitId: defaultRole === 'ADMIN' && activeUnitId === 'ALL' ? 'ALL' : defaultUnitId,
+      unitId: defaultUnitId,
       unitName: defaultUnitName,
     });
     setCreatedCredentials(null);
@@ -1310,13 +1310,7 @@ export const AdminUserManagement = () => {
                             : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400'
                         }`}
                       >
-                        {u.unitName
-                          ? `${u.unitName} (${u.unitId})`
-                          : u.unitId
-                          ? u.unitId
-                          : isAdm || u.role === 'OWNER'
-                          ? 'All Units (Company Wide)'
-                          : 'Unassigned (Legacy)'}
+                        {u.unitName || (u.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
                       </span>
                     </div>
 
@@ -1730,24 +1724,22 @@ export const AdminUserManagement = () => {
                     Assigned Plant Unit *
                   </label>
                   <select
-                    value={createForm.unitId || ''}
+                    required
+                    value={createForm.unitId || 'UNIT-1'}
                     onChange={(e) => {
-                      const uId = e.target.value;
+                      const uId = e.target.value === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
                       const matched = units.find((u) => u.unitId === uId);
                       setCreateForm({
                         ...createForm,
                         unitId: uId,
-                        unitName: matched ? matched.name : (uId === 'ALL' ? 'All Units' : ''),
+                        unitName: matched ? matched.name : (uId === 'UNIT-2' ? 'Unit 2' : 'Unit 1'),
                       });
                     }}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none font-semibold cursor-pointer"
                   >
-                    {createForm.role === 'ADMIN' && (
-                      <option value="ALL">🏢 All Units (Company-Wide Administrator)</option>
-                    )}
-                    {units.map((u) => (
+                    {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
                       <option key={u.unitId} value={u.unitId}>
-                        📍 {u.name} ({u.unitId})
+                        📍 {u.name}
                       </option>
                     ))}
                   </select>
@@ -2048,25 +2040,22 @@ export const AdminUserManagement = () => {
                   Assigned Plant Unit
                 </label>
                 <select
-                  value={editForm.unitId || ''}
+                  required
+                  value={editForm.unitId || 'UNIT-1'}
                   onChange={(e) => {
-                    const uId = e.target.value;
+                    const uId = e.target.value === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
                     const matched = units.find((u) => u.unitId === uId);
                     setEditForm({
                       ...editForm,
                       unitId: uId,
-                      unitName: matched ? matched.name : (uId === 'ALL' ? 'All Units' : ''),
+                      unitName: matched ? matched.name : (uId === 'UNIT-2' ? 'Unit 2' : 'Unit 1'),
                     });
                   }}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-semibold cursor-pointer"
                 >
-                  <option value="">(Unassigned / Legacy)</option>
-                  {(editForm.role === 'ADMIN' || selectedUser.role === 'OWNER') && (
-                    <option value="ALL">🏢 All Units (Company-Wide Administrator)</option>
-                  )}
-                  {units.map((u) => (
+                  {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
                     <option key={u.unitId} value={u.unitId}>
-                      📍 {u.name} ({u.unitId})
+                      📍 {u.name}
                     </option>
                   ))}
                 </select>

@@ -3,6 +3,15 @@ const ComplianceTask = require('../models/ComplianceTask');
 const Complaint = require('../models/Complaint');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
+const {
+  normalizeUnit,
+  getCanonicalUnitId,
+  getCanonicalUnitName,
+  getTaskModel,
+  getComplaintModel,
+  getUserModel,
+  getAttendanceModel,
+} = require('../models/unitModels');
 const mockStore = require('../config/mockStore');
 const {
   getDailyAttendanceMap,
@@ -10,6 +19,111 @@ const {
   getTodayISTString,
 } = require('../utils/attendanceHelper');
 const { toBase64DataUrl } = require('../utils/base64Helper');
+
+/**
+ * Resolves request unit strictly to 'UNIT-1' or 'UNIT-2'.
+ * Non-admins are locked to their assigned unit.
+ */
+const resolveRequestUnit = (req, explicitUnitId = null) => {
+  if (req?.user && req.user.role !== 'ADMIN') {
+    return getCanonicalUnitId(req.user.unitId || req.activeUnitId);
+  }
+  const candidate = explicitUnitId || req?.body?.unitId || req?.query?.unitId || req?.headers?.['x-active-unit-id'] || req?.activeUnitId;
+  return getCanonicalUnitId(candidate);
+};
+
+/**
+ * Finds task in unit's collection. Non-admins cannot see other unit's tasks.
+ */
+const findTaskInUnitOrActive = async (req, paramId) => {
+  const query = { $or: [{ id: paramId }] };
+  if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+    query.$or.unshift({ _id: paramId });
+  }
+
+  if (req?.user && req.user.role !== 'ADMIN') {
+    const unitId = getCanonicalUnitId(req.user.unitId || req.activeUnitId);
+    const TaskModel = getTaskModel(unitId);
+    let doc = await TaskModel.findOne(query).lean();
+    if (doc) return { task: { ...doc, id: doc._id ? doc._id.toString() : doc.id }, unitId, TaskModel };
+
+    // Check complaint in same unit
+    const ComplaintModel = getComplaintModel(unitId);
+    const cmpQuery = { $or: [{ complaintId: paramId }] };
+    if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+      cmpQuery.$or.unshift({ _id: paramId });
+    }
+    const c = await ComplaintModel.findOne(cmpQuery).lean();
+    if (c) {
+      const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
+      const isBusy = c.status === 'In Progress';
+      return {
+        task: {
+          id: c.complaintId || c._id.toString(),
+          _id: c._id.toString(),
+          complaintId: c.complaintId,
+          title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+          department: c.department,
+          description: c.findingDescription || c.description,
+          priority: c.priority || c.riskSeverity || 'HIGH',
+          dueDate: c.deadlineTimestamp,
+          status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
+          workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
+          startedAt: c.startedAt || null,
+          startedBy: c.startedBy || null,
+          completedAt: c.actualCompletedAt || null,
+          proofPhoto: c.afterPhoto || null,
+          unitId,
+        },
+        unitId,
+        isComplaint: true,
+      };
+    }
+    return { task: null, unitId, TaskModel };
+  }
+
+  // Admin user: check requested or active unit first
+  const preferredUnit = getCanonicalUnitId(req?.query?.unitId || req?.body?.unitId || req?.headers?.['x-active-unit-id'] || req?.activeUnitId);
+  for (const u of [preferredUnit, preferredUnit === 'UNIT-1' ? 'UNIT-2' : 'UNIT-1']) {
+    const TaskModel = getTaskModel(u);
+    let doc = await TaskModel.findOne(query).lean();
+    if (doc) return { task: { ...doc, id: doc._id ? doc._id.toString() : doc.id }, unitId: u, TaskModel };
+
+    const ComplaintModel = getComplaintModel(u);
+    const cmpQuery = { $or: [{ complaintId: paramId }] };
+    if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+      cmpQuery.$or.unshift({ _id: paramId });
+    }
+    const c = await ComplaintModel.findOne(cmpQuery).lean();
+    if (c) {
+      const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
+      const isBusy = c.status === 'In Progress';
+      return {
+        task: {
+          id: c.complaintId || c._id.toString(),
+          _id: c._id.toString(),
+          complaintId: c.complaintId,
+          title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+          department: c.department,
+          description: c.findingDescription || c.description,
+          priority: c.priority || c.riskSeverity || 'HIGH',
+          dueDate: c.deadlineTimestamp,
+          status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
+          workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
+          startedAt: c.startedAt || null,
+          startedBy: c.startedBy || null,
+          completedAt: c.actualCompletedAt || null,
+          proofPhoto: c.afterPhoto || null,
+          unitId: u,
+        },
+        unitId: u,
+        isComplaint: true,
+      };
+    }
+  }
+
+  return { task: null, unitId: preferredUnit, TaskModel: getTaskModel(preferredUnit) };
+};
 
 /**
  * Compliance Tasks
@@ -222,28 +336,14 @@ const matchesFilter = (task, state, department) => {
 const getTasks = async (req, res) => {
   try {
     const { state, department, unitId } = req.query;
-    const targetUnit = (unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
-
-    let taskFilter = {};
-    let complaintFilter = { isDeleted: { $ne: true } };
-
-    if (targetUnit && targetUnit !== 'ALL') {
-      if (targetUnit === 'UNASSIGNED') {
-        const unassignedOr = {
-          $or: [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }],
-        };
-        taskFilter = { ...unassignedOr };
-        complaintFilter = { isDeleted: { $ne: true }, ...unassignedOr };
-      } else {
-        taskFilter = { unitId: targetUnit };
-        complaintFilter = { isDeleted: { $ne: true }, unitId: targetUnit };
-      }
-    }
+    const targetUnit = resolveRequestUnit(req, unitId);
+    const TaskModel = getTaskModel(targetUnit);
+    const ComplaintModel = getComplaintModel(targetUnit);
 
     let tasks = [];
     if (isMongoConnected()) {
       try {
-        const data = await ComplianceTask.find(taskFilter).sort({ createdAt: -1 }).lean();
+        const data = await TaskModel.find({}).sort({ createdAt: -1 }).lean();
         tasks = (data || []).map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (dbErr) {
         console.warn('[TaskController:getTasks] MongoDB fallback:', dbErr.message);
@@ -257,7 +357,7 @@ const getTasks = async (req, res) => {
     let complaints = [];
     if (isMongoConnected()) {
       try {
-        const cData = await Complaint.find(complaintFilter).sort({ createdAt: -1 }).lean();
+        const cData = await ComplaintModel.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
         if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {}
     } else {
@@ -340,8 +440,10 @@ const createTask = async (req, res) => {
     }
 
     // Resolve target unit for this task
-    const resolvedUnitId = (unitId || (req.activeUnitId !== 'ALL' ? req.activeUnitId : null) || req.user?.unitId || '').toString().trim().toUpperCase();
-    const resolvedUnitName = unitName || (resolvedUnitId === 'UNIT-1' ? 'Unit 1' : resolvedUnitId === 'UNIT-2' ? 'Unit 2' : resolvedUnitId || '');
+    const resolvedUnitId = resolveRequestUnit(req, unitId);
+    const resolvedUnitName = getCanonicalUnitName(resolvedUnitId);
+    const UserModel = getUserModel(resolvedUnitId);
+    const TaskModel = getTaskModel(resolvedUnitId);
 
     // Resolve the assignee: explicit user, department pool, else self.
     let assignedTo = null;
@@ -353,7 +455,8 @@ const createTask = async (req, res) => {
         employeeId: 'DEPT-POOL',
         name: `${department || 'Department'} (Open to All Department Workers)`,
         department: department || 'Central Quality Audit',
-        unitId: resolvedUnitId && resolvedUnitId !== 'ALL' ? resolvedUnitId : null,
+        unitId: resolvedUnitId,
+        unitName: resolvedUnitName,
         isDepartmentPool: true,
       };
     } else {
@@ -366,7 +469,7 @@ const createTask = async (req, res) => {
           if (lookupId && typeof lookupId === 'string' && lookupId.match(/^[0-9a-fA-F]{24}$/)) {
             query.$or.unshift({ _id: lookupId });
           }
-          const found = await User.findOne(query).lean();
+          const found = await UserModel.findOne(query).lean();
           if (found) owner = { ...found, id: found._id ? found._id.toString() : found.id };
         } catch (e) {
           console.warn('[TaskController:createTask] assignee lookup notice:', e.message);
@@ -377,23 +480,23 @@ const createTask = async (req, res) => {
 
       // Strict Cross-Unit Assignment Guard:
       // Unit 1 tasks must not be assigned to Unit 2 members and vice versa.
-      if (owner && resolvedUnitId && resolvedUnitId !== 'ALL') {
-        const ownerUnit = (owner.unitId || '').toString().trim().toUpperCase();
+      if (owner && resolvedUnitId) {
+        const ownerUnit = getCanonicalUnitId(owner.unitId);
         if (ownerUnit && ownerUnit !== resolvedUnitId) {
           return res.status(400).json({
             success: false,
-            message: `Cross-Unit Assignment Blocked: Member '${owner.name}' belongs to ${owner.unitName || ownerUnit} and cannot be assigned to a ${resolvedUnitName || resolvedUnitId} task. Unit 1 tasks must not be assigned to Unit 2 members and vice versa.`,
+            message: `Cross-Unit Assignment Blocked: Member '${owner.name}' belongs to ${owner.unitName || ownerUnit} and cannot be assigned to a ${resolvedUnitName} task. Unit 1 tasks must not be assigned to Unit 2 members and vice versa.`,
           });
         }
       }
 
       assignedTo = {
-        userId: owner.id || owner._id || '',
-        employeeId: owner.employeeId || '',
-        name: owner.name || '',
-        department: owner.department || department || '',
-        unitId: owner.unitId || resolvedUnitId || null,
-        unitName: owner.unitName || resolvedUnitName || '',
+        userId: owner?.id || owner?._id || '',
+        employeeId: owner?.employeeId || '',
+        name: owner?.name || '',
+        department: owner?.department || department || '',
+        unitId: resolvedUnitId,
+        unitName: resolvedUnitName,
       };
     }
 
@@ -402,7 +505,7 @@ const createTask = async (req, res) => {
       department: department || 'Central Quality Audit',
       description: description || '',
       assignedTo,
-      unitId: resolvedUnitId && resolvedUnitId !== 'ALL' ? resolvedUnitId : null,
+      unitId: resolvedUnitId,
       unitName: resolvedUnitName,
       dueDate: new Date(dueDate).toISOString(),
       status: 'Pending',
@@ -414,7 +517,7 @@ const createTask = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        const created = await ComplianceTask.create(payload);
+        const created = await TaskModel.create(payload);
         if (created) {
           const taskObj = { ...created.toObject(), id: created._id.toString() };
           mockStore.createTask(taskObj);
@@ -476,6 +579,8 @@ const updateTask = async (req, res) => {
     const lookupId = assignedToUserId || assignedToEmployeeId;
     if (lookupId !== undefined && lookupId !== '') {
       let owner = null;
+      const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+      const UserModel = getUserModel(taskUnit);
       if (isMongoConnected()) {
         try {
           const query = {
@@ -484,7 +589,7 @@ const updateTask = async (req, res) => {
           if (lookupId && typeof lookupId === 'string' && lookupId.match(/^[0-9a-fA-F]{24}$/)) {
             query.$or.unshift({ _id: lookupId });
           }
-          const found = await User.findOne(query).lean();
+          const found = await UserModel.findOne(query).lean();
           if (found) owner = { ...found, id: found._id ? found._id.toString() : found.id };
         } catch (e) {
           console.warn('[TaskController:updateTask] assignee lookup notice:', e.message);
@@ -509,11 +614,13 @@ const updateTask = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
+        const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+        const TaskModel = getTaskModel(taskUnit);
         const query = { $or: [{ id: task.id }] };
         if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: task.id });
         }
-        const updated = await ComplianceTask.findOneAndUpdate(query, updates, { new: true }).lean();
+        const updated = await TaskModel.findOneAndUpdate(query, updates, { new: true }).lean();
         if (updated) {
           const taskObj = { ...updated, id: updated._id ? updated._id.toString() : updated.id };
           mockStore.updateTask(task.id, updates);
@@ -586,10 +693,14 @@ const startTask = async (req, res) => {
 
     // 3. Prevent already busy employees from taking on duplicate active tasks:
     // Check if this employee is ALREADY actively working on another incomplete task
+    const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+    const TaskModel = getTaskModel(taskUnit);
+    const ComplaintModel = getComplaintModel(taskUnit);
+
     let allTasks = [];
     if (isMongoConnected()) {
       try {
-        const data = await ComplianceTask.find().lean();
+        const data = await TaskModel.find().lean();
         if (data) allTasks = data.map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (e) {}
     }
@@ -631,7 +742,7 @@ const startTask = async (req, res) => {
       if (isMongoConnected()) {
         try {
           const query = { $or: [{ complaintId: task.complaintId || task.id }] };
-          const cur = await Complaint.findOne(query);
+          const cur = await ComplaintModel.findOne(query);
           if (cur) {
             cur.status = 'In Progress';
             cur.startedAt = now;
@@ -696,7 +807,7 @@ const startTask = async (req, res) => {
         if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: task.id });
         }
-        const dbUpdated = await ComplianceTask.findOneAndUpdate(query, safeUpdates, { new: true }).lean();
+        const dbUpdated = await TaskModel.findOneAndUpdate(query, safeUpdates, { new: true }).lean();
         if (dbUpdated) updated = { ...dbUpdated, id: dbUpdated._id ? dbUpdated._id.toString() : dbUpdated.id };
       } catch (dbErr) {
         console.warn('[TaskController:startTask] MongoDB update notice:', dbErr.message);
@@ -792,11 +903,12 @@ const completeTask = async (req, res) => {
         name: req.user?.name || '',
         department: req.user?.department || task.department || '',
       };
-      const base64ProofPhoto = toBase64DataUrl(proofPhoto);
+      const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+      const ComplaintModel = getComplaintModel(taskUnit);
       if (isMongoConnected()) {
         try {
           const query = { $or: [{ complaintId: task.complaintId || task.id }] };
-          const cur = await Complaint.findOne(query);
+          const cur = await ComplaintModel.findOne(query);
           if (cur) {
             cur.status = 'CAP Submitted';
             cur.actualCompletedAt = now;
@@ -916,7 +1028,9 @@ const completeTask = async (req, res) => {
         if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: task.id });
         }
-        const dbUpdated = await ComplianceTask.findOneAndUpdate(query, safeUpdates, { new: true }).lean();
+        const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+        const TaskModel = getTaskModel(taskUnit);
+        const dbUpdated = await TaskModel.findOneAndUpdate(query, safeUpdates, { new: true }).lean();
         if (dbUpdated) {
           completed = { ...dbUpdated, id: dbUpdated._id ? dbUpdated._id.toString() : dbUpdated.id };
         } else {
@@ -959,6 +1073,8 @@ const completeTask = async (req, res) => {
     if (task.recurrence && task.recurrence !== 'NONE') {
       const nextDue = nextDueDate(task.dueDate, task.recurrence);
       if (nextDue) {
+        const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+        const TaskModel = getTaskModel(taskUnit);
         const nextPayload = {
           title: task.title,
           department: task.department,
@@ -970,6 +1086,8 @@ const completeTask = async (req, res) => {
             department: task.department,
             isDepartmentPool: true,
           },
+          unitId: taskUnit,
+          unitName: getCanonicalUnitName(taskUnit),
           dueDate: nextDue.toISOString(),
           status: 'Pending',
           recurrence: task.recurrence,
@@ -980,7 +1098,7 @@ const completeTask = async (req, res) => {
 
         if (isMongoConnected()) {
           try {
-            const nextDb = await ComplianceTask.create(nextPayload);
+            const nextDb = await TaskModel.create(nextPayload);
             if (nextDb) nextTask = { ...nextDb.toObject(), id: nextDb._id.toString() };
           } catch (dbErr) {
             console.warn('[TaskController:completeTask] Recurrence insert notice:', dbErr.message);
@@ -1024,7 +1142,9 @@ const deleteTask = async (req, res) => {
         if (task.id && typeof task.id === 'string' && task.id.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: task.id });
         }
-        await ComplianceTask.findOneAndDelete(query);
+        const taskUnit = getCanonicalUnitId(task.unitId || req.user?.unitId);
+        const TaskModel = getTaskModel(taskUnit);
+        await TaskModel.findOneAndDelete(query);
         mockStore.deleteTask(task.id);
         return res.json({ success: true, message: 'Task deleted.' });
       } catch (dbErr) {
@@ -1064,11 +1184,16 @@ const getEmployeeWorkStatus = async (req, res) => {
     const attendanceMap = await getDailyAttendanceMap(todayDate);
     const nowTime = new Date();
 
-    // 1. Fetch all users
+    const activeUnit = resolveRequestUnit(req, req.query?.unitId);
+    const UserModel = getUserModel(activeUnit);
+    const TaskModel = getTaskModel(activeUnit);
+    const ComplaintModel = getComplaintModel(activeUnit);
+
+    // 1. Fetch all users from unit collection
     let allUsers = [];
     if (isMongoConnected()) {
       try {
-        const dbUsers = await User.find({ isActive: true }).select('name employeeId email role department designation isActive isPresent lastLoginAt lastLogoutAt unitId unitName assignedUnits').lean();
+        const dbUsers = await UserModel.find({ isActive: true }).select('name employeeId email role department designation isActive isPresent lastLoginAt lastLogoutAt unitId unitName assignedUnits').lean();
         if (dbUsers) allUsers = dbUsers.map((u) => ({ ...u, id: u._id.toString() }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] users fetch fallback:', e.message);
@@ -1081,11 +1206,11 @@ const getEmployeeWorkStatus = async (req, res) => {
     // Active workers only
     allUsers = allUsers.filter((u) => u.isActive !== false);
 
-    // 2. Fetch all tasks
+    // 2. Fetch all tasks from unit collection
     let allTasks = [];
     if (isMongoConnected()) {
       try {
-        const dbTasks = await ComplianceTask.find().lean();
+        const dbTasks = await TaskModel.find().lean();
         if (dbTasks) allTasks = dbTasks.map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] tasks fetch fallback:', e.message);
@@ -1098,11 +1223,11 @@ const getEmployeeWorkStatus = async (req, res) => {
     // Enrich all tasks with live tracking metadata (startedAt, workStatus, proof)
     allTasks = (allTasks || []).map((t) => enrichTaskWithMeta(t));
 
-    // 2b. Fetch all Non-Conformance complaints so NC work reflects on Live Operations
+    // 2b. Fetch all Non-Conformance complaints from unit collection
     let allComplaints = [];
     if (isMongoConnected()) {
       try {
-        const dbComplaints = await Complaint.find({ isDeleted: { $ne: true } }).lean();
+        const dbComplaints = await ComplaintModel.find({ isDeleted: { $ne: true } }).lean();
         if (dbComplaints) allComplaints = dbComplaints.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] complaints fetch fallback:', e.message);
@@ -1110,21 +1235,6 @@ const getEmployeeWorkStatus = async (req, res) => {
     }
     if (!allComplaints || allComplaints.length === 0) {
       allComplaints = mockStore.getComplaints().filter((c) => !c.isDeleted);
-    }
-
-    // Filter by unit if specified or active
-    const activeUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
-
-    if (activeUnit && activeUnit !== 'ALL') {
-      if (activeUnit === 'UNASSIGNED') {
-        allTasks = allTasks.filter((t) => !t.unitId || t.unitId === 'UNASSIGNED');
-        allComplaints = allComplaints.filter((c) => !c.unitId || c.unitId === 'UNASSIGNED');
-        allUsers = allUsers.filter((u) => !u.unitId || u.unitId === 'UNASSIGNED');
-      } else {
-        allTasks = allTasks.filter((t) => t.unitId && t.unitId.toUpperCase() === activeUnit);
-        allComplaints = allComplaints.filter((c) => c.unitId && c.unitId.toUpperCase() === activeUnit);
-        allUsers = allUsers.filter((u) => (u.unitId && u.unitId.toUpperCase() === activeUnit) || (Array.isArray(u.assignedUnits) && u.assignedUnits.includes(activeUnit)));
-      }
     }
 
     // Filter by department if specified
@@ -1589,16 +1699,23 @@ const canManage = (user, task) => {
   return false;
 };
 
-const findTask = async (id) => {
+const findTask = async (id, targetUnit = null) => {
   let task = null;
+  const unitsToSearch = targetUnit ? [getCanonicalUnitId(targetUnit)] : ['UNIT-1', 'UNIT-2'];
   if (isMongoConnected()) {
     try {
       const query = { $or: [{ id }] };
       if (id && typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
         query.$or.unshift({ _id: id });
       }
-      const data = await ComplianceTask.findOne(query).lean();
-      if (data) task = { ...data, id: data._id ? data._id.toString() : data.id };
+      for (const u of unitsToSearch) {
+        const TaskModel = getTaskModel(u);
+        const data = await TaskModel.findOne(query).lean();
+        if (data) {
+          task = { ...data, id: data._id ? data._id.toString() : data.id, unitId: u };
+          break;
+        }
+      }
     } catch (e) {
       console.warn('[TaskController] findTask fallback:', e.message);
     }
@@ -1614,32 +1731,38 @@ const findTask = async (id) => {
         if (id && typeof id === 'string' && id.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: id });
         }
-        const c = await Complaint.findOne(query).lean();
-        if (c) {
-          const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
-          const isBusy = c.status === 'In Progress';
-          task = {
-            id: c.complaintId || c._id.toString(),
-            _id: c._id.toString(),
-            complaintId: c.complaintId,
-            title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
-            department: c.department,
-            description: c.findingDescription || c.description,
-            priority: c.priority || c.riskSeverity || 'HIGH',
-            dueDate: c.deadlineTimestamp,
-            status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
-            workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
-            startedAt: c.startedAt || null,
-            startedBy: c.startedBy || null,
-            completedAt: c.actualCompletedAt || null,
-            proofPhoto: c.afterPhoto || null,
-            proofNotes: c.actionNotes || null,
-            assignedTo: c.assignedTo || {},
-            isNC: true,
-          };
+        for (const u of unitsToSearch) {
+          const ComplaintModel = getComplaintModel(u);
+          const c = await ComplaintModel.findOne(query).lean();
+          if (c) {
+            const isDone = ['CAP Submitted', 'Under Review', 'Verified', 'Closed', 'Under Verification'].includes(c.status);
+            const isBusy = c.status === 'In Progress';
+            task = {
+              id: c.complaintId || c._id.toString(),
+              _id: c._id.toString(),
+              complaintId: c.complaintId,
+              title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+              department: c.department,
+              description: c.findingDescription || c.description,
+              priority: c.priority || c.riskSeverity || 'HIGH',
+              dueDate: c.deadlineTimestamp,
+              status: isDone ? 'Completed' : isBusy ? 'In Progress' : 'Pending',
+              workStatus: isDone ? 'COMPLETED' : isBusy ? 'IN_PROGRESS' : 'PENDING',
+              startedAt: c.startedAt || null,
+              startedBy: c.startedBy || null,
+              completedAt: c.actualCompletedAt || null,
+              proofPhoto: c.afterPhoto || null,
+              proofNotes: c.actionNotes || null,
+              assignedTo: c.assignedTo || {},
+              unitId: u,
+              isNC: true,
+            };
+            break;
+          }
         }
       } catch (e) {}
     }
+  }
     if (!task) {
       const c = mockStore.findComplaintById(id);
       if (c) {

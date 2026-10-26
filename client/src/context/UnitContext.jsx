@@ -4,63 +4,65 @@ import { unitService } from '../services/api';
 
 const UnitContext = createContext(null);
 
+const DEFAULT_UNITS = [
+  { unitId: 'UNIT-1', name: 'Unit 1', code: 'U1', description: 'Primary Plant / Unit 1 Facility' },
+  { unitId: 'UNIT-2', name: 'Unit 2', code: 'U2', description: 'Secondary Plant / Unit 2 Facility' },
+];
+
 export const UnitProvider = ({ children }) => {
   const { user, isAdmin, isOwner } = useAuth();
-  const isCompanyAdmin = isAdmin || isOwner || user?.employeeId === 'ALL-001' || user?.email === 'all@factory.com';
+  const isCompanyAdmin = isAdmin || isOwner || user?.employeeId === 'ADM-001' || user?.email === 'admin@factory.com';
 
-  const [units, setUnits] = useState([
-    { unitId: 'UNIT-1', name: 'Unit 1', code: 'U1', description: 'Primary Manufacturing / Plant 1' },
-    { unitId: 'UNIT-2', name: 'Unit 2', code: 'U2', description: 'Secondary Plant / Facility 2' },
-  ]);
+  const [units, setUnits] = useState(DEFAULT_UNITS);
   const [unassignedCounts, setUnassignedCounts] = useState({ ncCount: 0, userCount: 0, taskCount: 0 });
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Initialize active unit based on user permissions
+  // Initialize active unit: strictly 'UNIT-1' or 'UNIT-2' (defaults to 'UNIT-1')
   const [activeUnitId, setActiveUnitIdState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('garment_qms_active_unit') || localStorage.getItem('garment_qms_active_unit');
-      if (saved) return saved;
+      if (saved === 'UNIT-1' || saved === 'UNIT-2') return saved;
     }
-    return 'ALL';
+    return 'UNIT-1';
   });
 
   // Keep activeUnitId synchronized with logged-in user's assignment
   useEffect(() => {
     if (!user) {
-      setActiveUnitIdState('ALL');
+      setActiveUnitIdState('UNIT-1');
       if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('garment_qms_active_unit');
+        sessionStorage.setItem('garment_qms_active_unit', 'UNIT-1');
       }
       return;
     }
 
     if (!isCompanyAdmin) {
-      // Non-admin user is strictly locked to their assigned unit (or fallback to legacy null)
-      const userUnit = user.unitId || 'UNIT-1';
+      // Non-admin user is strictly locked to their assigned unit (default Unit 1)
+      const userUnit = (user.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1');
       setActiveUnitIdState(userUnit);
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('garment_qms_active_unit', userUnit);
       }
     } else {
-      // Company Admin: verify saved preference is valid or keep ALL
+      // Company Admin: verify saved preference is strictly UNIT-1 or UNIT-2
       const saved = sessionStorage.getItem('garment_qms_active_unit');
-      if (!saved) {
-        setActiveUnitIdState('ALL');
-        sessionStorage.setItem('garment_qms_active_unit', 'ALL');
+      if (saved !== 'UNIT-1' && saved !== 'UNIT-2') {
+        setActiveUnitIdState('UNIT-1');
+        sessionStorage.setItem('garment_qms_active_unit', 'UNIT-1');
       }
     }
   }, [user, isCompanyAdmin]);
 
-  // Fetch real units and unassigned statistics from backend
+  // Fetch units from backend (strictly Unit 1 & Unit 2)
   const fetchUnits = useCallback(async () => {
     if (!user) return;
     try {
       setLoadingUnits(true);
       const res = await unitService.getUnits();
       if (res.data?.success && Array.isArray(res.data.data)) {
-        setUnits(res.data.data);
-        if (res.data.unassigned) {
-          setUnassignedCounts(res.data.unassigned);
+        const filtered = res.data.data.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2');
+        if (filtered.length > 0) {
+          setUnits(filtered);
         }
       }
     } catch (err) {
@@ -74,23 +76,24 @@ export const UnitProvider = ({ children }) => {
     fetchUnits();
   }, [fetchUnits]);
 
-  // Switching units for Company Admin
+  // Switching units strictly between UNIT-1 and UNIT-2
   const switchUnit = useCallback(
     (newUnitId) => {
-      if (!isCompanyAdmin && user?.unitId && newUnitId !== user.unitId) {
+      const cleanId = (newUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1');
+      if (!isCompanyAdmin && user?.unitId && cleanId !== user.unitId) {
         console.warn('[UnitContext] Cross-unit switch prevented for non-admin user.');
         return;
       }
-      setActiveUnitIdState(newUnitId);
+      setActiveUnitIdState(cleanId);
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('garment_qms_active_unit', newUnitId);
-        localStorage.setItem('garment_qms_active_unit', newUnitId);
+        sessionStorage.setItem('garment_qms_active_unit', cleanId);
+        localStorage.setItem('garment_qms_active_unit', cleanId);
       }
     },
     [isCompanyAdmin, user]
   );
 
-  const activeUnit = units.find((u) => u.unitId === activeUnitId) || (activeUnitId === 'ALL' ? { unitId: 'ALL', name: 'All Units (Company Wide)' } : { unitId: activeUnitId, name: activeUnitId });
+  const activeUnit = units.find((u) => u.unitId === activeUnitId) || units[0] || DEFAULT_UNITS[0];
 
   return (
     <UnitContext.Provider

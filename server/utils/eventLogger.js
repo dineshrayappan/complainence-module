@@ -1,27 +1,12 @@
 const AuditLog = require('../models/AuditLog');
 const mockStore = require('../config/mockStore');
 const { isMongoConnected } = require('../config/db');
+const { getAuditLogModel, getCanonicalUnitId } = require('../models/unitModels');
 
 /**
  * Centrally and non-blockingly record an application event.
- * Automatically saves to MongoDB when connected, and mirrors in-memory in mockStore.
- *
- * @param {Object} options
- * @param {Object} [options.req] - Express request object for IP and actor extraction
- * @param {string} [options.userId] - Actor user ID or employee ID
- * @param {string} [options.userName] - Actor display name
- * @param {string} [options.userRole] - Actor role
- * @param {string} options.action - Action constant (e.g., 'AUTH_LOGIN_SUCCESS', 'NC_CREATED')
- * @param {string} options.actionLabel - Human-friendly label (e.g., 'User Sign In', 'NC Created')
- * @param {string} [options.category='SYSTEM'] - 'AUTH' | 'USER_MGMT' | 'NC_DEFECT' | 'WORK_TASK' | 'DEPARTMENT' | 'SECURITY' | 'SYSTEM'
- * @param {string} [options.severity='INFO'] - 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL'
- * @param {string} [options.entityType='SYSTEM'] - Entity type
- * @param {string} [options.entityId] - ID of affected entity
- * @param {string} [options.entityName] - Name or code of affected entity
- * @param {string} [options.relatedNcId] - Associated NC ticket ID if applicable
- * @param {string} [options.details] - Detailed text explanation of the event
- * @param {Object} [options.payload] - Additional arbitrary JSON payload
- * @param {string} [options.ipAddress] - IP address
+ * Automatically saves to unit-specific collection (unit1_auditlogs or unit2_auditlogs)
+ * as well as legacy AuditLog collection.
  */
 async function logEvent(options = {}) {
   try {
@@ -57,6 +42,8 @@ async function logEvent(options = {}) {
         ipAddress;
     }
 
+    const targetUnit = getCanonicalUnitId(options.unitId || req?.activeUnitId || req?.user?.unitId || 'UNIT-1');
+
     const timestamp = new Date();
     const eventRecord = {
       id: `evt-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -71,6 +58,7 @@ async function logEvent(options = {}) {
       entity_id: entityId ? String(entityId) : null,
       entity_name: entityName ? String(entityName) : null,
       related_nc_id: relatedNcId ? String(relatedNcId) : null,
+      unit_id: targetUnit,
       details: String(details || ''),
       payload: payload || {},
       ip_address: String(ipAddress),
@@ -78,28 +66,29 @@ async function logEvent(options = {}) {
       created_at: timestamp,
     };
 
-    // Mirror to in-memory store for instant UI response and resilient fallback
+    // Mirror to in-memory store
     if (typeof mockStore.addAuditLog === 'function') {
       mockStore.addAuditLog(eventRecord);
     }
 
-    // Persist to MongoDB if active
+    // Persist to MongoDB
     if (isMongoConnected()) {
       try {
-        await AuditLog.create(eventRecord);
+        const UnitAuditLogModel = getAuditLogModel(targetUnit);
+        await Promise.allSettled([
+          UnitAuditLogModel.create(eventRecord),
+          AuditLog.create(eventRecord),
+        ]);
       } catch (dbErr) {
-        console.warn('⚠️ [EventLogger] Could not persist to MongoDB, in-memory log preserved:', dbErr.message);
+        console.warn('⚠️ [EventLogger] Notice persisting audit log:', dbErr.message);
       }
     }
 
     return eventRecord;
   } catch (err) {
-    // Non-blocking catch to ensure operational requests never fail because of logging
     console.error('❌ [EventLogger] Failure recording event:', err.message);
     return null;
   }
 }
 
-module.exports = {
-  logEvent,
-};
+module.exports = { logEvent };

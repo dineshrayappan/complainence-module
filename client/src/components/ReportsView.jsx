@@ -124,11 +124,11 @@ export const ReportsView = ({
   // 11. Record Status Filter ('ALL' | 'ACTIVE' | 'DELETED')
   const [recordStatusFilter, setRecordStatusFilter] = useState('ALL');
 
-  // 12. Unit Filter ('ALL' | 'UNIT-1' | 'UNIT-2' ...)
-  const [unitFilter, setUnitFilter] = useState(() => (activeUnitId ? activeUnitId : 'ALL'));
+  // 12. Unit Filter (Strictly 'UNIT-1' or 'UNIT-2')
+  const [unitFilter, setUnitFilter] = useState(() => (activeUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1'));
 
   useEffect(() => {
-    if (activeUnitId) {
+    if (activeUnitId === 'UNIT-1' || activeUnitId === 'UNIT-2') {
       setUnitFilter(activeUnitId);
     }
   }, [activeUnitId]);
@@ -690,13 +690,9 @@ export const ReportsView = ({
         if (!matchesSearch) return false;
       }
 
-      // 12. Unit Filter
-      if (unitFilter !== 'ALL') {
-        const cUnit = c.unitId || '';
-        if (cUnit && cUnit !== unitFilter) return false;
-        // If ticket has no unitId (legacy unassigned) and a specific unit is filtered, exclude from specific unit view
-        if (!cUnit) return false;
-      }
+      // 12. Unit Filter (Strictly Unit 1 or Unit 2)
+      const cUnit = c.unitId || 'UNIT-1';
+      if (cUnit !== unitFilter) return false;
 
       return true;
     });
@@ -1824,25 +1820,18 @@ export const ReportsView = ({
             )}
           </div>
 
-          {/* Unit Filter (Company Admin & Unit Scoping) */}
+          {/* Unit Filter (Strictly Unit 1 and Unit 2) */}
           <select
             id="filter-unit-reports"
             value={unitFilter}
             onChange={(e) => setUnitFilter(e.target.value)}
-            disabled={!isCompanyAdmin && user?.unitId && user?.unitId !== 'ALL'}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              unitFilter !== 'ALL'
-                ? 'bg-indigo-50/90 border-indigo-300 text-indigo-900 dark:bg-indigo-950/70 dark:border-indigo-700 dark:text-cyan-200 font-bold'
-                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+            disabled={!isCompanyAdmin && user?.unitId}
+            className="px-3 py-1.5 text-xs rounded-xl border border-indigo-300 font-bold cursor-pointer transition-colors bg-indigo-50/90 text-indigo-900 dark:bg-indigo-950/70 dark:border-indigo-700 dark:text-cyan-200"
             title="Filter by Factory Plant Unit"
           >
-            {isCompanyAdmin && (
-              <option value="ALL">🏢 All Units (Combined Company-Wide)</option>
-            )}
-            {units.map((u) => (
+            {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
               <option key={u.unitId} value={u.unitId}>
-                📍 {u.name} ({u.unitId})
+                📍 {u.name}
               </option>
             ))}
           </select>

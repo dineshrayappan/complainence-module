@@ -5,10 +5,25 @@ const Complaint = require('../models/Complaint');
 const ComplianceTask = require('../models/ComplianceTask');
 const Audit = require('../models/Audit');
 const mockStore = require('../config/mockStore');
+const {
+  getDepartmentModel,
+  getUserModel,
+  getComplaintModel,
+  getTaskModel,
+  getAuditModel,
+  getCanonicalUnitId,
+  getCanonicalUnitName,
+} = require('../models/unitModels');
 const { logEvent } = require('../utils/eventLogger');
 
 // Helper to normalize department name
 const normalizeDeptName = (name) => (name || '').trim();
+
+// Helper to resolve unit strictly to UNIT-1 or UNIT-2
+const resolveDeptRequestUnit = (req, explicitUnit) => {
+  const candidate = explicitUnit || req.query?.unitId || req.body?.unitId || req.activeUnitId || req.user?.unitId || 'UNIT-1';
+  return getCanonicalUnitId(candidate);
+};
 
 // @desc    Get all factory departments with real-time stats
 // @route   GET /api/departments
@@ -16,53 +31,42 @@ const normalizeDeptName = (name) => (name || '').trim();
 const getDepartments = async (req, res) => {
   try {
     let departments = [];
+    const activeUnit = resolveDeptRequestUnit(req);
 
-    if (isMongoConnected()) {
+    if (!isMongoConnected()) {
+      departments = mockStore.getDepartments();
+    } else {
       try {
-        const dbDepts = await Department.find().sort({ name: 1 }).lean();
+        const DepartmentModel = getDepartmentModel(activeUnit);
+        const dbDepts = await DepartmentModel.find().sort({ name: 1 }).lean();
         if (Array.isArray(dbDepts)) {
           departments = dbDepts.map((d) => ({
             ...d,
             id: d._id.toString(),
+            unitId: activeUnit,
+            unitName: getCanonicalUnitName(activeUnit),
           }));
         }
       } catch (err) {
         console.warn('[getDepartments] MongoDB query notice:', err.message);
       }
-    } else {
-      departments = mockStore.getDepartments();
     }
 
-    // Augment with live counts: personnel, open NCs, and active tasks
+    // Augment with live counts: personnel, open NCs, and active tasks in target unit
     let usersList = [];
     let complaintsList = [];
     let tasksList = [];
 
-    const activeUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
-
     if (isMongoConnected()) {
       try {
-        const uQuery = { isActive: true };
-        const cQuery = { status: { $nin: ['Closed', 'Verified'] }, isDeleted: { $ne: true } };
-        const tQuery = { status: { $ne: 'Completed' } };
-
-        if (activeUnit && activeUnit !== 'ALL') {
-          if (activeUnit === 'UNASSIGNED') {
-            const unassigned = { $or: [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }] };
-            Object.assign(uQuery, unassigned);
-            Object.assign(cQuery, unassigned);
-            Object.assign(tQuery, unassigned);
-          } else {
-            uQuery.$or = [{ unitId: activeUnit }, { assignedUnits: activeUnit }];
-            cQuery.unitId = activeUnit;
-            tQuery.unitId = activeUnit;
-          }
-        }
+        const UserModel = getUserModel(activeUnit);
+        const ComplaintModel = getComplaintModel(activeUnit);
+        const TaskModel = getTaskModel(activeUnit);
 
         const [uRes, cRes, tRes] = await Promise.all([
-          User.find(uQuery).select('department unitId').lean(),
-          Complaint.find(cQuery).select('department status unitId').lean(),
-          ComplianceTask.find(tQuery).select('department status unitId').lean(),
+          UserModel.find({ isActive: true, isDeleted: { $ne: true } }).select('department unitId').lean(),
+          ComplaintModel.find({ status: { $nin: ['Closed', 'Verified'] }, isDeleted: { $ne: true } }).select('department status unitId').lean(),
+          TaskModel.find({ status: { $ne: 'Completed' } }).select('department status unitId').lean(),
         ]);
         usersList = uRes || [];
         complaintsList = cRes || [];
@@ -98,6 +102,8 @@ const getDepartments = async (req, res) => {
         code: d.code,
         manager: d.manager || 'Unassigned',
         headcount: d.headcount || 20,
+        unitId: activeUnit,
+        unitName: getCanonicalUnitName(activeUnit),
         createdAt: d.createdAt,
         personnelCount,
         openNCs,
@@ -108,6 +114,8 @@ const getDepartments = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: enriched.length,
+      unitId: activeUnit,
+      unitName: getCanonicalUnitName(activeUnit),
       departments: enriched,
     });
   } catch (error) {
@@ -125,17 +133,19 @@ const getDepartments = async (req, res) => {
 const checkDepartmentDependencies = async (req, res) => {
   try {
     const deptId = req.params.id;
+    const activeUnit = resolveDeptRequestUnit(req);
     let targetDept = null;
 
     if (isMongoConnected()) {
       try {
+        const DepartmentModel = getDepartmentModel(activeUnit);
         const query = {
           $or: [{ code: deptId.toUpperCase() }, { name: new RegExp(`^${deptId}$`, 'i') }],
         };
         if (deptId && typeof deptId === 'string' && deptId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: deptId });
         }
-        targetDept = await Department.findOne(query).lean();
+        targetDept = await DepartmentModel.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -161,12 +171,18 @@ const checkDepartmentDependencies = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        activePersonnel = await User.countDocuments({
+        const UserModel = getUserModel(activeUnit);
+        const ComplaintModel = getComplaintModel(activeUnit);
+        const TaskModel = getTaskModel(activeUnit);
+        const AuditModel = getAuditModel(activeUnit);
+
+        activePersonnel = await UserModel.countDocuments({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           isActive: true,
+          isDeleted: { $ne: true },
         });
 
-        const complaints = await Complaint.find({
+        const complaints = await ComplaintModel.find({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           isDeleted: { $ne: true },
         }).lean();
@@ -175,7 +191,7 @@ const checkDepartmentDependencies = async (req, res) => {
           else openNCs++;
         });
 
-        const tasks = await ComplianceTask.find({
+        const tasks = await TaskModel.find({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
         }).lean();
         tasks.forEach((t) => {
@@ -183,7 +199,7 @@ const checkDepartmentDependencies = async (req, res) => {
           else activeTasks++;
         });
 
-        scheduledAudits = await Audit.countDocuments({
+        scheduledAudits = await AuditModel.countDocuments({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           status: { $ne: 'Completed' },
         });
@@ -221,6 +237,8 @@ const checkDepartmentDependencies = async (req, res) => {
     return res.status(200).json({
       success: true,
       department: targetDept,
+      unitId: activeUnit,
+      unitName: getCanonicalUnitName(activeUnit),
       dependencies: {
         activePersonnel,
         openNCs,
@@ -245,7 +263,7 @@ const checkDepartmentDependencies = async (req, res) => {
 // @access  Private (Admin Only)
 const createDepartment = async (req, res) => {
   try {
-    const { name, code, manager, headcount } = req.body;
+    const { name, code, manager, headcount, unitId } = req.body;
 
     if (!name || !code) {
       return res.status(400).json({
@@ -254,13 +272,15 @@ const createDepartment = async (req, res) => {
       });
     }
 
+    const activeUnit = resolveDeptRequestUnit(req, unitId);
     const cleanName = name.trim();
     const cleanCode = code.trim().toUpperCase();
 
-    // Check duplicate in MongoDB
+    // Check duplicate in MongoDB for target unit
     if (isMongoConnected()) {
       try {
-        const existing = await Department.findOne({
+        const DepartmentModel = getDepartmentModel(activeUnit);
+        const existing = await DepartmentModel.findOne({
           $or: [
             { name: new RegExp(`^${cleanName}$`, 'i') },
             { code: cleanCode },
@@ -270,15 +290,17 @@ const createDepartment = async (req, res) => {
         if (existing) {
           return res.status(400).json({
             success: false,
-            message: `Department '${cleanName}' or Code '${cleanCode}' already exists in the system.`,
+            message: `Department '${cleanName}' or Code '${cleanCode}' already exists in ${getCanonicalUnitName(activeUnit)}.`,
           });
         }
 
-        const inserted = await Department.create({
+        const inserted = await DepartmentModel.create({
           name: cleanName,
           code: cleanCode,
           manager: manager ? manager.trim() : 'Unassigned',
           headcount: Number(headcount) || 20,
+          unitId: activeUnit,
+          unitName: getCanonicalUnitName(activeUnit),
         });
 
         mockStore.createDepartment({
@@ -287,11 +309,12 @@ const createDepartment = async (req, res) => {
           code: inserted.code,
           manager: inserted.manager,
           headcount: inserted.headcount,
+          unitId: activeUnit,
         });
 
         return res.status(201).json({
           success: true,
-          message: `Department '${inserted.name}' (${inserted.code}) created successfully.`,
+          message: `Department '${inserted.name}' (${inserted.code}) created successfully in ${getCanonicalUnitName(activeUnit)}.`,
           department: inserted,
         });
       } catch (dbErr) {
@@ -319,11 +342,12 @@ const createDepartment = async (req, res) => {
       code: cleanCode,
       manager: manager ? manager.trim() : 'Unassigned',
       headcount: Number(headcount) || 20,
+      unitId: activeUnit,
     });
 
     return res.status(201).json({
       success: true,
-      message: `Department '${newDept.name}' (${newDept.code}) created successfully.`,
+      message: `Department '${newDept.name}' (${newDept.code}) created successfully in ${getCanonicalUnitName(activeUnit)}.`,
       department: newDept,
     });
   } catch (error) {
@@ -341,17 +365,19 @@ const createDepartment = async (req, res) => {
 const deleteDepartment = async (req, res) => {
   try {
     const deptId = req.params.id;
+    const activeUnit = resolveDeptRequestUnit(req);
     let targetDept = null;
 
     if (isMongoConnected()) {
       try {
+        const DepartmentModel = getDepartmentModel(activeUnit);
         const query = {
           $or: [{ code: deptId.toUpperCase() }, { name: new RegExp(`^${deptId}$`, 'i') }],
         };
         if (deptId && typeof deptId === 'string' && deptId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: deptId });
         }
-        targetDept = await Department.findOne(query).lean();
+        targetDept = await DepartmentModel.findOne(query).lean();
       } catch (e) {}
     }
 
@@ -368,7 +394,7 @@ const deleteDepartment = async (req, res) => {
 
     const deptNameLower = (targetDept.name || '').trim().toLowerCase();
 
-    // Check active dependencies
+    // Check active dependencies in unit
     let activePersonnel = 0;
     let openNCs = 0;
     let activeTasks = 0;
@@ -376,22 +402,29 @@ const deleteDepartment = async (req, res) => {
 
     if (isMongoConnected()) {
       try {
-        activePersonnel = await User.countDocuments({
+        const UserModel = getUserModel(activeUnit);
+        const ComplaintModel = getComplaintModel(activeUnit);
+        const TaskModel = getTaskModel(activeUnit);
+        const AuditModel = getAuditModel(activeUnit);
+
+        activePersonnel = await UserModel.countDocuments({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           isActive: true,
+          isDeleted: { $ne: true },
         });
 
-        openNCs = await Complaint.countDocuments({
+        openNCs = await ComplaintModel.countDocuments({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           status: { $nin: ['Closed', 'Verified'] },
+          isDeleted: { $ne: true },
         });
 
-        activeTasks = await ComplianceTask.countDocuments({
+        activeTasks = await TaskModel.countDocuments({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           status: { $ne: 'Completed' },
         });
 
-        scheduledAudits = await Audit.countDocuments({
+        scheduledAudits = await AuditModel.countDocuments({
           department: new RegExp(`^${targetDept.name.trim()}$`, 'i'),
           status: { $ne: 'Completed' },
         });
@@ -420,40 +453,41 @@ const deleteDepartment = async (req, res) => {
     if (activePersonnel > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete department '${targetDept.name}': There are currently ${activePersonnel} active employees assigned to this department. Please reassign or update them first.`,
+        message: `Cannot delete department '${targetDept.name}': There are currently ${activePersonnel} active employees assigned to this department in ${getCanonicalUnitName(activeUnit)}. Please reassign or update them first.`,
       });
     }
 
     if (openNCs > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete department '${targetDept.name}': There are ${openNCs} active open Non-Conformance tickets in this department that require rectification.`,
+        message: `Cannot delete department '${targetDept.name}': There are ${openNCs} active open Non-Conformance tickets in this department that require rectification in ${getCanonicalUnitName(activeUnit)}.`,
       });
     }
 
     if (activeTasks > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete department '${targetDept.name}': There are ${activeTasks} active compliance tasks scheduled.`,
+        message: `Cannot delete department '${targetDept.name}': There are ${activeTasks} active compliance tasks scheduled in ${getCanonicalUnitName(activeUnit)}.`,
       });
     }
 
     if (scheduledAudits > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete department '${targetDept.name}': There are ${scheduledAudits} pending quality audits scheduled.`,
+        message: `Cannot delete department '${targetDept.name}': There are ${scheduledAudits} pending quality audits scheduled in ${getCanonicalUnitName(activeUnit)}.`,
       });
     }
 
-    // Perform deletion
+    // Perform deletion in target unit's collection
     if (isMongoConnected()) {
+      const DepartmentModel = getDepartmentModel(activeUnit);
       const query = {
         $or: [{ code: targetDept.code }, { name: targetDept.name }],
       };
       if (targetDept._id) {
         query.$or.unshift({ _id: targetDept._id });
       }
-      await Department.findOneAndDelete(query);
+      await DepartmentModel.findOneAndDelete(query);
     }
 
     // Delete in mockStore
@@ -475,7 +509,7 @@ const deleteDepartment = async (req, res) => {
       entityType: 'DEPARTMENT',
       entityId: targetDept.code || targetDept.name,
       entityName: targetDept.name,
-      details: `Department '${targetDept.name}' (${targetDept.code}) was permanently deleted by ${actorName} (${actorEmpId} • ${actorRole}).`,
+      details: `Department '${targetDept.name}' (${targetDept.code}) was permanently deleted from ${getCanonicalUnitName(activeUnit)} by ${actorName} (${actorEmpId} • ${actorRole}).`,
       payload: {
         deletedBy: { name: actorName, employeeId: actorEmpId, role: actorRole },
         deletedDepartment: {
@@ -483,6 +517,7 @@ const deleteDepartment = async (req, res) => {
           code: targetDept.code,
           manager: targetDept.manager,
           headcount: targetDept.headcount,
+          unitId: activeUnit,
         },
         deletedAt: new Date().toISOString(),
       },
@@ -490,7 +525,7 @@ const deleteDepartment = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Department '${targetDept.name}' (${targetDept.code}) has been deleted successfully by ${actorName}. Historical audit records remain preserved.`,
+      message: `Department '${targetDept.name}' (${targetDept.code}) has been deleted successfully from ${getCanonicalUnitName(activeUnit)} by ${actorName}. Historical audit records remain preserved.`,
       deletedDepartment: targetDept,
     });
   } catch (error) {

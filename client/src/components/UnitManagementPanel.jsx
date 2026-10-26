@@ -206,15 +206,6 @@ export const UnitManagementPanel = ({ showToast }) => {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             <span>Sync</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all hover:scale-102 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Add Unit</span>
-          </button>
         </div>
       </div>
 
@@ -222,16 +213,16 @@ export const UnitManagementPanel = ({ showToast }) => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
           <span className="text-xs text-slate-500 font-semibold block mb-1">Configured Units</span>
-          <span className="text-2xl font-black text-slate-900 dark:text-white">{units.length}</span>
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono block mt-1">● Active Plants</span>
+          <span className="text-2xl font-black text-slate-900 dark:text-white">2</span>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono block mt-1">● Unit 1 &amp; Unit 2</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-indigo-500/20 shadow-xs">
           <span className="text-xs text-indigo-600 dark:text-cyan-400 font-semibold block mb-1">Active Unit View</span>
           <span className="text-sm font-black text-slate-900 dark:text-white truncate block">
-            {activeUnitId === 'ALL' ? 'All Units (Company Wide)' : units.find((u) => u.unitId === activeUnitId)?.name || activeUnitId}
+            {units.find((u) => u.unitId === activeUnitId)?.name || (activeUnitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
           </span>
-          <span className="text-[10px] text-slate-400 font-mono block mt-1">Filtered in Header</span>
+          <span className="text-[10px] text-slate-400 font-mono block mt-1">Active Workspace</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/20 shadow-xs">
@@ -370,7 +361,7 @@ export const UnitManagementPanel = ({ showToast }) => {
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-              As required by company rules, existing production NCs and personnel without a confirmed unit mapping are safely preserved and accessible in the <strong>All Units (Company Wide)</strong> view. They are never blindly overwritten. Use this tool to map them to the verified factory plant unit.
+              As required by company rules, all existing production NCs, CAP submissions, and personnel are permanently preserved in <strong>Unit 1</strong>, while <strong>Unit 2</strong> operates as an independent clean plant partition.
             </p>
           </div>
         </div>

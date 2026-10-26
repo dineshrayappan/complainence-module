@@ -108,9 +108,8 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
   const { units, activeUnitId, isCompanyAdmin } = useUnit();
 
   const getDefaultUnitId = () => {
-    if (user?.unitId && user?.unitId !== 'ALL') return user.unitId;
-    if (activeUnitId && activeUnitId !== 'ALL') return activeUnitId;
-    return units[0]?.unitId || 'UNIT-1';
+    if (user?.unitId === 'UNIT-2' || activeUnitId === 'UNIT-2') return 'UNIT-2';
+    return 'UNIT-1';
   };
 
   const [selectedUnitId, setSelectedUnitId] = useState(getDefaultUnitId);
@@ -356,12 +355,8 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   // Filter employees strictly belonging to the currently selected department and selected unit
   const unitFilteredSupervisors = (supervisors || []).filter((s) => {
-    if (selectedUnitId && selectedUnitId !== 'ALL') {
-      if (s.unitId && s.unitId !== 'ALL' && s.unitId !== selectedUnitId) {
-        return false;
-      }
-    }
-    return true;
+    const sUnit = s.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
+    return sUnit === selectedUnitId;
   });
 
   const departmentEmployees = unitFilteredSupervisors.filter((s) => isDeptMatch(s.department, department));
@@ -549,9 +544,9 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     }}
                     className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
-                    {units.map((u) => (
+                    {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
                       <option key={u.unitId} value={u.unitId}>
-                        {u.name} ({u.unitId})
+                        {u.name}
                       </option>
                     ))}
                   </select>

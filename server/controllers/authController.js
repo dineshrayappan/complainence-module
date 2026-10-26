@@ -11,9 +11,16 @@ const {
 } = require('../utils/attendanceHelper');
 const { logEvent } = require('../utils/eventLogger');
 
-const generateToken = (id) => {
+const {
+  getUserModel,
+  getCanonicalUnitId,
+  getCanonicalUnitName,
+  normalizeUnit,
+} = require('../models/unitModels');
+
+const generateToken = (id, unitId = 'UNIT-1') => {
   return jwt.sign(
-    { id },
+    { id, unitId: getCanonicalUnitId(unitId) },
     process.env.JWT_SECRET || 'garment_qms_super_secret_jwt_key_2026_sewing_audit',
     {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -54,6 +61,9 @@ const formatUserResponse = (user, expectedRole) => {
     department: user.department,
     designation: user.designation,
     mobileNumber: user.mobileNumber,
+    unitId: getCanonicalUnitId(user.unitId),
+    unitName: getCanonicalUnitName(user.unitId),
+    assignedUnits: [getCanonicalUnitId(user.unitId)],
     isActive: typeof user.isActive !== 'undefined' ? user.isActive : true,
     isPresent,
     attendance: isPresent ? 'Present' : 'Absent',
@@ -67,12 +77,34 @@ const formatUserResponse = (user, expectedRole) => {
   };
 };
 
+const selectMatchingUser = async (candidateUsers, password, expectedRole) => {
+  if (!candidateUsers || candidateUsers.length === 0) return null;
+  const sorted = [...candidateUsers].sort((a, b) => {
+    if (expectedRole) {
+      const aMatch = a.role === expectedRole || (expectedRole === 'SUPERVISOR' && a.role === 'ACTION_PERSON');
+      const bMatch = b.role === expectedRole || (expectedRole === 'SUPERVISOR' && b.role === 'ACTION_PERSON');
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+    }
+    if (a.isDeleted !== b.isDeleted) return a.isDeleted ? 1 : -1;
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return 0;
+  });
+
+  for (const cand of sorted) {
+    if (cand.isDeleted) continue;
+    const isMatch = await cand.matchPassword(password);
+    if (isMatch) return cand;
+  }
+  return sorted[0];
+};
+
 // @desc    Sign in user with email or employeeId & password
 // @route   POST /api/auth/login
 // @access  Public
 const login = async (req, res) => {
   try {
-    const { identifier, email, employeeId, password, expectedRole } = req.body;
+    const { identifier, email, employeeId, password, expectedRole, unitId } = req.body;
     const queryIdentifier = (identifier || email || employeeId || '').trim();
 
     if (!queryIdentifier || !password) {
@@ -81,6 +113,8 @@ const login = async (req, res) => {
         message: 'Please provide both an Email/Employee ID and password.',
       });
     }
+
+    const requestedUnit = unitId ? getCanonicalUnitId(unitId) : null;
 
     // 1. If MongoDB is connected (or can be connected), attempt authentication from MongoDB
     if (!isMongoConnected()) {
@@ -99,37 +133,48 @@ const login = async (req, res) => {
           { employeeId: { $regex: new RegExp(`^${term}$`, 'i') } },
         ]);
 
-        const candidateUsers = await User.find({ $or: orFilters });
         let user = null;
+        let targetUnit = requestedUnit || 'UNIT-1';
 
-        if (candidateUsers && candidateUsers.length > 0) {
-          // Sort candidates: prioritize matching expectedRole, non-deleted, and active users
-          const sorted = [...candidateUsers].sort((a, b) => {
-            if (expectedRole) {
-              const aMatch = a.role === expectedRole || (expectedRole === 'SUPERVISOR' && a.role === 'ACTION_PERSON');
-              const bMatch = b.role === expectedRole || (expectedRole === 'SUPERVISOR' && b.role === 'ACTION_PERSON');
-              if (aMatch && !bMatch) return -1;
-              if (!aMatch && bMatch) return 1;
-            }
-            if (a.isDeleted !== b.isDeleted) return a.isDeleted ? 1 : -1;
-            if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
-            return 0;
-          });
-
-          // Test password against candidates to select the authentic user (supports duplicate email accounts)
-          for (const cand of sorted) {
-            if (cand.isDeleted) continue;
-            const isMatch = await cand.matchPassword(password);
-            if (isMatch) {
-              user = cand;
-              break;
+        if (requestedUnit) {
+          const UserModel = getUserModel(requestedUnit);
+          const candidateUsers = await UserModel.find({ $or: orFilters });
+          if (candidateUsers && candidateUsers.length > 0) {
+            user = await selectMatchingUser(candidateUsers, password, expectedRole);
+          } else {
+            // Check other unit to prevent cross-unit confusion
+            const otherUnit = requestedUnit === 'UNIT-2' ? 'UNIT-1' : 'UNIT-2';
+            const OtherUserModel = getUserModel(otherUnit);
+            const otherCandidates = await OtherUserModel.find({ $or: orFilters });
+            if (otherCandidates && otherCandidates.length > 0) {
+              const otherUser = await selectMatchingUser(otherCandidates, password, expectedRole);
+              if (otherUser) {
+                return res.status(403).json({
+                  success: false,
+                  message: `This account is assigned to ${getCanonicalUnitName(otherUnit)}. Please select ${getCanonicalUnitName(otherUnit)} workspace on the sign in page.`,
+                });
+              }
             }
           }
-
-          // If no candidate matched password, pick first to produce accurate password rejection
-          if (!user && sorted.length > 0) {
-            user = sorted[0];
+        } else {
+          // If no unit explicitly passed, search unit1_users first, then unit2_users
+          const User1 = getUserModel('UNIT-1');
+          const cand1 = await User1.find({ $or: orFilters });
+          user = await selectMatchingUser(cand1, password, expectedRole);
+          targetUnit = 'UNIT-1';
+          if (!user) {
+            const User2 = getUserModel('UNIT-2');
+            const cand2 = await User2.find({ $or: orFilters });
+            user = await selectMatchingUser(cand2, password, expectedRole);
+            if (user) targetUnit = 'UNIT-2';
           }
+        }
+
+        // Resilient fallback to User master collection if document not yet migrated
+        if (!user) {
+          const fallbackCand = await User.find({ $or: orFilters });
+          user = await selectMatchingUser(fallbackCand, password, expectedRole);
+          if (user) targetUnit = user.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
         }
 
         if (user) {
@@ -190,7 +235,10 @@ const login = async (req, res) => {
             },
           });
 
-          const token = generateToken(user._id.toString());
+          user.unitId = targetUnit;
+          user.unitName = getCanonicalUnitName(targetUnit);
+
+          const token = generateToken(user._id.toString(), targetUnit);
           return res.status(200).json({
             success: true,
             token,
@@ -421,7 +469,16 @@ const getMe = async (req, res) => {
         if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.unshift({ _id: userId });
         }
-        const data = await User.findOne(query).select('-password').lean();
+        const activeUnit = req.user?.unitId || req.activeUnitId || 'UNIT-1';
+        const UserModel = getUserModel(activeUnit);
+        let data = await UserModel.findOne(query).select('-password').lean();
+        if (!data) {
+          const OtherUser = getUserModel(activeUnit === 'UNIT-2' ? 'UNIT-1' : 'UNIT-2');
+          data = await OtherUser.findOne(query).select('-password').lean();
+        }
+        if (!data) {
+          data = await User.findOne(query).select('-password').lean();
+        }
 
         if (data) {
           const att = evaluateUserDailyAttendance(data, attendanceMap, todayDate);

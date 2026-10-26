@@ -82,12 +82,15 @@ export const AuthProvider = ({ children }) => {
     return { success: false, message: 'Role switching disabled in production mode.' };
   };
 
-  const login = async (identifier, password, expectedRole) => {
+  const login = async (identifier, password, expectedRole, unitId) => {
     try {
-      const res = await authService.login({ identifier, password, expectedRole });
+      const res = await authService.login({ identifier, password, expectedRole, unitId });
       if (res.data?.success && res.data.user) {
+        const canonicalUnit = (res.data.user.unitId === 'UNIT-2' || unitId === 'UNIT-2') ? 'UNIT-2' : 'UNIT-1';
         sessionStorage.setItem('garment_qms_token', res.data.token);
         sessionStorage.setItem('garment_qms_user', JSON.stringify(res.data.user));
+        sessionStorage.setItem('garment_qms_active_unit', canonicalUnit);
+        localStorage.setItem('garment_qms_active_unit', canonicalUnit);
         setToken(res.data.token);
         setUser(res.data.user);
         return { success: true, user: res.data.user };
