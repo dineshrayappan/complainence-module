@@ -1537,7 +1537,6 @@ export const ReportsView = ({
           'Risk Severity / Priority',
           'Department',
           'Plant Location / Station',
-          'Defect Category',
           'Creation Timestamp',
           'Deleted Timestamp',
           'Deleted By',
@@ -1581,7 +1580,6 @@ export const ReportsView = ({
             `"${c.priority || c.riskSeverity || 'Medium'}"`,
             `"${c.department || ''}"`,
             `"${c.location || ''}"`,
-            `"${c.category || ''}"`,
             `"${c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}"`,
             `"${c.deletedAt ? new Date(c.deletedAt).toLocaleString() : ''}"`,
             `"${(deletedByName || '').replace(/"/g, '""')}"`,
@@ -2236,7 +2234,7 @@ export const ReportsView = ({
                       <th className="py-2.5 px-3">NC ID</th>
                       <th className="py-2.5 px-3">Date Logged</th>
                       <th className="py-2.5 px-3">Department &amp; Line</th>
-                      <th className="py-2.5 px-3">Finding &amp; Category</th>
+                      <th className="py-2.5 px-3">Defect Finding</th>
                       <th className="py-2.5 px-3">Assigned Resolver</th>
                       <th className="py-2.5 px-3">5-Why Root Cause</th>
                       <th className="py-2.5 px-3">CAP Corrective Action</th>
@@ -2314,16 +2312,11 @@ export const ReportsView = ({
                             </div>
                           </td>
 
-                          {/* 5. Finding & Category */}
+                          {/* 5. Defect Finding */}
                           <td className="py-3 px-3 align-top max-w-xs">
                             <p className="text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
                               {getFindingText(c)}
                             </p>
-                            <div className="mt-1 flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                {c.category || '—'}
-                              </span>
-                            </div>
                           </td>
 
                           {/* 6. Assigned Resolver */}
@@ -3319,7 +3312,7 @@ export const ReportsView = ({
                   {getFindingText(drilldownComplaint)}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  {drilldownComplaint.department} • {drilldownComplaint.location} • Category: {drilldownComplaint.category}
+                  {drilldownComplaint.department} • {drilldownComplaint.location}
                 </p>
               </div>
 

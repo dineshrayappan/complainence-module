@@ -402,7 +402,7 @@ export const extractFinding = (c) => {
   if (!c) return 'General Quality Non-Conformance';
   const desc = c.description || c.findingDescription || c.title || '';
   if (desc && !desc.toLowerCase().includes('no defect description')) return desc;
-  return c.category || 'General Quality Defect';
+  return `${c.department || 'Floor'} Non-Conformance`;
 };
 
 export const extractRootCause = (c) => {

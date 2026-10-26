@@ -61,7 +61,7 @@ export const ComplaintTable = ({
           <tr>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">NC / CMP ID</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Priority</th>
-            <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">NC Defect & Location</th>
+            <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Department & Location</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Responsible Person</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Deadline Condition</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">NC Status</th>
@@ -130,7 +130,7 @@ export const ComplaintTable = ({
                     ) : null}
                     <div>
                       <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <span>{c.category}</span>
+                        <span>{c.department}</span>
                         {c.afterPhoto && (
                           <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                             Proof
@@ -138,7 +138,7 @@ export const ComplaintTable = ({
                         )}
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {c.location} • <span className="text-slate-400 dark:text-slate-500">{c.department}</span>
+                        {c.location}
                       </div>
                     </div>
                   </div>

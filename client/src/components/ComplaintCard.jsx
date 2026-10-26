@@ -118,10 +118,10 @@ export const ComplaintCard = ({
           />
         </div>
 
-        {/* Defect Category & Status */}
+        {/* Department Title & Status */}
         <div className="flex items-center justify-between mb-1.5">
           <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-sans group-hover:text-indigo-600 dark:group-hover:text-blue-400 transition-colors truncate pr-2">
-            {complaint.category}
+            {complaint.department} Non-Conformance
           </h3>
           <span
             className={`text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 rounded-full border shrink-0 ${getStatusBadge(

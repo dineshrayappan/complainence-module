@@ -2517,8 +2517,6 @@ export const AdminUserManagement = () => {
                           {rec.description || 'No detailed description provided.'}
                         </p>
                         <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap gap-2">
-                          <span><strong>Category:</strong> {rec.category}</span>
-                          <span>•</span>
                           <span><strong>Dept:</strong> {rec.department}</span>
                           <span>•</span>
                           <span><strong>Severity:</strong> {rec.riskSeverity || rec.priority || 'Major'}</span>

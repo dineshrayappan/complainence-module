@@ -413,7 +413,7 @@ export const AuditProDashboard = ({
           daysOverdue,
           status: isOverdue ? 'Overdue' : c.status || 'Open',
           priority: (c.priority || c.riskSeverity || 'Medium').charAt(0).toUpperCase() + (c.priority || c.riskSeverity || 'Medium').slice(1).toLowerCase(),
-          title: c.title || c.description || `${c.category || 'Quality'} Non-Conformance`,
+          title: c.title || c.description || `${c.department || 'Quality'} Non-Conformance`,
         });
       }
     });
@@ -480,7 +480,7 @@ export const AuditProDashboard = ({
         activities.push({
           id: `act-nc-${c._id || c.id || c.complaintId}`,
           title: 'New NC created',
-          detail: `${c.complaintId || 'NC'} • ${c.title || c.category || c.department || 'Issue logged'}`,
+          detail: `${c.complaintId || 'NC'} • ${c.title || c.department || 'Issue logged'}`,
           timestamp: createdDate,
           icon: AlertTriangle,
           iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400',
@@ -747,7 +747,7 @@ export const AuditProDashboard = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by NC ID, Department, Category..."
+              placeholder="Search by NC ID, Department, Location..."
               className="pl-8 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 w-56 sm:w-72 shadow-2xs"
             />
           </div>

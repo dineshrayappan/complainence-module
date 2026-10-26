@@ -343,7 +343,7 @@ export const ComplaintDetailModal = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h2 className="text-sm sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
-                  {complaint.category}
+                  {complaint.department} Non-Conformance
                 </h2>
                 <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider px-1.5 sm:px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
                   {complaint.priority}
@@ -505,10 +505,10 @@ export const ComplaintDetailModal = ({
           <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs shadow-2xs">
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block">
-                Defect Category
+                Department &amp; Location
               </span>
               <span className="font-extrabold text-slate-900 dark:text-white truncate block mt-0.5">
-                {complaint.category || 'Quality'}
+                {complaint.department} • {complaint.location}
               </span>
             </div>
             <div>
@@ -740,7 +740,7 @@ export const ComplaintDetailModal = ({
                       NC: Non-Conformance Breached
                     </span>
                     <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
-                      {complaint.category} • {complaint.department}
+                      {complaint.department}
                     </span>
                   </div>
                   <div className="text-xs font-bold text-slate-800 dark:text-slate-100">

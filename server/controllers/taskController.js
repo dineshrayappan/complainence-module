@@ -62,7 +62,7 @@ const findTaskInUnitOrActive = async (req, paramId) => {
           id: c.complaintId || c._id.toString(),
           _id: c._id.toString(),
           complaintId: c.complaintId,
-          title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+          title: `NC: ${c.complaintId} — ${c.department || 'Quality'} Non-Conformance`,
           department: c.department,
           description: c.findingDescription || c.description,
           priority: c.priority || c.riskSeverity || 'HIGH',
@@ -103,7 +103,7 @@ const findTaskInUnitOrActive = async (req, paramId) => {
           id: c.complaintId || c._id.toString(),
           _id: c._id.toString(),
           complaintId: c.complaintId,
-          title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+          title: `NC: ${c.complaintId} — ${c.department || 'Quality'} Non-Conformance`,
           department: c.department,
           description: c.findingDescription || c.description,
           priority: c.priority || c.riskSeverity || 'HIGH',
@@ -371,7 +371,7 @@ const getTasks = async (req, res) => {
         id: c.complaintId || c._id?.toString() || c.id,
         _id: c._id?.toString() || c.id || c.complaintId,
         complaintId: c.complaintId,
-        title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+        title: `NC: ${c.complaintId} — ${c.department || 'Quality'} Non-Conformance`,
         department: c.department,
         description: c.findingDescription || c.description || 'Non-conformance rectification',
         priority: c.priority || c.riskSeverity || 'HIGH',
@@ -1403,7 +1403,7 @@ const getEmployeeWorkStatus = async (req, res) => {
         taskStatus = 'In Progress';
         currentTask = {
           id: activeNC.complaintId || activeNC.id,
-          title: `NC: ${activeNC.complaintId} - ${activeNC.category || 'Floor Non-Conformance'}`,
+          title: `NC: ${activeNC.complaintId} - ${activeNC.department || 'Quality'} Non-Conformance`,
           priority: activeNC.priority || activeNC.riskSeverity || 'HIGH',
           dueDate: activeNC.deadlineTimestamp || activeNC.createdAt,
           department: activeNC.department,
@@ -1468,7 +1468,7 @@ const getEmployeeWorkStatus = async (req, res) => {
         if (latestCompletedNC) {
           candidates.push({
             id: latestCompletedNC.complaintId || latestCompletedNC.id,
-            title: `NC: ${latestCompletedNC.complaintId} - ${latestCompletedNC.category || 'Floor Rectification'}`,
+            title: `NC: ${latestCompletedNC.complaintId} - ${latestCompletedNC.department || 'Quality'} Rectification`,
             priority: latestCompletedNC.priority || 'HIGH',
             dueDate: latestCompletedNC.deadlineTimestamp,
             department: latestCompletedNC.department,
@@ -1741,7 +1741,7 @@ const findTask = async (id, targetUnit = null) => {
               id: c.complaintId || c._id.toString(),
               _id: c._id.toString(),
               complaintId: c.complaintId,
-              title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+              title: `NC: ${c.complaintId} — ${c.department || 'Quality'} Non-Conformance`,
               department: c.department,
               description: c.findingDescription || c.description,
               priority: c.priority || c.riskSeverity || 'HIGH',
@@ -1771,7 +1771,7 @@ const findTask = async (id, targetUnit = null) => {
         task = {
           id: c.complaintId || c.id,
           complaintId: c.complaintId,
-          title: `NC: ${c.complaintId} — ${c.category || 'Floor Defect'}`,
+          title: `NC: ${c.complaintId} — ${c.department || 'Quality'} Non-Conformance`,
           department: c.department,
           description: c.findingDescription || c.description,
           priority: c.priority || c.riskSeverity || 'HIGH',

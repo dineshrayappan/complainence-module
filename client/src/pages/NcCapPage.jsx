@@ -37,7 +37,6 @@ export const NcCapPage = () => {
   const activeTab = searchParams.get('tab') || 'all';
   const deadlineFilter = searchParams.get('deadline') || '';
   const departmentFilter = searchParams.get('dept') || '';
-  const categoryFilter = searchParams.get('cat') || '';
   const priorityFilter = searchParams.get('priority') || '';
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [viewMode, setViewMode] = useState(searchParams.get('view') || 'cards');
@@ -91,10 +90,6 @@ export const NcCapPage = () => {
 
   const handleDepartmentChange = (newDept) => {
     updateQueryParam('dept', newDept);
-  };
-
-  const handleCategoryChange = (newCat) => {
-    updateQueryParam('cat', newCat);
   };
 
   const handlePriorityChange = (newPriority) => {
@@ -177,12 +172,7 @@ export const NcCapPage = () => {
         return false;
       }
 
-      // 4. Category filter
-      if (categoryFilter && c.defectType !== categoryFilter && c.category !== categoryFilter) {
-        return false;
-      }
-
-      // 5. Priority filter
+      // 4. Priority filter
       if (priorityFilter && c.priority !== priorityFilter) {
         return false;
       }
@@ -204,7 +194,7 @@ export const NcCapPage = () => {
 
       return true;
     });
-  }, [complaints, activeTab, deadlineFilter, departmentFilter, categoryFilter, priorityFilter, searchTerm, user]);
+  }, [complaints, activeTab, deadlineFilter, departmentFilter, priorityFilter, searchTerm, user]);
 
   return (
     <>
@@ -279,8 +269,6 @@ export const NcCapPage = () => {
         departments={availableDeptList}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
-        categoryFilter={categoryFilter}
-        onCategoryChange={handleCategoryChange}
         priorityFilter={priorityFilter}
         onPriorityChange={handlePriorityChange}
         onRefresh={() => loadData(false, true)}

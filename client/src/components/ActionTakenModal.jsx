@@ -274,7 +274,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
                   </span>
                 </div>
                 <div className="font-extrabold text-slate-900 dark:text-slate-100 text-sm">
-                  {complaint.category} • {complaint.location}
+                  {complaint.location}
                 </div>
                 <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-1 mt-0.5">
                   {complaint.description}

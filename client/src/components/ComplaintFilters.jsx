@@ -12,8 +12,6 @@ export const ComplaintFilters = ({
   departmentFilter = '',
   onDepartmentChange,
   departments = [],
-  categoryFilter,
-  onCategoryChange,
   priorityFilter,
   onPriorityChange,
   onRefresh,
@@ -37,18 +35,6 @@ export const ComplaintFilters = ({
     { value: 'Due Soon', label: `Due Soon (<4h) (${counts?.dueSoonCount ?? 0})` },
     { value: 'Open', label: `Open (Within SLA) (${counts?.openDeadlineCount ?? 0})` },
     { value: 'Closed', label: `Closed (${counts?.closedDeadlineCount ?? counts?.closedTickets ?? 0})` },
-  ];
-
-  const categories = [
-    'All Categories',
-    'Quality Defect',
-    'Workmanship Flaw',
-    'Fabric Defect',
-    'Oil / Stain',
-    'Measurement / Fit',
-    'Trims / Accessories',
-    'Finishing / Pressing',
-    'Stitching Fault',
   ];
 
   const priorities = ['All Priorities', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
@@ -232,24 +218,8 @@ export const ComplaintFilters = ({
           </select>
         </div>
 
-        {/* Category Filter */}
-        <div className={`sm:col-span-1 ${departments && departments.length > 0 ? 'lg:col-span-1.5' : 'lg:col-span-2'}`}>
-          <select
-            value={categoryFilter}
-            onChange={(e) => onCategoryChange(e.target.value)}
-            aria-label="Filter by Defect Category"
-            className="w-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer font-medium"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c === 'All Categories' ? '' : c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* Priority Filter */}
-        <div className={`sm:col-span-1 ${departments && departments.length > 0 ? 'lg:col-span-1.5' : 'lg:col-span-2'}`}>
+        <div className={`sm:col-span-1 ${departments && departments.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
           <select
             value={priorityFilter}
             onChange={(e) => onPriorityChange(e.target.value)}
