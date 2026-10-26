@@ -34,7 +34,7 @@ const complaintSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Defect category is required'],
       trim: true,
-      default: 'Stitching Fault',
+      default: 'Quality Defect',
     },
     department: {
       type: String,

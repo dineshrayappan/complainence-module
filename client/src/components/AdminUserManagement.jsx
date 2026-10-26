@@ -725,7 +725,7 @@ export const AdminUserManagement = () => {
             {supervisorCount}
           </div>
           <span className="text-[10px] text-slate-400 font-mono truncate block">
-            Line in-charges
+            Responsible Persons
           </span>
         </div>
 
@@ -1710,7 +1710,7 @@ export const AdminUserManagement = () => {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Senior Line In-Charge"
+                      placeholder="e.g. Senior Responsible Person"
                       value={createForm.designation}
                       onChange={(e) => setCreateForm({ ...createForm, designation: e.target.value })}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"

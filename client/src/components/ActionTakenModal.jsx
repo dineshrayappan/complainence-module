@@ -159,7 +159,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
           name: responsibleName.trim(),
           department: responsibleDept.trim(),
           employeeId: complaint.assignedTo?.employeeId || 'SUP-001',
-          designation: complaint.assignedTo?.designation || 'In-Charge',
+          designation: complaint.assignedTo?.designation || 'Responsible Person',
         })
       );
 

@@ -32,7 +32,6 @@ export const Header = ({
   const { units, activeUnitId, activeUnit, switchUnit, isCompanyAdmin } = useUnit();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [isUnitMenuOpen, setIsUnitMenuOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -141,57 +140,29 @@ export const Header = ({
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Unit Switcher for Company Admin / Unit Indicator for Members */}
             {isCompanyAdmin ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  id="btn-unit-switcher"
-                  onClick={() => setIsUnitMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 transition-all text-xs font-bold cursor-pointer shadow-xs"
-                  title="Switch Active Plant Unit"
-                >
-                  <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400 shrink-0" />
-                  <span className="truncate max-w-[110px] sm:max-w-[150px]">
-                    {activeUnit ? activeUnit.name : 'Unit 1'}
-                  </span>
-                  <ChevronDown className={`w-3 h-3 text-indigo-500 dark:text-indigo-400 transition-transform ${isUnitMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isUnitMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsUnitMenuOpen(false)} />
-                    <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2">
-                      <div className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                        <span>Select Factory Unit</span>
-                        <span className="text-indigo-600 dark:text-cyan-400 font-bold">Plant Scope</span>
-                      </div>
-
-                      <div className="space-y-1 mt-1.5">
-                        {units.map((u) => (
-                          <button
-                            key={u.unitId}
-                            type="button"
-                            onClick={() => {
-                              switchUnit(u.unitId);
-                              setIsUnitMenuOpen(false);
-                              if (onRefresh) onRefresh();
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
-                              activeUnitId === u.unitId
-                                ? 'bg-indigo-600 text-white shadow-xs'
-                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                            }`}
-                          >
-                            <span className="flex items-center gap-2 truncate">
-                              <Building2 className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">{u.name}</span>
-                            </span>
-                            {activeUnitId === u.unitId && <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
+              <div className="relative flex items-center">
+                <div className="relative flex items-center">
+                  <div className="absolute left-2.5 pointer-events-none text-indigo-600 dark:text-cyan-400">
+                    <Building2 className="w-3.5 h-3.5" />
+                  </div>
+                  <select
+                    id="select-active-unit"
+                    value={activeUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1'}
+                    onChange={(e) => {
+                      switchUnit(e.target.value);
+                      if (onRefresh) onRefresh();
+                    }}
+                    aria-label="Active Factory Unit"
+                    className="pl-8 pr-7 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/90 dark:bg-indigo-950/70 text-indigo-950 dark:text-cyan-200 text-xs font-bold cursor-pointer shadow-xs focus:ring-2 focus:ring-indigo-500 outline-none appearance-none transition-all hover:bg-indigo-100 dark:hover:bg-indigo-900/80"
+                    title="Switch Factory Plant Unit"
+                  >
+                    <option value="UNIT-1">Unit 1</option>
+                    <option value="UNIT-2">Unit 2</option>
+                  </select>
+                  <div className="absolute right-2 pointer-events-none text-indigo-500 dark:text-indigo-400">
+                    <ChevronDown className="w-3 h-3" />
+                  </div>
+                </div>
               </div>
             ) : (
               <div

@@ -113,7 +113,7 @@ const findUserLeanInUnitOrAny = async (userId, preferredUnit = 'UNIT-1') => {
   return { userDoc: null, UserModel: getUserModel(normPref), unitId: normPref };
 };
 
-// @desc    Get Master Contact List of Line In-Charges for assignment
+// @desc    Get Master Contact List of Responsible Persons for assignment
 // @route   GET /api/users/line-supervisors
 // @access  Private (Auditor or Authenticated)
 const getLineSupervisors = async (req, res) => {

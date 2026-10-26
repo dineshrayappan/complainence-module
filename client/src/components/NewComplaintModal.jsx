@@ -60,6 +60,20 @@ const isDeptMatch = (userDept, targetDept) => {
 
 
 
+// Defect Categories
+const DEFECT_CATEGORIES = [
+  'Quality Defect',
+  'Workmanship Flaw',
+  'Measurement Deviation',
+  'Fabric Defect',
+  'Trim / Accessory Flaw',
+  'Finishing / Packing Issue',
+  'Oil / Stain Contamination',
+  'Safety & Compliance',
+  'Machine / Process Defect',
+  'Other / Custom Defect',
+];
+
 // Risk / Severity Levels
 const RISK_LEVELS = [
   { level: 'CRITICAL', label: 'Critical Risk (AQL 0.0 - Embargo / Safety)' },
@@ -124,6 +138,8 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   // Form State - Left Column
   const [department, setDepartment] = useState('Production');
+  const [category, setCategory] = useState('');
+  const [customCategory, setCustomCategory] = useState('');
   const [priority, setPriority] = useState('HIGH');
   const [dueDate, setDueDate] = useState(() => toDatetimeLocal(Date.now() + 16 * 60 * 60 * 1000));
   const [deadlineHours, setDeadlineHours] = useState(16);
@@ -273,12 +289,20 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   // Apply prefill data if opened from an audit item
   useEffect(() => {
-    if (isOpen && prefillData) {
-      if (prefillData.department) {
-        handleDepartmentChange(prefillData.department);
-      }
-      if (prefillData.description) {
-        setDescription(prefillData.description);
+    if (isOpen) {
+      if (prefillData) {
+        if (prefillData.department) {
+          handleDepartmentChange(prefillData.department);
+        }
+        if (prefillData.category) {
+          setCategory(prefillData.category);
+        }
+        if (prefillData.description) {
+          setDescription(prefillData.description);
+        }
+      } else {
+        setCategory('');
+        setCustomCategory('');
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -402,8 +426,10 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       formData.append('unitId', finalUnitId);
       formData.append('unitName', finalUnitName);
 
+      const effectiveCategory = (category === 'Other / Custom Defect' ? customCategory : category).trim() || 'Quality Defect';
+
       formData.append('department', department);
-      formData.append('category', 'Stitching Fault');
+      formData.append('category', effectiveCategory);
       formData.append('location', location.trim() || `${department} Floor`);
       formData.append('priority', priority || 'HIGH');
       formData.append('riskSeverity', priority || 'HIGH');
@@ -544,11 +570,8 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     }}
                     className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                   >
-                    {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
-                      <option key={u.unitId} value={u.unitId}>
-                        {u.name}
-                      </option>
-                    ))}
+                    <option value="UNIT-1">Unit 1</option>
+                    <option value="UNIT-2">Unit 2</option>
                   </select>
                 ) : (
                   <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
@@ -586,6 +609,38 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   <span>Selected zone: <strong className="text-indigo-600 dark:text-cyan-400">{department}</strong></span>
                   <span className="font-mono text-slate-400">{location}</span>
                 </div>
+              </div>
+
+              {/* 1.5. DEFECT CATEGORY DROPDOWN */}
+              <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 space-y-2">
+                <label className="block font-bold text-slate-900 dark:text-white text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+                    <span>Defect Category <strong className="text-rose-500">*</strong></span>
+                  </span>
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  <option value="">Select Defect Category (Default: Quality Defect)</option>
+                  {DEFECT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+
+                {category === 'Other / Custom Defect' && (
+                  <input
+                    type="text"
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    placeholder="Enter specific defect category..."
+                    className="w-full p-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 mt-2"
+                  />
+                )}
               </div>
 
               {/* 2. RISK / SEVERITY DROPDOWN */}
@@ -842,12 +897,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                           </span>
                         </div>
                         <div className="text-[10px] text-slate-400">
-                          {selectedSupervisor.designation || 'In-Charge'} • {selectedSupervisor.department}
+                          {selectedSupervisor.designation || 'Responsible Person'} • {selectedSupervisor.department}
                         </div>
                       </div>
                     </div>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                      Line In-Charge
+                      Responsible Person
                     </span>
                   </div>
                 )}

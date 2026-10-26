@@ -235,7 +235,7 @@ export const ComplaintCard = ({
           {/* Line Supervisor Avatar & Info */}
           <div className="ml-auto text-right text-xs min-w-0">
             <div className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 tracking-wider truncate">
-              Line In-Charge
+              Responsible Person
             </div>
             <div className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[100px] sm:max-w-[140px]">
               {complaint.assignedTo?.name}

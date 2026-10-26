@@ -1076,7 +1076,7 @@ export const ReportsView = ({
           startY,
           head: [[
             'Department',
-            'Manager / In-Charge',
+            'Manager / Responsible Person',
             'Total NCs',
             'Open',
             'Closed',
@@ -1419,7 +1419,7 @@ export const ReportsView = ({
         headers = [
           'Department Name',
           'Department Code',
-          'Department Manager / In-Charge',
+          'Department Manager / Responsible Person',
           'Factory Headcount',
           'Total NCs Raised',
           'Open / In Progress NCs',
@@ -1829,11 +1829,8 @@ export const ReportsView = ({
             className="px-3 py-1.5 text-xs rounded-xl border border-indigo-300 font-bold cursor-pointer transition-colors bg-indigo-50/90 text-indigo-900 dark:bg-indigo-950/70 dark:border-indigo-700 dark:text-cyan-200"
             title="Filter by Factory Plant Unit"
           >
-            {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
-              <option key={u.unitId} value={u.unitId}>
-                📍 {u.name}
-              </option>
-            ))}
+            <option value="UNIT-1">📍 Unit 1</option>
+            <option value="UNIT-2">📍 Unit 2</option>
           </select>
 
           {/* Record Status Filter */}
@@ -2686,7 +2683,7 @@ export const ReportsView = ({
                       <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
                         <th className="py-2.5 px-3 text-center w-10">#</th>
                         <th className="py-2.5 px-3">Department Name</th>
-                        <th className="py-2.5 px-3">Head / In-Charge</th>
+                        <th className="py-2.5 px-3">Head / Responsible Person</th>
                         <th className="py-2.5 px-3 text-center">Total NCs</th>
                         <th className="py-2.5 px-3 text-center">Open</th>
                         <th className="py-2.5 px-3 text-center">Review</th>
@@ -3391,7 +3388,7 @@ export const ReportsView = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  Responsible In-Charge (Resolver)
+                  Responsible Person (Resolver)
                 </span>
                 <div className="text-sm font-bold text-slate-900 dark:text-white">
                   {getAssignedToName(drilldownComplaint)}

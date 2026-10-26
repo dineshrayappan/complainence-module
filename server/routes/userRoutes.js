@@ -16,7 +16,7 @@ const {
 } = require('../controllers/userController');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
-// Line In-Charges master contact list (for assignment dropdown)
+// Responsible Persons master contact list (for assignment dropdown)
 router.get('/line-supervisors', verifyToken, getLineSupervisors);
 
 // Daily Attendance status endpoint for Admin & Auditor oversight

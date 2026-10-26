@@ -41,12 +41,14 @@ export const ComplaintFilters = ({
 
   const categories = [
     'All Categories',
-    'Stitching Fault',
+    'Quality Defect',
+    'Workmanship Flaw',
     'Fabric Defect',
     'Oil / Stain',
     'Measurement / Fit',
     'Trims / Accessories',
     'Finishing / Pressing',
+    'Stitching Fault',
   ];
 
   const priorities = ['All Priorities', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];

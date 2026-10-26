@@ -62,7 +62,7 @@ export const ComplaintTable = ({
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">NC / CMP ID</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Priority</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">NC Defect & Location</th>
-            <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Line In-Charge</th>
+            <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Responsible Person</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">Deadline Condition</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold">NC Status</th>
             <th className="py-3 px-3.5 sm:py-3.5 sm:px-4 font-semibold text-right">Actions</th>
@@ -144,7 +144,7 @@ export const ComplaintTable = ({
                   </div>
                 </td>
 
-                {/* Line In-Charge */}
+                {/* Responsible Person */}
                 <td className="py-3 px-4 whitespace-nowrap">
                   <div className="font-semibold text-slate-800 dark:text-slate-200">
                     {c.assignedTo?.name}

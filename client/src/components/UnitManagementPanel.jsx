@@ -228,7 +228,7 @@ export const UnitManagementPanel = ({ showToast }) => {
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-amber-500/20 shadow-xs">
           <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold block mb-1">Unassigned NCs</span>
           <span className="text-2xl font-black text-amber-700 dark:text-amber-300">{unassignedData.complaints || 0}</span>
-          <span className="text-[10px] text-slate-400 font-mono block mt-1">Preserved in All-Units view</span>
+          <span className="text-[10px] text-slate-400 font-mono block mt-1">Preserved database records</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-purple-500/20 shadow-xs">
@@ -404,11 +404,8 @@ export const UnitManagementPanel = ({ showToast }) => {
               onChange={(e) => setTargetMigrationUnit(e.target.value)}
               className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              {units.map((u) => (
-                <option key={u.unitId} value={u.unitId}>
-                  {u.name} ({u.unitId})
-                </option>
-              ))}
+              <option value="UNIT-1">Unit 1 (UNIT-1)</option>
+              <option value="UNIT-2">Unit 2 (UNIT-2)</option>
             </select>
           </div>
 

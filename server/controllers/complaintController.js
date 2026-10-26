@@ -450,7 +450,7 @@ const getFileUrl = (req, filename) => {
 const createComplaint = async (req, res) => {
   try {
     const {
-      category = 'Stitching Fault',
+      category = 'Quality Defect',
       department,
       location = 'Production Floor',
       priority = 'HIGH',
@@ -587,9 +587,9 @@ const createComplaint = async (req, res) => {
     const assignedToData = {
       userId: supervisor?.id || supervisor?._id || reqAssigned?.userId || '',
       employeeId: supervisor?.employeeId || reqAssigned?.employeeId || '',
-      name: supervisor?.name || reqAssigned?.name || (department ? `${department} Line In-Charge` : 'Line Supervisor'),
+      name: supervisor?.name || reqAssigned?.name || (department ? `${department} Responsible Person` : 'Responsible Person'),
       department: supervisor?.department || reqAssigned?.department || department || 'Production',
-      designation: supervisor?.designation || reqAssigned?.designation || 'Department In-Charge',
+      designation: supervisor?.designation || reqAssigned?.designation || 'Responsible Person',
       mobileNumber: supervisor?.mobileNumber || reqAssigned?.mobileNumber || '',
     };
 
@@ -626,7 +626,7 @@ const createComplaint = async (req, res) => {
         const ComplaintModel = getComplaintModel(targetUnitId);
         const mongoPayload = {
           complaintId,
-          category: category || 'Stitching Fault',
+          category: category || 'Quality Defect',
           department: department || supervisor?.department || 'Production',
           location: location || 'Production Floor',
           priority: effectivePriority,
@@ -683,7 +683,7 @@ const createComplaint = async (req, res) => {
 
     // Fallback when MongoDB is not connected
     const fallbackTicket = mockStore.createComplaint({
-      category: category || 'Stitching Fault',
+      category: category || 'Quality Defect',
       department: department || supervisor.department || 'Production',
       location: location || 'Production Floor',
       priority: effectivePriority,
@@ -2057,7 +2057,7 @@ const reassignComplaint = async (req, res) => {
     if (!assignedToUserId) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide the target Line In-Charge / Supervisor to assign this task to.',
+        message: 'Please provide the target Responsible Person to assign this task to.',
       });
     }
 
@@ -2107,7 +2107,7 @@ const reassignComplaint = async (req, res) => {
     if (!supervisor) {
       return res.status(400).json({
         success: false,
-        message: `Selected Line In-Charge was not found in the ${getCanonicalUnitName(foundUnit)} Master Contact list.`,
+        message: `Selected Responsible Person was not found in the ${getCanonicalUnitName(foundUnit)} Master Contact list.`,
       });
     }
 
@@ -2135,7 +2135,7 @@ const reassignComplaint = async (req, res) => {
             },
             notes:
               notes ||
-              `Task reassigned to Line In-Charge ${supervisor.name} (${supervisor.employeeId} - ${supervisor.department})`,
+              `Task reassigned to Responsible Person ${supervisor.name} (${supervisor.employeeId} - ${supervisor.department})`,
             timestamp: now.toISOString(),
           });
 
@@ -2180,7 +2180,7 @@ const reassignComplaint = async (req, res) => {
       },
       notes:
         notes ||
-        `Task reassigned to Line In-Charge ${supervisor.name} (${supervisor.employeeId} - ${supervisor.department})`,
+        `Task reassigned to Responsible Person ${supervisor.name} (${supervisor.employeeId} - ${supervisor.department})`,
       timestamp: now,
     });
     mockStore.updateComplaint(complaint._id, complaint);

@@ -154,7 +154,7 @@ export const ComplaintDetailModal = ({
   const handleReassign = async (e) => {
     e.preventDefault();
     if (!selectedSupervisorId) {
-      setError('Please select a Line In-Charge to assign this task to.');
+      setError('Please select a Responsible Person to assign this task to.');
       return;
     }
 
@@ -494,7 +494,7 @@ export const ComplaintDetailModal = ({
                     Awaiting After Photo Proof
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-600 mt-1 max-w-xs">
-                    Assigned Line In-Charge will capture proof from the shop floor once correction is completed.
+                    Assigned Responsible Person will capture proof from the shop floor once correction is completed.
                   </span>
                 </div>
               )}
@@ -539,7 +539,7 @@ export const ComplaintDetailModal = ({
               </div>
             </div>
 
-            {/* SLA & Line In-Charge Snapshot */}
+            {/* SLA & Responsible Person Snapshot */}
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
@@ -557,7 +557,7 @@ export const ComplaintDetailModal = ({
                     className="text-[11px] font-bold text-indigo-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-indigo-200 dark:border-indigo-800"
                   >
                     <UserPlus className="w-3 h-3" />
-                    <span>{showReassignBox ? 'Cancel Reassign' : 'Reassign In-Charge'}</span>
+                    <span>{showReassignBox ? 'Cancel Reassign' : 'Reassign Responsible Person'}</span>
                   </button>
                 )}
               </div>
@@ -567,7 +567,7 @@ export const ComplaintDetailModal = ({
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                       <UserCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
-                      Select New Line In-Charge
+                      Select New Responsible Person
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">
                       10 Contacts Available
@@ -852,7 +852,7 @@ export const ComplaintDetailModal = ({
                       {complaint.cap?.responsiblePerson?.name || complaint.assignedTo?.name || 'Line Supervisor'}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {complaint.cap?.responsiblePerson?.department || complaint.department} • {complaint.cap?.responsiblePerson?.designation || complaint.assignedTo?.designation || 'In-Charge'} ({complaint.cap?.responsiblePerson?.employeeId || complaint.assignedTo?.employeeId})
+                      {complaint.cap?.responsiblePerson?.department || complaint.department} • {complaint.cap?.responsiblePerson?.designation || complaint.assignedTo?.designation || 'Responsible Person'} ({complaint.cap?.responsiblePerson?.employeeId || complaint.assignedTo?.employeeId})
                     </div>
                   </div>
                 </div>
