@@ -24,6 +24,17 @@ const departmentSchema = new mongoose.Schema(
       type: Number,
       default: 25,
     },
+    unitId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    unitName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   {
     timestamps: true,

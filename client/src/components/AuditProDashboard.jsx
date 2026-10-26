@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { complaintService, taskService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useUnit } from '../context/UnitContext';
 import { DepartmentWorkOperations } from './DepartmentWorkOperations';
 
 export const AuditProDashboard = ({
@@ -43,6 +44,7 @@ export const AuditProDashboard = ({
   onViewComplaint,
 }) => {
   const { user, isAdmin, isAuditor } = useAuth();
+  const { activeUnitId, activeUnit } = useUnit();
 
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -93,7 +95,7 @@ export const AuditProDashboard = ({
 
   useEffect(() => {
     loadDashboardData(true);
-  }, []);
+  }, [activeUnitId]);
 
 
 
@@ -649,9 +651,17 @@ export const AuditProDashboard = ({
           ----------------------------------------------------------------------- */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-1">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-            NC &amp; CAP Dashboard
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+              NC &amp; CAP Dashboard
+            </h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              {activeUnit ? activeUnit.name : 'All Units (Company-Wide)'}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {activeUnit ? `Isolated metrics, overdue SLA analysis & CAP progress for ${activeUnit.name}` : 'Aggregated factory oversight across all production units'}
+          </p>
         </div>
 
         {/* Header Right Controls: Date Range Dropdown, Search Input */}

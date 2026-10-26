@@ -38,12 +38,31 @@ const getDepartments = async (req, res) => {
     let complaintsList = [];
     let tasksList = [];
 
+    const activeUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
+
     if (isMongoConnected()) {
       try {
+        const uQuery = { isActive: true };
+        const cQuery = { status: { $nin: ['Closed', 'Verified'] }, isDeleted: { $ne: true } };
+        const tQuery = { status: { $ne: 'Completed' } };
+
+        if (activeUnit && activeUnit !== 'ALL') {
+          if (activeUnit === 'UNASSIGNED') {
+            const unassigned = { $or: [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }] };
+            Object.assign(uQuery, unassigned);
+            Object.assign(cQuery, unassigned);
+            Object.assign(tQuery, unassigned);
+          } else {
+            uQuery.$or = [{ unitId: activeUnit }, { assignedUnits: activeUnit }];
+            cQuery.unitId = activeUnit;
+            tQuery.unitId = activeUnit;
+          }
+        }
+
         const [uRes, cRes, tRes] = await Promise.all([
-          User.find({ isActive: true }).select('department').lean(),
-          Complaint.find({ status: { $nin: ['Closed', 'Verified'] }, isDeleted: { $ne: true } }).select('department status').lean(),
-          ComplianceTask.find({ status: { $ne: 'Completed' } }).select('department status').lean(),
+          User.find(uQuery).select('department unitId').lean(),
+          Complaint.find(cQuery).select('department status unitId').lean(),
+          ComplianceTask.find(tQuery).select('department status unitId').lean(),
         ]);
         usersList = uRes || [];
         complaintsList = cRes || [];

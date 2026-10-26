@@ -513,9 +513,10 @@ export const drawNCWithPhotos = async (doc, c, startY, pageWidth, margin, conten
   const auditorName = extractAuditorName(c);
   const loggedDateStr = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A';
 
+  const unitLabel = c.unitName || (c.unitId ? `Unit: ${c.unitId}` : null);
   const headerTitle = idx !== null
-    ? `NC #${idx + 1}: ${ncId} • Department: ${deptName} • Priority: ${cRisk}`
-    : `${ncId} • Department: ${deptName} • Priority: ${cRisk}`;
+    ? `NC #${idx + 1}: ${ncId} • ${unitLabel ? `${unitLabel} • ` : ''}Department: ${deptName} • Priority: ${cRisk}`
+    : `${ncId} • ${unitLabel ? `${unitLabel} • ` : ''}Department: ${deptName} • Priority: ${cRisk}`;
 
   // 1. Header Bar
   doc.setFillColor(15, 23, 42); // slate-900
@@ -736,7 +737,7 @@ export const drawNCWithPhotos = async (doc, c, startY, pageWidth, margin, conten
     ['Corrective Action:', corrActionText],
     ['Preventive Action:', prevActionText],
     ['Standard / Clause:', c.requirement || 'ISO 9001 Clause 8.7 Nonconforming Outputs'],
-    ['Accountability:', `Assigned To: ${assignedName}   |   Auditor: ${auditorName}   |   Location: ${locationText}   |   Logged: ${loggedDateStr}`],
+    ['Accountability:', `Plant Unit: ${c.unitName || (c.unitId ? `Unit ${c.unitId}` : 'Unassigned')}   |   Assigned To: ${assignedName}   |   Auditor: ${auditorName}   |   Location: ${locationText}   |   Logged: ${loggedDateStr}`],
   ];
 
   autoTable(doc, {

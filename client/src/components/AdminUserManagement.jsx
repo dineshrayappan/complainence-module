@@ -41,8 +41,10 @@ import {
 } from 'lucide-react';
 import { userService, departmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useUnit } from '../context/UnitContext';
 import UserLoginTrackerPanel from './UserLoginTrackerPanel';
 import LogHistoryPanel from './LogHistoryPanel';
+import { UnitManagementPanel } from './UnitManagementPanel';
 
 const FACTORY_DEPARTMENTS = [
   'Production',
@@ -56,10 +58,13 @@ const FACTORY_DEPARTMENTS = [
 
 export const AdminUserManagement = () => {
   const { isOwner } = useAuth();
+  const { units, activeUnitId } = useUnit();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlTab = searchParams.get('tab');
   const initialTab =
-    urlTab === 'logins' || urlTab === 'login-times' || urlTab === 'login-tracker'
+    urlTab === 'units' || urlTab === 'unit-management'
+      ? 'UNITS'
+      : urlTab === 'logins' || urlTab === 'login-times' || urlTab === 'login-tracker'
       ? 'LOGIN_TRACKER'
       : urlTab === 'logs' || urlTab === 'history' || urlTab === 'audit-logs'
       ? 'LOG_HISTORY'
@@ -73,7 +78,9 @@ export const AdminUserManagement = () => {
   const handleTabChange = (newTab) => {
     setAdminTab(newTab);
     const tabParam =
-      newTab === 'LOGIN_TRACKER'
+      newTab === 'UNITS'
+        ? 'units'
+        : newTab === 'LOGIN_TRACKER'
         ? 'login-times'
         : newTab === 'LOG_HISTORY'
         ? 'history'
@@ -135,6 +142,8 @@ export const AdminUserManagement = () => {
     department: 'Quality',
     designation: 'QA Quality Auditor',
     mobileNumber: '',
+    unitId: 'UNIT-1',
+    unitName: 'Unit 1',
   });
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState(null);
@@ -157,6 +166,8 @@ export const AdminUserManagement = () => {
     designation: '',
     mobileNumber: '',
     role: '',
+    unitId: '',
+    unitName: '',
   });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
@@ -212,7 +223,7 @@ export const AdminUserManagement = () => {
     loadUsers();
     loadDepartments();
     loadArchivedUsers();
-  }, []);
+  }, [activeUnitId]);
 
   const handleOpenNcHistory = async (user) => {
     setNcHistoryUser(user);
@@ -438,6 +449,10 @@ export const AdminUserManagement = () => {
       ? (availableDepartmentNames.includes('Production') ? 'Production' : availableDepartmentNames[0] || 'Production')
       : (availableDepartmentNames.includes('EDP') ? 'EDP' : availableDepartmentNames[0] || 'EDP');
 
+    const defaultUnitId = activeUnitId && activeUnitId !== 'ALL' ? activeUnitId : (units[0]?.unitId || 'UNIT-1');
+    const matchedUnit = units.find((u) => u.unitId === defaultUnitId);
+    const defaultUnitName = defaultRole === 'ADMIN' && activeUnitId === 'ALL' ? 'All Units' : (matchedUnit ? matchedUnit.name : 'Unit 1');
+
     setCreateForm({
       role: defaultRole,
       name: '',
@@ -447,6 +462,8 @@ export const AdminUserManagement = () => {
       department: defaultDept,
       designation: isAud ? 'QA Quality Auditor' : isSup ? 'Production Supervisor' : 'System Administrator',
       mobileNumber: '+91 ',
+      unitId: defaultRole === 'ADMIN' && activeUnitId === 'ALL' ? 'ALL' : defaultUnitId,
+      unitName: defaultUnitName,
     });
     setCreatedCredentials(null);
     setCreateError('');
@@ -547,6 +564,8 @@ export const AdminUserManagement = () => {
       designation: user.designation || '',
       mobileNumber: user.mobileNumber || '',
       role: user.role === 'ACTION_PERSON' ? 'SUPERVISOR' : user.role,
+      unitId: user.unitId || '',
+      unitName: user.unitName || '',
     });
     setEditError('');
     setIsEditModalOpen(true);
@@ -795,10 +814,33 @@ export const AdminUserManagement = () => {
           <History className="w-3.5 h-3.5 text-purple-500" />
           <span>Past Records & Logs</span>
         </button>
+
+        <button
+          onClick={() => handleTabChange('UNITS')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+            adminTab === 'UNITS'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5 text-amber-500" />
+          <span>Plant Units & Migration</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500">
+            {units.length || 2}
+          </span>
+        </button>
       </div>
 
       {/* Render Active View Based on Selected Admin Tab */}
-      {adminTab === 'LOGIN_TRACKER' ? (
+      {adminTab === 'UNITS' ? (
+        <UnitManagementPanel
+          showToast={showToast}
+          onMigrateSuccess={() => {
+            loadUsers();
+            loadDepartments();
+          }}
+        />
+      ) : adminTab === 'LOGIN_TRACKER' ? (
         <UserLoginTrackerPanel initialFilterUserId={selectedLoginUser} />
       ) : adminTab === 'LOG_HISTORY' ? (
         <LogHistoryPanel />
@@ -1254,6 +1296,32 @@ export const AdminUserManagement = () => {
                   <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 mb-4">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Plant Unit:</span>
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${
+                          u.unitId === 'UNIT-1'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                            : u.unitId === 'UNIT-2'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                            : u.unitId === 'ALL' || isAdm || u.role === 'OWNER'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                        }`}
+                      >
+                        {u.unitName
+                          ? `${u.unitName} (${u.unitId})`
+                          : u.unitId
+                          ? u.unitId
+                          : isAdm || u.role === 'OWNER'
+                          ? 'All Units (Company Wide)'
+                          : 'Unassigned (Legacy)'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
                         <Building2 className="w-3.5 h-3.5" />
                         <span>Department:</span>
                       </span>
@@ -1656,6 +1724,35 @@ export const AdminUserManagement = () => {
                   </div>
                 </div>
 
+                {/* Assigned Plant Unit */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Assigned Plant Unit *
+                  </label>
+                  <select
+                    value={createForm.unitId || ''}
+                    onChange={(e) => {
+                      const uId = e.target.value;
+                      const matched = units.find((u) => u.unitId === uId);
+                      setCreateForm({
+                        ...createForm,
+                        unitId: uId,
+                        unitName: matched ? matched.name : (uId === 'ALL' ? 'All Units' : ''),
+                      });
+                    }}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none"
+                  >
+                    {createForm.role === 'ADMIN' && (
+                      <option value="ALL">🏢 All Units (Company-Wide Administrator)</option>
+                    )}
+                    {units.map((u) => (
+                      <option key={u.unitId} value={u.unitId}>
+                        📍 {u.name} ({u.unitId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Mobile Number */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -1944,6 +2041,35 @@ export const AdminUserManagement = () => {
                   onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Assigned Plant Unit
+                </label>
+                <select
+                  value={editForm.unitId || ''}
+                  onChange={(e) => {
+                    const uId = e.target.value;
+                    const matched = units.find((u) => u.unitId === uId);
+                    setEditForm({
+                      ...editForm,
+                      unitId: uId,
+                      unitName: matched ? matched.name : (uId === 'ALL' ? 'All Units' : ''),
+                    });
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">(Unassigned / Legacy)</option>
+                  {(editForm.role === 'ADMIN' || selectedUser.role === 'OWNER') && (
+                    <option value="ALL">🏢 All Units (Company-Wide Administrator)</option>
+                  )}
+                  {units.map((u) => (
+                    <option key={u.unitId} value={u.unitId}>
+                      📍 {u.name} ({u.unitId})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

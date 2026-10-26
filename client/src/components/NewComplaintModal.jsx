@@ -15,6 +15,8 @@ import {
   Check,
 } from 'lucide-react';
 import { userService, complaintService, taskService, departmentService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useUnit } from '../context/UnitContext';
 import { compressImage } from '../utils/imageCompressor';
 
 // Exact and fuzzy department matching helper ensuring department isolation
@@ -102,6 +104,23 @@ const generateDefaultAuditPhoto = (dept, prio, desc) => {
 };
 
 export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = null }) => {
+  const { user } = useAuth();
+  const { units, activeUnitId, isCompanyAdmin } = useUnit();
+
+  const getDefaultUnitId = () => {
+    if (user?.unitId && user?.unitId !== 'ALL') return user.unitId;
+    if (activeUnitId && activeUnitId !== 'ALL') return activeUnitId;
+    return units[0]?.unitId || 'UNIT-1';
+  };
+
+  const [selectedUnitId, setSelectedUnitId] = useState(getDefaultUnitId);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedUnitId(getDefaultUnitId());
+    }
+  }, [isOpen, activeUnitId, user]);
+
   const fileInputRef = useRef(null);
 
   // Form State - Left Column
@@ -335,19 +354,28 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   if (!isOpen) return null;
 
-  // Filter employees strictly belonging to the currently selected department
-  const departmentEmployees = (supervisors || []).filter((s) => isDeptMatch(s.department, department));
-  const otherEmployees = (supervisors || []).filter((s) => !isDeptMatch(s.department, department));
+  // Filter employees strictly belonging to the currently selected department and selected unit
+  const unitFilteredSupervisors = (supervisors || []).filter((s) => {
+    if (selectedUnitId && selectedUnitId !== 'ALL') {
+      if (s.unitId && s.unitId !== 'ALL' && s.unitId !== selectedUnitId) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const departmentEmployees = unitFilteredSupervisors.filter((s) => isDeptMatch(s.department, department));
+  const otherEmployees = unitFilteredSupervisors.filter((s) => !isDeptMatch(s.department, department));
 
   const effectiveAssignedId =
-    assignedToUserId && supervisors.some((s) => (s._id || s.id) === assignedToUserId)
+    assignedToUserId && unitFilteredSupervisors.some((s) => (s._id || s.id) === assignedToUserId)
       ? assignedToUserId
-      : departmentEmployees[0]?._id || departmentEmployees[0]?.id || supervisors[0]?._id || supervisors[0]?.id || '';
+      : departmentEmployees[0]?._id || departmentEmployees[0]?.id || unitFilteredSupervisors[0]?._id || unitFilteredSupervisors[0]?.id || '';
 
   const selectedSupervisor =
-    supervisors.find((s) => (s._id || s.id) === effectiveAssignedId) ||
+    unitFilteredSupervisors.find((s) => (s._id || s.id) === effectiveAssignedId) ||
     departmentEmployees[0] ||
-    supervisors[0] ||
+    unitFilteredSupervisors[0] ||
     null;
 
   // Form Submission
@@ -371,6 +399,14 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     try {
       setSubmitting(true);
       const formData = new FormData();
+
+      // Associate NC with selected Unit
+      const matchedUnit = units.find((u) => u.unitId === selectedUnitId);
+      const finalUnitId = selectedUnitId || 'UNIT-1';
+      const finalUnitName = matchedUnit?.name || (finalUnitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1');
+      formData.append('unitId', finalUnitId);
+      formData.append('unitName', finalUnitName);
+
       formData.append('department', department);
       formData.append('category', 'Stitching Fault');
       formData.append('location', location.trim() || `${department} Floor`);
@@ -489,6 +525,43 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             
             {/* ================= LEFT COLUMN ================= */}
             <div className="space-y-4">
+
+              {/* 0. FACTORY PLANT UNIT SELECTION */}
+              <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-900 dark:text-white text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+                      <span>Factory Plant Unit <strong className="text-rose-500">*</strong></span>
+                    </span>
+                  </label>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300">
+                    {isCompanyAdmin ? 'Admin Configurable' : 'Assigned Unit'}
+                  </span>
+                </div>
+
+                {isCompanyAdmin ? (
+                  <select
+                    value={selectedUnitId}
+                    onChange={(e) => {
+                      setSelectedUnitId(e.target.value);
+                      setAssignedToUserId('');
+                    }}
+                    className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    {units.map((u) => (
+                      <option key={u.unitId} value={u.unitId}>
+                        {u.name} ({u.unitId})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                    <span>{units.find((u) => u.unitId === selectedUnitId)?.name || (selectedUnitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">🔒 Locked to your assigned unit</span>
+                  </div>
+                )}
+              </div>
               
               {/* 1. DEPARTMENT DROPDOWN */}
               <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 space-y-2">

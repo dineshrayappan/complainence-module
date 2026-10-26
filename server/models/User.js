@@ -49,6 +49,21 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    unitId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    unitName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    assignedUnits: {
+      type: [String],
+      default: [],
+    },
     isOwner: {
       type: Boolean,
       default: false,

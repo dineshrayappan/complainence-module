@@ -221,12 +221,29 @@ const matchesFilter = (task, state, department) => {
 // @access  Private
 const getTasks = async (req, res) => {
   try {
-    const { state, department } = req.query;
+    const { state, department, unitId } = req.query;
+    const targetUnit = (unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
+
+    let taskFilter = {};
+    let complaintFilter = { isDeleted: { $ne: true } };
+
+    if (targetUnit && targetUnit !== 'ALL') {
+      if (targetUnit === 'UNASSIGNED') {
+        const unassignedOr = {
+          $or: [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }],
+        };
+        taskFilter = { ...unassignedOr };
+        complaintFilter = { isDeleted: { $ne: true }, ...unassignedOr };
+      } else {
+        taskFilter = { unitId: targetUnit };
+        complaintFilter = { isDeleted: { $ne: true }, unitId: targetUnit };
+      }
+    }
 
     let tasks = [];
     if (isMongoConnected()) {
       try {
-        const data = await ComplianceTask.find().sort({ createdAt: -1 }).lean();
+        const data = await ComplianceTask.find(taskFilter).sort({ createdAt: -1 }).lean();
         tasks = (data || []).map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
       } catch (dbErr) {
         console.warn('[TaskController:getTasks] MongoDB fallback:', dbErr.message);
@@ -240,7 +257,7 @@ const getTasks = async (req, res) => {
     let complaints = [];
     if (isMongoConnected()) {
       try {
-        const cData = await Complaint.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+        const cData = await Complaint.find(complaintFilter).sort({ createdAt: -1 }).lean();
         if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {}
     } else {
@@ -301,7 +318,7 @@ const getTasks = async (req, res) => {
 // @access  Private (ADMIN, AUDITOR)
 const createTask = async (req, res) => {
   try {
-    const { title, department, description, dueDate, recurrence, priority, assignedToUserId } = req.body;
+    const { title, department, description, dueDate, recurrence, priority, assignedToUserId, unitId, unitName } = req.body;
 
     if (!title || !dueDate) {
       return res.status(400).json({
@@ -322,6 +339,10 @@ const createTask = async (req, res) => {
       return res.status(400).json({ success: false, message: `Priority must be one of: ${PRIORITIES.join(', ')}` });
     }
 
+    // Resolve target unit for this task
+    const resolvedUnitId = (unitId || (req.activeUnitId !== 'ALL' ? req.activeUnitId : null) || req.user?.unitId || '').toString().trim().toUpperCase();
+    const resolvedUnitName = unitName || (resolvedUnitId === 'UNIT-1' ? 'Unit 1' : resolvedUnitId === 'UNIT-2' ? 'Unit 2' : resolvedUnitId || '');
+
     // Resolve the assignee: explicit user, department pool, else self.
     let assignedTo = null;
     const lookupId = assignedToUserId || req.body.assignedToEmployeeId;
@@ -332,6 +353,7 @@ const createTask = async (req, res) => {
         employeeId: 'DEPT-POOL',
         name: `${department || 'Department'} (Open to All Department Workers)`,
         department: department || 'Central Quality Audit',
+        unitId: resolvedUnitId && resolvedUnitId !== 'ALL' ? resolvedUnitId : null,
         isDepartmentPool: true,
       };
     } else {
@@ -353,11 +375,25 @@ const createTask = async (req, res) => {
       if (!owner) owner = mockStore.findUserById(lookupId) || mockStore.getUsers().find((u) => u.employeeId === lookupId);
       if (!owner) owner = req.user;
 
+      // Strict Cross-Unit Assignment Guard:
+      // Unit 1 tasks must not be assigned to Unit 2 members and vice versa.
+      if (owner && resolvedUnitId && resolvedUnitId !== 'ALL') {
+        const ownerUnit = (owner.unitId || '').toString().trim().toUpperCase();
+        if (ownerUnit && ownerUnit !== resolvedUnitId) {
+          return res.status(400).json({
+            success: false,
+            message: `Cross-Unit Assignment Blocked: Member '${owner.name}' belongs to ${owner.unitName || ownerUnit} and cannot be assigned to a ${resolvedUnitName || resolvedUnitId} task. Unit 1 tasks must not be assigned to Unit 2 members and vice versa.`,
+          });
+        }
+      }
+
       assignedTo = {
         userId: owner.id || owner._id || '',
         employeeId: owner.employeeId || '',
         name: owner.name || '',
         department: owner.department || department || '',
+        unitId: owner.unitId || resolvedUnitId || null,
+        unitName: owner.unitName || resolvedUnitName || '',
       };
     }
 
@@ -366,6 +402,8 @@ const createTask = async (req, res) => {
       department: department || 'Central Quality Audit',
       description: description || '',
       assignedTo,
+      unitId: resolvedUnitId && resolvedUnitId !== 'ALL' ? resolvedUnitId : null,
+      unitName: resolvedUnitName,
       dueDate: new Date(dueDate).toISOString(),
       status: 'Pending',
       recurrence: rec,
@@ -523,6 +561,15 @@ const startTask = async (req, res) => {
         success: false,
         code: 'UNAUTHORIZED_DEPARTMENT',
         message: `Unauthorized Action: You belong to the "${req.user?.department || 'Unassigned'}" department. Only authorized employees of the "${task.department}" department can start work on this task.`,
+      });
+    }
+
+    // Unit Isolation Check: non-company-admin cannot work on another unit's task
+    if (!req.isCompanyAdmin && task.unitId && req.user?.unitId && task.unitId.toUpperCase() !== req.user.unitId.toUpperCase()) {
+      return res.status(403).json({
+        success: false,
+        code: 'UNAUTHORIZED_UNIT',
+        message: `Cross-Unit Violation: This task belongs to ${task.unitName || task.unitId}, but your account is assigned to ${req.user.unitName || req.user.unitId}. You cannot access or work on another unit's tasks.`,
       });
     }
 
@@ -709,6 +756,15 @@ const completeTask = async (req, res) => {
         success: false,
         code: 'UNAUTHORIZED_DEPARTMENT',
         message: `Unauthorized Action: You belong to the "${req.user?.department || 'Unassigned'}" department. Only authorized employees of the "${task.department}" department can submit proof or complete this task.`,
+      });
+    }
+
+    // Unit Isolation Check: non-company-admin cannot submit proof for another unit's task
+    if (!req.isCompanyAdmin && task.unitId && req.user?.unitId && task.unitId.toUpperCase() !== req.user.unitId.toUpperCase()) {
+      return res.status(403).json({
+        success: false,
+        code: 'UNAUTHORIZED_UNIT',
+        message: `Cross-Unit Violation: This task belongs to ${task.unitName || task.unitId}, but your account is assigned to ${req.user.unitName || req.user.unitId}. You cannot submit proof or complete another unit's tasks.`,
       });
     }
 
@@ -1012,7 +1068,7 @@ const getEmployeeWorkStatus = async (req, res) => {
     let allUsers = [];
     if (isMongoConnected()) {
       try {
-        const dbUsers = await User.find({ isActive: true }).select('name employeeId email role department designation isActive isPresent lastLoginAt lastLogoutAt').lean();
+        const dbUsers = await User.find({ isActive: true }).select('name employeeId email role department designation isActive isPresent lastLoginAt lastLogoutAt unitId unitName assignedUnits').lean();
         if (dbUsers) allUsers = dbUsers.map((u) => ({ ...u, id: u._id.toString() }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] users fetch fallback:', e.message);
@@ -1054,6 +1110,21 @@ const getEmployeeWorkStatus = async (req, res) => {
     }
     if (!allComplaints || allComplaints.length === 0) {
       allComplaints = mockStore.getComplaints().filter((c) => !c.isDeleted);
+    }
+
+    // Filter by unit if specified or active
+    const activeUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
+
+    if (activeUnit && activeUnit !== 'ALL') {
+      if (activeUnit === 'UNASSIGNED') {
+        allTasks = allTasks.filter((t) => !t.unitId || t.unitId === 'UNASSIGNED');
+        allComplaints = allComplaints.filter((c) => !c.unitId || c.unitId === 'UNASSIGNED');
+        allUsers = allUsers.filter((u) => !u.unitId || u.unitId === 'UNASSIGNED');
+      } else {
+        allTasks = allTasks.filter((t) => t.unitId && t.unitId.toUpperCase() === activeUnit);
+        allComplaints = allComplaints.filter((c) => c.unitId && c.unitId.toUpperCase() === activeUnit);
+        allUsers = allUsers.filter((u) => (u.unitId && u.unitId.toUpperCase() === activeUnit) || (Array.isArray(u.assignedUnits) && u.assignedUnits.includes(activeUnit)));
+      }
     }
 
     // Filter by department if specified

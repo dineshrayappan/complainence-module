@@ -51,6 +51,8 @@ const formatComplaintOutput = (complaint) => {
   const obj = typeof complaint.toObject === 'function' ? complaint.toObject() : { ...complaint };
   obj._id = obj.id || obj._id;
   obj.id = obj.id || obj._id;
+  obj.unitId = obj.unitId || null;
+  obj.unitName = obj.unitName || '';
 
   if (obj.beforePhoto) {
     obj.beforePhoto = toBase64DataUrl(obj.beforePhoto);
@@ -404,9 +406,13 @@ const createComplaint = async (req, res) => {
       capRequired,
       verificationMethod = 'Physical Floor Re-inspection',
       dueDate,
+      unitId,
+      unitName,
     } = req.body;
 
     const targetSupervisorId = assignedToUserId || req.body.assignedToId;
+    const targetUnitId = (unitId || (req.activeUnitId !== 'ALL' ? req.activeUnitId : null) || req.user?.unitId || '').toString().trim().toUpperCase();
+    const targetUnitName = unitName || (targetUnitId === 'UNIT-1' ? 'Unit 1' : targetUnitId === 'UNIT-2' ? 'Unit 2' : targetUnitId || '');
 
     const now = new Date();
     let hours = Number(deadlineHours);
@@ -529,6 +535,17 @@ const createComplaint = async (req, res) => {
       mobileNumber: supervisor?.mobileNumber || reqAssigned?.mobileNumber || '',
     };
 
+    // Cross-Unit Assignment Guard:
+    if (supervisor && targetUnitId && targetUnitId !== 'ALL' && supervisor.unitId) {
+      const supUnit = supervisor.unitId.toString().trim().toUpperCase();
+      if (supUnit !== targetUnitId) {
+        return res.status(400).json({
+          success: false,
+          message: `Cross-Unit Assignment Blocked: Supervisor '${supervisor.name}' belongs to ${supervisor.unitName || supervisor.unitId} and cannot be assigned to an NC in ${targetUnitName || targetUnitId}. Unit 1 tasks and records must not be assigned to Unit 2 members and vice versa.`,
+        });
+      }
+    }
+
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const complaintId = `CMP-${randomSuffix}`;
 
@@ -559,6 +576,8 @@ const createComplaint = async (req, res) => {
           riskSeverity: effectivePriority,
           capRequired: isCapRequired,
           verificationMethod: effectiveVerification,
+          unitId: targetUnitId && targetUnitId !== 'ALL' ? targetUnitId : null,
+          unitName: targetUnitName,
           beforePhoto: beforePhotoUrl,
           afterPhoto: null,
           assignedTo: assignedToData,
@@ -615,6 +634,8 @@ const createComplaint = async (req, res) => {
       capRequired: isCapRequired,
       verificationMethod: effectiveVerification,
       beforePhoto: beforePhotoUrl,
+      unitId: targetUnitId && targetUnitId !== 'ALL' ? targetUnitId : null,
+      unitName: targetUnitName,
       assignedTo: assignedToData,
       createdBy: createdByData,
       deadlineHours: hours,
@@ -643,12 +664,34 @@ const createComplaint = async (req, res) => {
 // @access  Private
 const getComplaints = async (req, res) => {
   try {
-    const { status, category, priority, department, search, tab, deadlineCondition, deadline, recordStatus, includeDeleted } = req.query;
+    const { status, category, priority, department, search, tab, deadlineCondition, deadline, recordStatus, includeDeleted, unitId } = req.query;
     const now = new Date();
 
     if (isMongoConnected()) {
       try {
         const query = {};
+
+        // Unit scoping: company admin can switch units or view ALL; unit members are locked to their unit
+        const targetUnit = (unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
+
+        if (targetUnit && targetUnit !== 'ALL') {
+          if (targetUnit === 'UNASSIGNED') {
+            query.$or = [
+              { unitId: null },
+              { unitId: '' },
+              { unitId: 'UNASSIGNED' },
+              { unitId: { $exists: false } },
+            ];
+          } else if (req.isCompanyAdmin && unitId) {
+            query.unitId = targetUnit;
+          } else {
+            const unitOr = [{ unitId: targetUnit }];
+            if (!req.isCompanyAdmin) {
+              unitOr.push({ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' });
+            }
+            query.$or = unitOr;
+          }
+        }
 
         // Record Status filter: 'all' | 'active' | 'deleted' (Preserves deleted records in reports)
         if (recordStatus === 'deleted') {
@@ -799,6 +842,16 @@ const getComplaintById = async (req, res) => {
         const data = await Complaint.findOne(query).lean();
 
         if (data) {
+          // Unit Isolation Check: non-company-admin cannot access another unit's NC record
+          if (!req.isCompanyAdmin && data.unitId && req.user?.unitId) {
+            if (data.unitId.toUpperCase() !== req.user.unitId.toUpperCase()) {
+              return res.status(403).json({
+                success: false,
+                message: `Access Denied: This NC record belongs to ${data.unitName || data.unitId}. Your account is assigned to ${req.user.unitName || req.user.unitId}. Cross-unit access is strictly restricted.`,
+              });
+            }
+          }
+
           // Strict RBAC Isolation: If requester is a Supervisor or Action Person, verify this specific NC was assigned to them
           if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON')) {
             const userEmpId = (req.user.employeeId || '').toUpperCase();
@@ -1618,16 +1671,33 @@ const addTimelineComment = async (req, res) => {
   }
 };
 
-// @desc    Get KPI metrics for dashboard cards
-// @route   GET /api/complaints/stats/kpi
-// @access  Private
 const getKpiStats = async (req, res) => {
   try {
     const now = new Date();
+    const targetUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
 
     if (isMongoConnected()) {
       try {
         const query = { isDeleted: { $ne: true } };
+
+        if (targetUnit && targetUnit !== 'ALL') {
+          if (targetUnit === 'UNASSIGNED') {
+            query.$or = [
+              { unitId: null },
+              { unitId: '' },
+              { unitId: 'UNASSIGNED' },
+              { unitId: { $exists: false } },
+            ];
+          } else if (req.isCompanyAdmin && req.query?.unitId) {
+            query.unitId = targetUnit;
+          } else {
+            const unitOr = [{ unitId: targetUnit }];
+            if (!req.isCompanyAdmin) {
+              unitOr.push({ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' });
+            }
+            query.$or = unitOr;
+          }
+        }
 
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
           const userEmpId = (req.user.employeeId || '').toUpperCase();
@@ -1638,7 +1708,12 @@ const getKpiStats = async (req, res) => {
           if (userId) orConditions.push({ 'assignedTo.userId': userId });
 
           if (orConditions.length > 0) {
-            query.$or = orConditions;
+            if (query.$or) {
+              query.$and = [{ $or: query.$or }, { $or: orConditions }];
+              delete query.$or;
+            } else {
+              query.$or = orConditions;
+            }
           } else {
             query._id = null;
           }
@@ -1760,15 +1835,29 @@ const getKpiStats = async (req, res) => {
 const getAdminOversightStats = async (req, res) => {
   try {
     const now = new Date();
+    const targetUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
 
     let allComplaints = [];
     let allUsers = [];
 
     if (isMongoConnected()) {
       try {
+        const complaintFilter = { isDeleted: { $ne: true } };
+        const userFilter = { isActive: true };
+
+        if (targetUnit && targetUnit !== 'ALL') {
+          if (targetUnit === 'UNASSIGNED') {
+            complaintFilter.$or = [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }];
+            userFilter.$or = [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }];
+          } else {
+            complaintFilter.unitId = targetUnit;
+            userFilter.$or = [{ unitId: targetUnit }, { assignedUnits: targetUnit }];
+          }
+        }
+
         const [complaintsDocs, usersDocs] = await Promise.all([
-          Complaint.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean(),
-          User.find({ isActive: true }).lean(),
+          Complaint.find(complaintFilter).sort({ createdAt: -1 }).lean(),
+          User.find(userFilter).lean(),
         ]);
 
         if (complaintsDocs) {
@@ -2228,12 +2317,22 @@ const deleteComplaint = async (req, res) => {
 
 const getDepartmentComplianceStats = async (req, res) => {
   try {
+    const targetUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
     let allComplaints = [];
 
     // Fetch complaints from MongoDB if connected
     if (isMongoConnected()) {
       try {
-        const dbTickets = await Complaint.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+        const complaintFilter = { isDeleted: { $ne: true } };
+        if (targetUnit && targetUnit !== 'ALL') {
+          if (targetUnit === 'UNASSIGNED') {
+            complaintFilter.$or = [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }];
+          } else {
+            complaintFilter.unitId = targetUnit;
+          }
+        }
+
+        const dbTickets = await Complaint.find(complaintFilter).sort({ createdAt: -1 }).lean();
         if (Array.isArray(dbTickets)) {
           allComplaints = dbTickets.map(formatComplaintOutput);
         }
@@ -2443,7 +2542,8 @@ const getDepartmentComplianceStats = async (req, res) => {
     let totalAudits = 0;
     try {
       if (isMongoConnected()) {
-        totalAudits = await Audit.countDocuments();
+        const auditQuery = targetUnit && targetUnit !== 'ALL' ? { unitId: targetUnit } : {};
+        totalAudits = await Audit.countDocuments(auditQuery);
       }
     } catch (e) {
       totalAudits = 0;
@@ -2547,14 +2647,21 @@ const updateComplianceThresholds = async (req, res) => {
 // @access  Private
 const getAudits = async (req, res) => {
   try {
+    const targetUnit = (req.query?.unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
     let audits = [];
     let complaints = [];
 
     if (isMongoConnected()) {
       try {
+        const auditFilter = targetUnit && targetUnit !== 'ALL' ? { unitId: targetUnit } : {};
+        const complaintFilter = { isDeleted: { $ne: true } };
+        if (targetUnit && targetUnit !== 'ALL') {
+          complaintFilter.unitId = targetUnit;
+        }
+
         const [auditsDocs, complaintsDocs] = await Promise.all([
-          Audit.find().sort({ createdAt: -1 }).lean(),
-          Complaint.find({ isDeleted: { $ne: true } }).select('status').lean(),
+          Audit.find(auditFilter).sort({ createdAt: -1 }).lean(),
+          Complaint.find(complaintFilter).select('status unitId').lean(),
         ]);
         if (auditsDocs) {
           audits = auditsDocs.map((a) => ({ ...a, id: a._id.toString(), _id: a._id.toString() }));
@@ -2636,7 +2743,10 @@ const updateAuditChecklist = async (req, res) => {
 // @access  Private (AUDITOR or ADMIN)
 const createAuditRound = async (req, res) => {
   try {
-    const { title, date, departments, leadAuditor } = req.body;
+    const { title, date, departments, leadAuditor, unitId, unitName } = req.body;
+    const targetUnitId = (unitId || (req.activeUnitId !== 'ALL' ? req.activeUnitId : null) || req.user?.unitId || '').toString().trim().toUpperCase();
+    const targetUnitName = unitName || (targetUnitId === 'UNIT-1' ? 'Unit 1' : targetUnitId === 'UNIT-2' ? 'Unit 2' : targetUnitId || '');
+
     if (!title || !date) {
       return res.status(400).json({
         success: false,
@@ -2651,6 +2761,8 @@ const createAuditRound = async (req, res) => {
         date: date || new Date(),
         departments: departments || ['HR', 'Production', 'EHS'],
         leadAuditor: leadAuditor || req.user?.name || 'Auditor',
+        unitId: targetUnitId && targetUnitId !== 'ALL' ? targetUnitId : null,
+        unitName: targetUnitName,
         status: 'Scheduled',
       });
       newAudit = { ...created.toObject(), id: created._id.toString(), _id: created._id.toString() };

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { taskService, userService, complaintService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useUnit } from '../context/UnitContext';
 import { compressImage } from '../utils/imageCompressor';
 
 const FACTORY_DEPARTMENTS = [
@@ -59,7 +60,14 @@ export const DepartmentWorkOperations = ({
   embedded = false,
 }) => {
   const { isAdmin, isAuditor, user } = useAuth();
+  const { units, activeUnitId, activeUnit, isCompanyAdmin } = useUnit();
   const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || (!isAdmin && !isAuditor);
+
+  const getDefaultUnitId = useCallback(() => {
+    if (user?.unitId && user?.unitId !== 'ALL') return user.unitId;
+    if (activeUnitId && activeUnitId !== 'ALL') return activeUnitId;
+    return units[0]?.unitId || 'UNIT-1';
+  }, [user, activeUnitId, units]);
 
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -113,6 +121,7 @@ export const DepartmentWorkOperations = ({
   const [scheduleForm, setScheduleForm] = useState({
     title: '',
     department: selectedDept !== 'ALL' ? selectedDept : 'Production',
+    unitId: getDefaultUnitId(),
     description: '',
     dueDate: '',
     priority: 'MEDIUM',
@@ -156,7 +165,7 @@ export const DepartmentWorkOperations = ({
       if (showSpinner) setLoading(false);
       setIsRefreshing(false);
     }
-  }, [selectedDept]);
+  }, [selectedDept, activeUnitId]);
 
   useEffect(() => {
     loadData(true);
@@ -274,9 +283,15 @@ export const DepartmentWorkOperations = ({
     setSavingTask(true);
     setScheduleError(null);
     try {
+      const targetUnitId = scheduleForm.unitId || getDefaultUnitId();
+      const matchedUnit = units.find((u) => u.unitId === targetUnitId);
+      const targetUnitName = matchedUnit?.name || (targetUnitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1');
+
       const res = await taskService.createTask({
         title: scheduleForm.title.trim(),
         department: scheduleForm.department || (selectedDept !== 'ALL' ? selectedDept : 'Production'),
+        unitId: targetUnitId,
+        unitName: targetUnitName,
         description: scheduleForm.description.trim(),
         dueDate: scheduleForm.dueDate || null,
         priority: scheduleForm.priority || 'MEDIUM',
@@ -288,6 +303,7 @@ export const DepartmentWorkOperations = ({
         setScheduleForm({
           title: '',
           department: selectedDept !== 'ALL' ? selectedDept : 'Production',
+          unitId: getDefaultUnitId(),
           description: '',
           dueDate: '',
           priority: 'MEDIUM',
@@ -1634,6 +1650,30 @@ export const DepartmentWorkOperations = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Plant Unit Assignment
+                </label>
+                {isCompanyAdmin ? (
+                  <select
+                    value={scheduleForm.unitId || getDefaultUnitId()}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, unitId: e.target.value, assignedToUserId: 'DEPT_POOL' })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    {units.map((u) => (
+                      <option key={u.unitId} value={u.unitId}>
+                        {u.name} ({u.unitId})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                    <span>{units.find((u) => u.unitId === (scheduleForm.unitId || getDefaultUnitId()))?.name || 'Unit 1'}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">🔒 Assigned Unit</span>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -1670,7 +1710,7 @@ export const DepartmentWorkOperations = ({
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Assignee / Worker Selection
+                  Assignee / Worker Selection (Unit-Isolated)
                 </label>
                 <select
                   value={scheduleForm.assignedToUserId}
@@ -1681,7 +1721,17 @@ export const DepartmentWorkOperations = ({
                     🌟 Entire Department Pool (Any {scheduleForm.department} Worker can Start)
                   </option>
                   {usersList
-                    .filter((u) => (u.department || '').toLowerCase() === (scheduleForm.department || '').toLowerCase())
+                    .filter((u) => {
+                      const deptMatch = (u.department || '').toLowerCase() === (scheduleForm.department || '').toLowerCase();
+                      if (!deptMatch) return false;
+                      const targetUnit = scheduleForm.unitId || getDefaultUnitId();
+                      if (targetUnit && targetUnit !== 'ALL') {
+                        if (u.unitId && u.unitId !== 'ALL' && u.unitId !== targetUnit) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    })
                     .map((u) => {
                       const empStatus = (liveStatusData?.employees || []).find(
                         (e) => (e.employeeId || '').toUpperCase() === (u.employeeId || '').toUpperCase()

@@ -25,6 +25,9 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
     email: u.email,
     role: u.role === 'SUPERVISOR' ? 'ACTION_PERSON' : u.role,
     department: u.department,
+    unitId: u.unitId || null,
+    unitName: u.unitName || '',
+    assignedUnits: Array.isArray(u.assignedUnits) ? u.assignedUnits : (u.unitId ? [u.unitId] : []),
     designation: u.designation,
     mobileNumber: u.mobileNumber,
     isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
@@ -56,11 +59,23 @@ const getLineSupervisors = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const data = await User.find({
+        const activeUnit = (req.query?.unitId || req.activeUnitId || '').toString().trim().toUpperCase();
+        const supervisorFilter = {
           role: { $in: ['ACTION_PERSON', 'SUPERVISOR'] },
           isActive: true,
           isDeleted: { $ne: true },
-        })
+        };
+
+        if (activeUnit && activeUnit !== 'ALL') {
+          supervisorFilter.$or = [
+            { unitId: activeUnit },
+            { assignedUnits: activeUnit },
+            { unitId: null },
+            { unitId: '' },
+          ];
+        }
+
+        const data = await User.find(supervisorFilter)
           .sort({ department: 1, name: 1 })
           .lean();
 
@@ -101,7 +116,7 @@ const getLineSupervisors = async (req, res) => {
 // @access  Private (Admin or Authenticated)
 const getAllUsers = async (req, res) => {
   try {
-    const { role, department, search, isActive, date, includeDeleted, archived } = req.query;
+    const { role, department, search, isActive, date, includeDeleted, archived, unitId } = req.query;
     const todayDate = date || getTodayISTString();
     const attendanceMap = await getDailyAttendanceMap(todayDate);
 
@@ -139,15 +154,44 @@ const getAllUsers = async (req, res) => {
           query.isActive = isActive === 'true';
         }
 
+        const conditions = [];
+        const targetUnit = (unitId || (req.isCompanyAdmin ? req.activeUnitId : req.user?.unitId) || '').toString().trim().toUpperCase();
+
+        if (targetUnit && targetUnit !== 'ALL') {
+          if (targetUnit === 'UNASSIGNED') {
+            conditions.push({
+              $or: [{ unitId: null }, { unitId: '' }, { unitId: 'UNASSIGNED' }, { unitId: { $exists: false } }],
+            });
+          } else if (req.isCompanyAdmin && unitId) {
+            conditions.push({
+              $or: [{ unitId: targetUnit }, { assignedUnits: targetUnit }],
+            });
+          } else {
+            const unitOr = [{ unitId: targetUnit }, { assignedUnits: targetUnit }];
+            if (!req.isCompanyAdmin) {
+              unitOr.push({ unitId: null }, { unitId: '' });
+            }
+            conditions.push({ $or: unitOr });
+          }
+        }
+
         if (search) {
           const regex = new RegExp(search, 'i');
-          query.$or = [
-            { name: regex },
-            { employeeId: regex },
-            { email: regex },
-            { department: regex },
-            { designation: regex },
-          ];
+          conditions.push({
+            $or: [
+              { name: regex },
+              { employeeId: regex },
+              { email: regex },
+              { department: regex },
+              { designation: regex },
+            ],
+          });
+        }
+
+        if (conditions.length === 1) {
+          Object.assign(query, conditions[0]);
+        } else if (conditions.length > 1) {
+          query.$and = conditions;
         }
 
         const data = await User.find(query).sort({ role: 1, name: 1 }).lean();
@@ -248,6 +292,8 @@ const createUser = async (req, res) => {
       department,
       designation,
       mobileNumber,
+      unitId,
+      unitName,
     } = req.body;
 
     if (!employeeId || !name || !email || !password || !role || !department || !designation || !mobileNumber) {
@@ -265,6 +311,14 @@ const createUser = async (req, res) => {
     }
 
     const normalizedRole = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
+    const cleanUnitId = unitId ? unitId.trim().toUpperCase() : null;
+    const cleanUnitName = unitName
+      ? unitName.trim()
+      : cleanUnitId === 'UNIT-1'
+      ? 'Unit 1'
+      : cleanUnitId === 'UNIT-2'
+      ? 'Unit 2'
+      : cleanUnitId || '';
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -290,6 +344,9 @@ const createUser = async (req, res) => {
           department: department.trim(),
           designation: designation.trim(),
           mobileNumber: mobileNumber.trim(),
+          unitId: cleanUnitId,
+          unitName: cleanUnitName,
+          assignedUnits: cleanUnitId ? [cleanUnitId] : [],
           isActive: true,
         });
 
@@ -304,6 +361,9 @@ const createUser = async (req, res) => {
           department: inserted.department,
           designation: inserted.designation,
           mobileNumber: inserted.mobileNumber,
+          unitId: cleanUnitId,
+          unitName: cleanUnitName,
+          assignedUnits: cleanUnitId ? [cleanUnitId] : [],
         });
 
         // Record audit event
@@ -377,7 +437,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { name, email, department, designation, mobileNumber, role } = req.body;
+    const { name, email, department, designation, mobileNumber, role, unitId, unitName } = req.body;
 
     if (!isMongoConnected()) {
       await connectDB();
@@ -391,6 +451,18 @@ const updateUser = async (req, res) => {
         if (designation) updateData.designation = designation.trim();
         if (typeof mobileNumber !== 'undefined') updateData.mobileNumber = mobileNumber.trim();
         if (role) updateData.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
+        if (typeof unitId !== 'undefined') {
+          const cleanUnitId = unitId ? unitId.trim().toUpperCase() : null;
+          updateData.unitId = cleanUnitId;
+          updateData.unitName = unitName
+            ? unitName.trim()
+            : cleanUnitId === 'UNIT-1'
+            ? 'Unit 1'
+            : cleanUnitId === 'UNIT-2'
+            ? 'Unit 2'
+            : cleanUnitId || '';
+          updateData.assignedUnits = cleanUnitId ? [cleanUnitId] : [];
+        }
 
         const query = {
           $or: [{ employeeId: userId }, { email: userId }],
@@ -449,6 +521,18 @@ const updateUser = async (req, res) => {
     if (designation) updates.designation = designation.trim();
     if (typeof mobileNumber !== 'undefined') updates.mobileNumber = mobileNumber.trim();
     if (role) updates.role = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
+    if (typeof unitId !== 'undefined') {
+      const cleanUnitId = unitId ? unitId.trim().toUpperCase() : null;
+      updates.unitId = cleanUnitId;
+      updates.unitName = unitName
+        ? unitName.trim()
+        : cleanUnitId === 'UNIT-1'
+        ? 'Unit 1'
+        : cleanUnitId === 'UNIT-2'
+        ? 'Unit 2'
+        : cleanUnitId || '';
+      updates.assignedUnits = cleanUnitId ? [cleanUnitId] : [];
+    }
 
     const updated = mockStore.updateUser(userId, updates);
     res.status(200).json({

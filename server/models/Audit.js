@@ -22,6 +22,17 @@ const auditSchema = new mongoose.Schema(
       type: String,
       default: 'Scheduled',
     },
+    unitId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    unitName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     auditor: {
       type: mongoose.Schema.Types.Mixed,
       default: {},

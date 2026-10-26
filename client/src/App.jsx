@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Routes, Route, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCheck } from 'lucide-react';
 import { useAuth } from './context/AuthContext';
+import { useUnit } from './context/UnitContext';
 import { complaintService } from './services/api';
 import Header from './components/Header';
 import SidebarNavigation from './components/SidebarNavigation';
@@ -56,6 +57,7 @@ const safePersistCache = (items, user) => {
  */
 export const AppLayout = () => {
   const { user, isAdmin, isAuditor } = useAuth();
+  const { units, activeUnitId, activeUnit, switchUnit, refreshUnits, isCompanyAdmin, unassignedCounts } = useUnit();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -135,7 +137,7 @@ export const AppLayout = () => {
         setTimeout(() => setIsRefreshing(false), 400);
       }
     }
-  }, [user]);
+  }, [user, activeUnitId]);
 
   useEffect(() => {
     loadData(!initialLoadedRef.current, false);
@@ -394,6 +396,14 @@ export const AppLayout = () => {
     handleOpenNewComplaintWithPrefill,
     setIsNewModalOpen,
     showToast,
+    // Multi-Unit Architecture Context
+    units,
+    activeUnitId,
+    activeUnit,
+    switchUnit,
+    refreshUnits,
+    isCompanyAdmin,
+    unassignedCounts,
   };
 
   return (
@@ -435,13 +445,17 @@ export const AppLayout = () => {
         <main className="flex-1 min-w-0 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden">
           {/* Active Persona Banner */}
           <div className="p-3 sm:p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 text-xs mb-4 shadow-xs transition-colors">
-            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-wrap">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 shadow-xs" />
               <span className="text-slate-600 dark:text-slate-300 truncate">
                 Active Persona:{' '}
                 <strong className="text-slate-900 dark:text-white font-bold">{user?.name}</strong>{' '}
                 <span className="text-indigo-600 dark:text-cyan-400 font-mono font-semibold">({user?.employeeId}</span> •{' '}
                 <span className="text-slate-500 dark:text-slate-400">{user?.department})</span>
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                <span>{activeUnit ? activeUnit.name : 'All Factory Units'}</span>
               </span>
             </div>
 

@@ -12,6 +12,17 @@ const complianceTaskSchema = new mongoose.Schema(
       required: [true, 'Department is required'],
       trim: true,
     },
+    unitId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    unitName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     description: {
       type: String,
       trim: true,

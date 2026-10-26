@@ -50,6 +50,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
+import { useUnit } from '../context/UnitContext';
 import { drawNCWithPhotos, generateSingleNCPdf } from '../utils/ncPdfGenerator';
 // Pure NC/CAP Report - no external mock collections
 
@@ -61,6 +62,7 @@ export const ReportsView = ({
   initialTab = 'audit-register',
 }) => {
   const { user } = useAuth();
+  const { units, activeUnitId, isCompanyAdmin } = useUnit();
   const [downloadingCSV, setDownloadingCSV] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
 
@@ -122,7 +124,16 @@ export const ReportsView = ({
   // 11. Record Status Filter ('ALL' | 'ACTIVE' | 'DELETED')
   const [recordStatusFilter, setRecordStatusFilter] = useState('ALL');
 
-  // 12. Export Scope & Drill-Down Modal State
+  // 12. Unit Filter ('ALL' | 'UNIT-1' | 'UNIT-2' ...)
+  const [unitFilter, setUnitFilter] = useState(() => (activeUnitId ? activeUnitId : 'ALL'));
+
+  useEffect(() => {
+    if (activeUnitId) {
+      setUnitFilter(activeUnitId);
+    }
+  }, [activeUnitId]);
+
+  // 13. Export Scope & Drill-Down Modal State
   const [exportScope, setExportScope] = useState('FILTERED'); // 'FILTERED' | 'ALL'
   const [drilldownComplaint, setDrilldownComplaint] = useState(null);
   const [showFiltersExpanded, setShowFiltersExpanded] = useState(true);
@@ -679,6 +690,14 @@ export const ReportsView = ({
         if (!matchesSearch) return false;
       }
 
+      // 12. Unit Filter
+      if (unitFilter !== 'ALL') {
+        const cUnit = c.unitId || '';
+        if (cUnit && cUnit !== unitFilter) return false;
+        // If ticket has no unitId (legacy unassigned) and a specific unit is filtered, exclude from specific unit view
+        if (!cUnit) return false;
+      }
+
       return true;
     });
   }, [
@@ -694,6 +713,7 @@ export const ReportsView = ({
     repeatFilter,
     reworkFilter,
     recordStatusFilter,
+    unitFilter,
     datePreset,
     startDate,
     endDate,
@@ -1803,6 +1823,29 @@ export const ReportsView = ({
               </button>
             )}
           </div>
+
+          {/* Unit Filter (Company Admin & Unit Scoping) */}
+          <select
+            id="filter-unit-reports"
+            value={unitFilter}
+            onChange={(e) => setUnitFilter(e.target.value)}
+            disabled={!isCompanyAdmin && user?.unitId && user?.unitId !== 'ALL'}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              unitFilter !== 'ALL'
+                ? 'bg-indigo-50/90 border-indigo-300 text-indigo-900 dark:bg-indigo-950/70 dark:border-indigo-700 dark:text-cyan-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+            title="Filter by Factory Plant Unit"
+          >
+            {isCompanyAdmin && (
+              <option value="ALL">🏢 All Units (Combined Company-Wide)</option>
+            )}
+            {units.map((u) => (
+              <option key={u.unitId} value={u.unitId}>
+                📍 {u.name} ({u.unitId})
+              </option>
+            ))}
+          </select>
 
           {/* Record Status Filter */}
           <select

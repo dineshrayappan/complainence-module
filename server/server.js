@@ -14,6 +14,7 @@ const complaintRoutes = require('./routes/complaintRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
+const unitRoutes = require('./routes/unitRoutes');
 
 const app = express();
 
@@ -25,7 +26,7 @@ app.use(
   cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Unit-Id', 'x-unit-id'],
   })
 );
 
@@ -159,6 +160,8 @@ app.use('/api/departments', departmentRoutes);
 app.use('/departments', departmentRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/audit-logs', auditLogRoutes);
+app.use('/api/units', unitRoutes);
+app.use('/units', unitRoutes);
 
 // Central Error Handler
 app.use((err, req, res, next) => {

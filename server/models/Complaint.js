@@ -41,6 +41,17 @@ const complaintSchema = new mongoose.Schema(
       required: [true, 'Department is required'],
       trim: true,
     },
+    unitId: {
+      type: String,
+      default: null,
+      index: true,
+      trim: true,
+    },
+    unitName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     location: {
       type: String,
       required: [true, 'Location is required'],

@@ -2,6 +2,21 @@ const jwt = require('jsonwebtoken');
 const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const mockStore = require('../config/mockStore');
+const isCompanyAdmin = (user) => {
+  if (!user) return false;
+  return Boolean(
+    user.role === 'ADMIN' ||
+    user.role === 'OWNER' ||
+    user.role === 'SUPERADMIN' ||
+    user.isOwner ||
+    user.employeeId === 'ALL-001' ||
+    user.employeeId === 'OWNER-001' ||
+    user.employeeId === 'ADM-001' ||
+    user.email === 'all@factory.com' ||
+    user.isUniversal ||
+    user.hasAllRoles
+  );
+};
 
 const verifyToken = async (req, res, next) => {
   let token;
@@ -99,6 +114,30 @@ const verifyToken = async (req, res, next) => {
       }
 
       req.user = user;
+      req.isCompanyAdmin = isCompanyAdmin(user);
+
+      // Extract requested unit from header or query param
+      const rawHeaderUnit = req.headers['x-unit-id'] || req.headers['unit-id'];
+      const rawQueryUnit = req.query?.unitId;
+      const requestedUnit = ((rawHeaderUnit || rawQueryUnit || '').toString()).trim().toUpperCase();
+
+      if (req.isCompanyAdmin) {
+        // Company Admin can switch between 'ALL', 'UNIT-1', 'UNIT-2', etc.
+        req.activeUnitId = requestedUnit || 'ALL';
+      } else {
+        // Unit-level member is locked to their assigned unit
+        const userUnit = (user.unitId || '').toString().trim().toUpperCase();
+        req.activeUnitId = userUnit || null;
+
+        // Block unauthorized cross-unit requests
+        if (requestedUnit && requestedUnit !== 'ALL' && userUnit && requestedUnit !== userUnit) {
+          return res.status(403).json({
+            success: false,
+            message: `Access denied. You are assigned to unit '${user.unitName || userUnit}' and cannot access data for unit '${requestedUnit}'.`,
+          });
+        }
+      }
+
       next();
     } catch (err) {
       console.error('[AuthMiddleware] Token verification failed:', err.message);
@@ -167,4 +206,24 @@ const requireOwner = (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, requireRole, requireOwner };
+// Enforce that a record matches the user's unit (or user is company admin)
+const enforceUnitMatch = (recordUnitId, req, res) => {
+  if (req.isCompanyAdmin) return true;
+  // If record has no assigned unit yet (legacy unassigned), allow access to avoid breaking workflows
+  if (!recordUnitId || recordUnitId === 'UNASSIGNED') return true;
+
+  const userUnit = (req.user?.unitId || '').toString().trim().toUpperCase();
+  const targetUnit = (recordUnitId || '').toString().trim().toUpperCase();
+
+  if (userUnit && targetUnit && userUnit !== targetUnit) {
+    res.status(403).json({
+      success: false,
+      message: `Access denied. Record belongs to ${targetUnit}, but your account is assigned to ${userUnit}.`,
+    });
+    return false;
+  }
+  return true;
+};
+
+module.exports = { verifyToken, requireRole, requireOwner, isCompanyAdmin, enforceUnitMatch };
+

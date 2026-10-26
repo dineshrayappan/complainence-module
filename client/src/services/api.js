@@ -19,6 +19,13 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    const activeUnit =
+      (typeof window !== 'undefined' && window.sessionStorage?.getItem('garment_qms_active_unit')) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem('garment_qms_active_unit'));
+    if (activeUnit) {
+      config.headers['X-Unit-Id'] = activeUnit;
+    }
     // CRITICAL: When data is FormData, remove Content-Type so browser / axios
     // automatically populates multipart/form-data with the required boundary string
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
@@ -118,4 +125,13 @@ export const auditLogService = {
   clearAuditLogs: () => api.delete('/audit-logs'),
 };
 
+export const unitService = {
+  getUnits: () => api.get('/units'),
+  createUnit: (data) => api.post('/units', data),
+  updateUnit: (id, data) => api.put(`/units/${id}`, data),
+  getUnassignedRecords: () => api.get('/units/unassigned'),
+  assignRecords: (data) => api.post('/units/assign-records', data),
+};
+
 export default api;
+
