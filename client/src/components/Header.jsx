@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUnit } from '../context/UnitContext';
+import { useCompany } from '../context/CompanyContext';
 import { useNavigate, Link } from 'react-router-dom';
 
 export const Header = ({
@@ -30,6 +31,7 @@ export const Header = ({
 }) => {
   const { user, isOwner, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
   const { units, activeUnitId, activeUnit, switchUnit, isCompanyAdmin } = useUnit();
+  const { basePath, companyName } = useCompany();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -109,7 +111,7 @@ export const Header = ({
 
             {/* Brand Logo & Name */}
             <Link
-              to="/compliance"
+              to={basePath}
               className="flex items-center space-x-2.5 sm:space-x-3 min-w-0 group cursor-pointer focus:outline-none"
               title="Go to Compliance Overview"
             >
@@ -122,7 +124,7 @@ export const Header = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm sm:text-base lg:text-lg font-black tracking-tight text-slate-900 dark:text-white uppercase font-sans truncate group-hover:text-indigo-600 dark:group-hover:text-cyan-400 transition-colors">
-                    COMPLIANCE MANAGEMENT
+                    {companyName ? `${companyName.toUpperCase()}` : 'COMPLIANCE MANAGEMENT'}
                   </span>
                   <span className="hidden md:inline-flex items-center gap-1 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
@@ -280,7 +282,7 @@ export const Header = ({
                         onClick={() => {
                           setShowNotifications(false);
                           if (onSelectOverdue) onSelectOverdue();
-                          navigate('/compliance/nc-cap?deadline=Overdue');
+                          navigate(`${basePath}/nc-cap?deadline=Overdue`);
                         }}
                         className="text-xs font-bold text-indigo-600 dark:text-cyan-400 hover:underline cursor-pointer"
                       >
@@ -363,7 +365,7 @@ export const Header = ({
             <button
               onClick={async () => {
                 await logout();
-                navigate('/compliance/login');
+                navigate(`${basePath}/login`);
               }}
               id="btn-sign-out"
               title="Sign out of system"

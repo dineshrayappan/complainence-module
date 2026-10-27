@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle, ShieldCheck, Lock, User, HelpCircle, X } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, ShieldCheck, Lock, User, HelpCircle, X, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
 
 export const LoginPage = () => {
   const { user, login } = useAuth();
+  const { companyName, companySlug, basePath } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
   const [identifier, setIdentifier] = useState('');
@@ -15,9 +17,9 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  // If already authenticated, redirect to /compliance which routes to appropriate persona page
+  // If already authenticated, redirect to active workspace dashboard
   if (user) {
-    return <Navigate to="/compliance" replace />;
+    return <Navigate to={basePath} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -39,7 +41,7 @@ export const LoginPage = () => {
         setError(res.message || 'Login failed. Please verify your credentials.');
       } else if (res && res.success) {
         const from = location.state?.from;
-        const targetPath = from?.pathname ? `${from.pathname}${from.search || ''}` : '/compliance';
+        const targetPath = from?.pathname ? `${from.pathname}${from.search || ''}` : basePath;
         navigate(targetPath, { replace: true });
       }
     } catch (err) {
@@ -57,10 +59,13 @@ export const LoginPage = () => {
         <div className="w-full max-w-[440px] bg-white rounded-3xl border border-slate-200/90 shadow-[0_20px_60px_-15px_rgba(15,23,42,0.14),0_0_0_1px_rgba(226,232,240,0.8)] p-7 sm:p-9 transition-all">
           
           {/* Card Top Pill Badge */}
-          <div className="mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-100/90">
               <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-              Compliance Module
+              {companyName}
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-semibold uppercase">
+              /{companySlug}
             </span>
           </div>
 
@@ -69,7 +74,7 @@ export const LoginPage = () => {
             Welcome back!
           </h1>
           <p className="text-xs sm:text-[13px] text-slate-500 mt-1 mb-6 leading-relaxed">
-            Please sign in to access your compliance & audit workspace.
+            Sign in to access {companyName}&apos;s compliance &amp; NC/CAP tracking portal.
           </p>
 
           {/* Error Alert */}

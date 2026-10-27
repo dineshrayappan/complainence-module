@@ -5,6 +5,8 @@ mongoose.set('bufferCommands', false);
 
 let isConnected = false;
 let lastConnectionError = null;
+let knownClusterDbs = new Set();
+const companyDbCache = new Map();
 
 const DEFAULT_MONGODB_URI =
   'mongodb://127.0.0.1:27017/garment_qms';
@@ -42,6 +44,18 @@ const connectDB = async () => {
     isConnected = true;
     lastConnectionError = null;
     console.log('✅ [Database] Successfully connected to MongoDB server');
+
+    // Discover known databases in this MongoDB cluster
+    try {
+      const adminDb = mongoose.connection.db.admin();
+      const dbsList = await adminDb.listDatabases();
+      if (dbsList && Array.isArray(dbsList.databases)) {
+        knownClusterDbs = new Set(dbsList.databases.map((d) => d.name));
+        console.log(`[Database] Cluster databases discovered: [${Array.from(knownClusterDbs).join(', ')}]`);
+      }
+    } catch (dbListErr) {
+      console.warn('[Database] Cluster database discovery notice:', dbListErr.message);
+    }
 
     // Automatically ensure default admin user (admin / admin123) is present upon connection
     try {
@@ -109,11 +123,46 @@ const isMongoConnected = () => {
 
 const getLastConnectionError = () => lastConnectionError;
 
+/**
+ * Returns a cached Mongoose Connection bound strictly to a company's database
+ * @param {string} dbName - Target database name e.g. 'compliance_esstee'
+ * @param {string} [fallbackDbName] - Fallback database name e.g. 'compliance_module'
+ * @returns {mongoose.Connection}
+ */
+const getCompanyConnection = (dbName, fallbackDbName = null) => {
+  if (!mongoose.connection || mongoose.connection.readyState !== 1) {
+    return null;
+  }
+  if (!dbName) {
+    return mongoose.connection;
+  }
+
+  // If fallbackDbName is specified, and target db doesn't exist yet but fallback does, use fallback
+  let effectiveDbName = dbName;
+  if (
+    fallbackDbName &&
+    knownClusterDbs.size > 0 &&
+    !knownClusterDbs.has(dbName) &&
+    knownClusterDbs.has(fallbackDbName)
+  ) {
+    effectiveDbName = fallbackDbName;
+  }
+
+  if (companyDbCache.has(effectiveDbName)) {
+    return companyDbCache.get(effectiveDbName);
+  }
+
+  const conn = mongoose.connection.useDb(effectiveDbName, { useCache: true });
+  companyDbCache.set(effectiveDbName, conn);
+  return conn;
+};
+
 const disconnectDB = async () => {
   try {
     if (mongoose.connection.readyState !== 0) {
       await mongoose.disconnect();
       isConnected = false;
+      companyDbCache.clear();
       console.log('[Database] MongoDB connection cleanly closed.');
     }
   } catch (err) {
@@ -126,4 +175,5 @@ module.exports = {
   disconnectDB,
   isMongoConnected,
   getLastConnectionError,
+  getCompanyConnection,
 };

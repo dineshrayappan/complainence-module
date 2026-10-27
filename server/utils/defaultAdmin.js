@@ -1,15 +1,18 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const { getRootUserModel } = require('../models/unitModels');
 
 /**
  * Ensures the default administrator user exists in MongoDB with credentials:
  * Username / Identifier: admin (or ADMIN, ADM-001, admin@factory.com)
  * Password:             admin123
  */
-const ensureDefaultAdminUser = async () => {
+const ensureDefaultAdminUser = async (targetConn = null) => {
   try {
+    const UserModel = targetConn ? getRootUserModel(targetConn) : getRootUserModel();
+
     // Search for existing root admin account
-    let admin = await User.findOne({
+    let admin = await UserModel.findOne({
       $or: [
         { employeeId: 'ADMIN' },
         { employeeId: 'ADM-001' },
@@ -19,7 +22,7 @@ const ensureDefaultAdminUser = async () => {
     });
 
     if (!admin) {
-      admin = await User.create({
+      admin = await UserModel.create({
         employeeId: 'ADMIN',
         name: 'System Admin',
         email: 'admin@factory.com',

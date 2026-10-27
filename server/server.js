@@ -15,6 +15,8 @@ const taskRoutes = require('./routes/taskRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
 const unitRoutes = require('./routes/unitRoutes');
+const companyRoutes = require('./routes/companyRoutes');
+const { identifyCompany } = require('./middleware/companyMiddleware');
 
 const app = express();
 
@@ -26,7 +28,18 @@ app.use(
   cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Unit-Id', 'x-unit-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Unit-Id',
+      'x-unit-id',
+      'X-Company-Slug',
+      'x-company-slug',
+      'X-Company-Id',
+      'x-company-id',
+      'X-Workspace-Slug',
+      'x-workspace-slug',
+    ],
   })
 );
 
@@ -93,6 +106,10 @@ app.use('/api', async (req, res, next) => {
   }
 });
 
+// Company Workspace Isolation Middleware (runs request context inside AsyncLocalStorage)
+app.use('/api', identifyCompany);
+app.use(['/auth', '/users', '/complaints', '/tasks', '/departments', '/audit-logs', '/units', '/companies'], identifyCompany);
+
 // API Overview & Documentation helper (useful for Postman testing & browser verification)
 const apiOverview = (req, res) => {
   res.status(200).json({
@@ -146,6 +163,10 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Company Directory and Validation Routes
+app.use('/api/companies', companyRoutes);
+app.use('/companies', companyRoutes);
 
 // API Routes
 app.use('/api/auth', authRoutes);

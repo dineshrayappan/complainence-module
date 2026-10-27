@@ -22,31 +22,44 @@ import RequirementsPage from './pages/RequirementsPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
+import { useCompany } from './context/CompanyContext';
+import CompanyWorkspaceRoute from './components/CompanyWorkspaceRoute';
 
-// Safe localStorage caching helper namespaced by user to prevent QuotaExceededError and cross-account data leaks
+// Safe storage caching helper namespaced by user to prevent QuotaExceededError and cross-account data leaks
 const getCacheKey = (user) => `garment_qms_cached_complaints_${user?.employeeId || user?.id || user?._id || 'guest'}`;
 
 const safePersistCache = (items, user) => {
-  if (!user) return;
+  if (!user || !Array.isArray(items)) return;
   try {
     const key = getCacheKey(user);
-    const list = (items || []).slice(0, 30);
+    // Strip all heavy photos, attachments, proof images, and large binary fields
+    // to strictly preserve storage quota and completely prevent QuotaExceededError
+    const lean = items.slice(0, 20).map((item) => ({
+      _id: item._id || item.id,
+      id: item.id || item._id,
+      complaintId: item.complaintId,
+      department: item.department,
+      status: item.status,
+      severity: item.severity || item.riskSeverity,
+      priority: item.priority,
+      title: item.title,
+      description: item.description ? String(item.description).substring(0, 120) : '',
+      stage: item.stage,
+      createdAt: item.createdAt,
+      unitId: item.unitId || 'UNIT-1',
+    }));
+
     try {
-      localStorage.setItem(key, JSON.stringify(list));
-    } catch (quotaErr) {
-      const lean = list.slice(0, 20).map((item) => {
-        const isBeforeBase64 = item.beforePhoto?.startsWith('data:image/');
-        const isAfterBase64 = item.afterPhoto?.startsWith('data:image/');
-        return {
-          ...item,
-          beforePhoto: isBeforeBase64 ? null : item.beforePhoto,
-          afterPhoto: isAfterBase64 ? null : item.afterPhoto,
-        };
-      });
-      localStorage.setItem(key, JSON.stringify(lean));
-    }
-  } catch (err) {
-    console.warn('Could not persist complaints cache:', err);
+      sessionStorage.setItem(key, JSON.stringify(lean));
+    } catch (_) {}
+
+    // Clean up bloated legacy localStorage entries to immediately free browser quota
+    try {
+      localStorage.removeItem(key);
+      localStorage.removeItem('garment_qms_cached_complaints');
+    } catch (_) {}
+  } catch (_) {
+    // Silently suppress quota warnings
   }
 };
 
@@ -58,15 +71,16 @@ const safePersistCache = (items, user) => {
 export const AppLayout = () => {
   const { user, isAdmin, isAuditor } = useAuth();
   const { units, activeUnitId, activeUnit, switchUnit, refreshUnits, isCompanyAdmin, unassignedCounts } = useUnit();
+  const { basePath, companyName } = useCompany();
   const location = useLocation();
   const navigate = useNavigate();
 
   // Data State with user-scoped hydration
   const [complaints, setComplaints] = useState(() => {
     try {
-      localStorage.removeItem('garment_qms_cached_complaints');
-      if (user) {
-        const cached = localStorage.getItem(getCacheKey(user));
+      if (typeof window !== 'undefined' && user) {
+        const key = getCacheKey(user);
+        const cached = sessionStorage.getItem(key) || localStorage.getItem(key);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -377,6 +391,9 @@ export const AppLayout = () => {
   }, [complaints, user]);
 
   const isAtDashboard =
+    location.pathname === `${basePath}/dashboard` ||
+    location.pathname === basePath ||
+    location.pathname === `${basePath}/` ||
     location.pathname === '/compliance/dashboard' ||
     location.pathname === '/compliance' ||
     location.pathname === '/compliance/';
@@ -423,7 +440,7 @@ export const AppLayout = () => {
         onRefresh={() => loadData(false, true)}
         isRefreshing={isRefreshing}
         overdueCount={derivedCounts.overdueCount ?? 0}
-        onSelectOverdue={() => navigate('/compliance/nc-cap?deadline=Overdue')}
+        onSelectOverdue={() => navigate(`${basePath}/nc-cap?deadline=Overdue`)}
       />
 
       {/* Two-Column App Shell Layout */}
@@ -455,7 +472,7 @@ export const AppLayout = () => {
               </span>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                <span>{activeUnit ? activeUnit.name : 'All Factory Units'}</span>
+                <span>{activeUnit ? activeUnit.name : 'Unit 1'}</span>
               </span>
             </div>
 
@@ -477,7 +494,7 @@ export const AppLayout = () => {
                   <span>•</span>
                   <button
                     type="button"
-                    onClick={() => navigate('/compliance/dashboard')}
+                    onClick={() => navigate(`${basePath}/dashboard`)}
                     className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase transition-colors bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
                   >
                     ← Factory Overview
@@ -527,103 +544,112 @@ export const AppLayout = () => {
 export const App = () => {
   return (
     <Routes>
-      {/* Root redirect to common /compliance base path */}
-      <Route path="/" element={<Navigate to="/compliance" replace />} />
+      {/* Root redirect to default active workspace */}
+      <Route path="/" element={<Navigate to="/esstee" replace />} />
 
-      {/* Public Login Route with /compliance base */}
-      <Route path="/compliance/login" element={<LoginPage />} />
+      {/* Legacy /compliance direct redirects to /esstee */}
+      <Route path="/compliance" element={<Navigate to="/esstee" replace />} />
+      <Route path="/compliance/login" element={<Navigate to="/esstee/login" replace />} />
+      <Route path="/compliance/dashboard" element={<Navigate to="/esstee/dashboard" replace />} />
+      <Route path="/compliance/admin" element={<Navigate to="/esstee/admin" replace />} />
+      <Route path="/compliance/settings" element={<Navigate to="/esstee/admin" replace />} />
+      <Route path="/compliance/department" element={<Navigate to="/esstee/department" replace />} />
+      <Route path="/compliance/departments" element={<Navigate to="/esstee/department" replace />} />
+      <Route path="/compliance/reports" element={<Navigate to="/esstee/reports" replace />} />
+      <Route path="/compliance/nc-cap" element={<Navigate to="/esstee/nc-cap" replace />} />
+      <Route path="/compliance/nc" element={<Navigate to="/esstee/nc-cap" replace />} />
+      <Route path="/compliance/cap" element={<Navigate to="/esstee/nc-cap?tab=cap-submitted" replace />} />
+      <Route path="/compliance/tasks" element={<Navigate to="/esstee/nc-cap?tab=open" replace />} />
+      <Route path="/compliance/complaints" element={<Navigate to="/esstee/nc-cap" replace />} />
+      <Route path="/compliance/work-operations" element={<Navigate to="/esstee/work-operations" replace />} />
+      <Route path="/compliance/requirements" element={<Navigate to="/esstee/requirements" replace />} />
+      <Route path="/compliance/*" element={<Navigate to="/esstee" replace />} />
 
-      {/* Legacy / Direct redirects to /compliance */}
-      <Route path="/login" element={<Navigate to="/compliance/login" replace />} />
-      <Route path="/admin" element={<Navigate to="/compliance/admin" replace />} />
-      <Route path="/admin/*" element={<Navigate to="/compliance/admin" replace />} />
-      <Route path="/auditor" element={<Navigate to="/compliance/dashboard" replace />} />
-      <Route path="/departments" element={<Navigate to="/compliance/department" replace />} />
-      <Route path="/department" element={<Navigate to="/compliance/department" replace />} />
-      <Route path="/reports" element={<Navigate to="/compliance/reports" replace />} />
-      <Route path="/dashboard" element={<Navigate to="/compliance/dashboard" replace />} />
-      <Route path="/nc-cap" element={<Navigate to="/compliance/nc-cap" replace />} />
-      <Route path="/nc" element={<Navigate to="/compliance/nc-cap" replace />} />
-      <Route path="/cap" element={<Navigate to="/compliance/nc-cap?tab=cap-submitted" replace />} />
-      <Route path="/tasks" element={<Navigate to="/compliance/nc-cap?tab=open" replace />} />
-      <Route path="/complaints" element={<Navigate to="/compliance/nc-cap" replace />} />
-      <Route path="/work-operations" element={<Navigate to="/compliance/work-operations" replace />} />
-      <Route path="/requirements" element={<Navigate to="/compliance/requirements" replace />} />
-      <Route path="/settings" element={<Navigate to="/compliance/admin" replace />} />
+      {/* Top-level aliases redirected to default workspace */}
+      <Route path="/login" element={<Navigate to="/esstee/login" replace />} />
+      <Route path="/admin" element={<Navigate to="/esstee/admin" replace />} />
+      <Route path="/dashboard" element={<Navigate to="/esstee/dashboard" replace />} />
+      <Route path="/nc-cap" element={<Navigate to="/esstee/nc-cap" replace />} />
+      <Route path="/work-operations" element={<Navigate to="/esstee/work-operations" replace />} />
+      <Route path="/department" element={<Navigate to="/esstee/department" replace />} />
+      <Route path="/reports" element={<Navigate to="/esstee/reports" replace />} />
 
-      {/* Protected Application Routes under /compliance Base Path */}
-      <Route
-        path="/compliance"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        {/* Dynamic landing redirect based on persona */}
-        <Route index element={<RoleBasedIndexRedirect />} />
+      {/* Company Workspace Routes: /:companySlug/... */}
+      <Route path="/:companySlug" element={<CompanyWorkspaceRoute />}>
+        {/* Workspace Login */}
+        <Route path="login" element={<LoginPage />} />
 
-        {/* Dashboard (Executive / Plant Oversight) */}
+        {/* Protected Application Routes under Active Company Workspace */}
         <Route
-          path="dashboard"
           element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
-              <DashboardPage />
+            <ProtectedRoute>
+              <AppLayout />
             </ProtectedRoute>
           }
-        />
+        >
+          {/* Dynamic landing redirect based on persona */}
+          <Route index element={<RoleBasedIndexRedirect />} />
 
-        {/* Admin Route: /compliance/admin (and /compliance/settings alias) */}
-        <Route
-          path="admin"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="settings" element={<Navigate to="/compliance/admin" replace />} />
-        <Route path="admin/users" element={<Navigate to="/compliance/admin" replace />} />
+          {/* Dashboard (Executive / Plant Oversight) */}
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Auditor Route alias -> Dashboard */}
-        <Route path="auditor" element={<Navigate to="/compliance/dashboard" replace />} />
+          {/* Admin Route: /:companySlug/admin */}
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="settings" element={<Navigate to="admin" replace />} />
+          <Route path="admin/users" element={<Navigate to="admin" replace />} />
+          <Route path="auditor" element={<Navigate to="dashboard" replace />} />
 
-        {/* Department Route: /compliance/department (and /compliance/departments alias) */}
-        <Route
-          path="department"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
-              <DepartmentsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="departments" element={<Navigate to="/compliance/department" replace />} />
+          {/* Department Route */}
+          <Route
+            path="department"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+                <DepartmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="departments" element={<Navigate to="department" replace />} />
 
-        {/* Reports Route: /compliance/reports */}
-        <Route path="reports" element={<ReportsPage />} />
+          {/* Reports Route */}
+          <Route path="reports" element={<ReportsPage />} />
 
-        {/* NC / CAP Defect Register and its semantic aliases */}
-        <Route path="nc-cap" element={<NcCapPage />} />
-        <Route path="nc" element={<Navigate to="/compliance/nc-cap" replace />} />
-        <Route path="cap" element={<Navigate to="/compliance/nc-cap?tab=cap-submitted" replace />} />
-        <Route path="tasks" element={<Navigate to="/compliance/nc-cap?tab=open" replace />} />
-        <Route path="complaints" element={<Navigate to="/compliance/nc-cap" replace />} />
+          {/* NC / CAP Defect Register */}
+          <Route path="nc-cap" element={<NcCapPage />} />
+          <Route path="nc" element={<Navigate to="nc-cap" replace />} />
+          <Route path="cap" element={<Navigate to="nc-cap?tab=cap-submitted" replace />} />
+          <Route path="tasks" element={<Navigate to="nc-cap?tab=open" replace />} />
+          <Route path="complaints" element={<Navigate to="nc-cap" replace />} />
 
-        {/* Work Operations */}
-        <Route path="work-operations" element={<WorkOperationsPage />} />
+          {/* Work Operations */}
+          <Route path="work-operations" element={<WorkOperationsPage />} />
 
-        {/* Requirements Compliance Matrix */}
-        <Route
-          path="requirements"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
-              <RequirementsPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* Requirements Compliance Matrix */}
+          <Route
+            path="requirements"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+                <RequirementsPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* 404 Inside App Shell */}
-        <Route path="*" element={<NotFoundPage />} />
+          {/* 404 inside workspace */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Route>
 
       {/* Global Fallback Route */}

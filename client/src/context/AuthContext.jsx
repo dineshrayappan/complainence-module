@@ -1,36 +1,53 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../services/api';
+import { authService, getActiveCompanySlug } from '../services/api';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  // Purge any legacy persistent auth credentials in localStorage so fresh visits do not auto-login
+  const currentSlug = getActiveCompanySlug();
+
+  // Purge legacy persistent auth credentials in localStorage so fresh visits do not auto-login
   if (typeof window !== 'undefined') {
     try {
       localStorage.removeItem('garment_qms_user');
       localStorage.removeItem('garment_qms_token');
+      localStorage.removeItem(`garment_qms_user_${currentSlug}`);
+      localStorage.removeItem(`garment_qms_token_${currentSlug}`);
     } catch (e) {}
   }
 
   const [user, setUser] = useState(() => {
     try {
-      const savedUser = sessionStorage.getItem('garment_qms_user');
+      const savedUser =
+        sessionStorage.getItem(`garment_qms_user_${currentSlug}`) ||
+        sessionStorage.getItem('garment_qms_user');
       return savedUser ? JSON.parse(savedUser) : null;
     } catch (e) {
       return null;
     }
   });
+
   const [token, setToken] = useState(() => {
     try {
-      return sessionStorage.getItem('garment_qms_token');
+      return (
+        sessionStorage.getItem(`garment_qms_token_${currentSlug}`) ||
+        sessionStorage.getItem('garment_qms_token')
+      );
     } catch (e) {
       return null;
     }
   });
+
   const [loading, setLoading] = useState(() => {
     try {
-      const hasToken = !!sessionStorage.getItem('garment_qms_token');
-      const hasUser = !!sessionStorage.getItem('garment_qms_user');
+      const hasToken = !!(
+        sessionStorage.getItem(`garment_qms_token_${currentSlug}`) ||
+        sessionStorage.getItem('garment_qms_token')
+      );
+      const hasUser = !!(
+        sessionStorage.getItem(`garment_qms_user_${currentSlug}`) ||
+        sessionStorage.getItem('garment_qms_user')
+      );
       return hasToken && !hasUser;
     } catch (e) {
       return false;
@@ -84,16 +101,19 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (identifier, password, expectedRole, unitId) => {
     try {
+      const slug = getActiveCompanySlug();
       const res = await authService.login({ identifier, password, expectedRole, unitId });
       if (res.data?.success && res.data.user) {
         const canonicalUnit = (res.data.user.unitId === 'UNIT-2' || unitId === 'UNIT-2') ? 'UNIT-2' : 'UNIT-1';
+        sessionStorage.setItem(`garment_qms_token_${slug}`, res.data.token);
+        sessionStorage.setItem(`garment_qms_user_${slug}`, JSON.stringify(res.data.user));
         sessionStorage.setItem('garment_qms_token', res.data.token);
         sessionStorage.setItem('garment_qms_user', JSON.stringify(res.data.user));
         sessionStorage.setItem('garment_qms_active_unit', canonicalUnit);
         localStorage.setItem('garment_qms_active_unit', canonicalUnit);
         setToken(res.data.token);
         setUser(res.data.user);
-        return { success: true, user: res.data.user };
+        return { success: true, user: res.data.user, company: res.data.company };
       }
       return {
         success: false,
@@ -109,8 +129,11 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
+      const slug = getActiveCompanySlug();
       const res = await authService.register(userData);
       if (res.data?.success && res.data.user) {
+        sessionStorage.setItem(`garment_qms_token_${slug}`, res.data.token);
+        sessionStorage.setItem(`garment_qms_user_${slug}`, JSON.stringify(res.data.user));
         sessionStorage.setItem('garment_qms_token', res.data.token);
         sessionStorage.setItem('garment_qms_user', JSON.stringify(res.data.user));
         setToken(res.data.token);
@@ -130,8 +153,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    const slug = getActiveCompanySlug();
     try {
-      const storedUser = user || JSON.parse(sessionStorage.getItem('garment_qms_user') || '{}');
+      const storedUser = user || JSON.parse(sessionStorage.getItem(`garment_qms_user_${slug}`) || sessionStorage.getItem('garment_qms_user') || '{}');
       const userId = storedUser._id || storedUser.id || storedUser.employeeId;
       if (userId) {
         await authService.logout({
@@ -144,9 +168,13 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.warn('[AuthContext:logout] server notice:', e.message);
     } finally {
+      sessionStorage.removeItem(`garment_qms_token_${slug}`);
+      sessionStorage.removeItem(`garment_qms_user_${slug}`);
       sessionStorage.removeItem('garment_qms_token');
       sessionStorage.removeItem('garment_qms_user');
       sessionStorage.removeItem('garment_qms_cached_complaints');
+      localStorage.removeItem(`garment_qms_token_${slug}`);
+      localStorage.removeItem(`garment_qms_user_${slug}`);
       localStorage.removeItem('garment_qms_token');
       localStorage.removeItem('garment_qms_user');
       localStorage.removeItem('garment_qms_cached_complaints');

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { isMongoConnected, connectDB } = require('../config/db');
 const User = require('../models/User');
 const mockStore = require('../config/mockStore');
-const { getUserModel, getCanonicalUnitId } = require('../models/unitModels');
+const { getUserModel, getCanonicalUnitId, getRootUserModel } = require('../models/unitModels');
 
 const isCompanyAdmin = (user) => {
   if (!user) return false;
@@ -50,6 +50,15 @@ const verifyToken = async (req, res, next) => {
         process.env.JWT_SECRET || 'garment_qms_super_secret_jwt_key_2026_sewing_audit'
       );
 
+      // 3. Enforce Strict Multi-Company Isolation: Reject Cross-Company Tokens
+      if (req.company && decoded.companySlug && decoded.companySlug !== req.company.slug) {
+        return res.status(403).json({
+          success: false,
+          code: 'CROSS_COMPANY_ACCESS_DENIED',
+          message: `Access denied. This login session belongs to workspace '${decoded.companySlug}', not '${req.company.slug}'.`,
+        });
+      }
+
       let user = null;
 
       // Ensure MongoDB connection is active in serverless execution
@@ -61,7 +70,7 @@ const verifyToken = async (req, res, next) => {
         }
       }
 
-      // Try MongoDB lookup from unit1_users, unit2_users, or fallback User
+      // Try MongoDB lookup from unit1_users, unit2_users, or fallback User in active company database
       if (isMongoConnected()) {
         try {
           const query = {
@@ -74,8 +83,10 @@ const verifyToken = async (req, res, next) => {
             query.$or.unshift({ _id: decoded.id });
           }
 
-          const User1 = getUserModel('UNIT-1');
-          const User2 = getUserModel('UNIT-2');
+          const User1 = getUserModel('UNIT-1', req.companyDb);
+          const User2 = getUserModel('UNIT-2', req.companyDb);
+          const RootUser = getRootUserModel(req.companyDb);
+
           let found = null;
           if (decoded.unitId === 'UNIT-2') {
             found = await User2.findOne(query).select('-password').lean();
@@ -83,6 +94,9 @@ const verifyToken = async (req, res, next) => {
           } else {
             found = await User1.findOne(query).select('-password').lean();
             if (!found) found = await User2.findOne(query).select('-password').lean();
+          }
+          if (!found) {
+            found = await RootUser.findOne(query).select('-password').lean();
           }
           if (!found) {
             found = await User.findOne(query).select('-password').lean();

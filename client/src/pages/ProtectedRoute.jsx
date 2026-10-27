@@ -1,9 +1,11 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCompany } from '../context/CompanyContext';
 
 export const ProtectedRoute = ({ allowedRoles, children }) => {
   const { user, loading: authLoading, isOwner, isAdmin, isAuditor } = useAuth();
+  const { basePath } = useCompany();
   const location = useLocation();
 
   if (authLoading) {
@@ -16,7 +18,7 @@ export const ProtectedRoute = ({ allowedRoles, children }) => {
   }
 
   if (!user) {
-    return <Navigate to="/compliance/login" state={{ from: location }} replace />;
+    return <Navigate to={`${basePath}/login`} state={{ from: location }} replace />;
   }
 
   // Executive Owner has omni-access to all routes
@@ -37,7 +39,7 @@ export const ProtectedRoute = ({ allowedRoles, children }) => {
 
     if (!hasAllowedRole) {
       // Redirect supervisor to nc-cap, admin/auditor to dashboard
-      const fallbackTarget = isSupervisor ? '/compliance/nc-cap' : '/compliance/dashboard';
+      const fallbackTarget = isSupervisor ? `${basePath}/nc-cap` : `${basePath}/dashboard`;
       return <Navigate to={fallbackTarget} replace />;
     }
   }

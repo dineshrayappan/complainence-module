@@ -10,11 +10,31 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token automatically to every outgoing request
+// Resolve the active company slug from URL path, sessionStorage, or default to 'esstee'
+export const getActiveCompanySlug = () => {
+  if (typeof window !== 'undefined') {
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    if (segments.length > 0 && segments[0] !== 'compliance' && segments[0] !== 'api') {
+      return segments[0].toLowerCase();
+    }
+    const saved =
+      window.sessionStorage?.getItem('garment_qms_company_slug') ||
+      window.localStorage?.getItem('garment_qms_company_slug');
+    if (saved) return saved.toLowerCase();
+  }
+  return 'esstee';
+};
+
+// Attach Company Slug and JWT token automatically to every outgoing request
 api.interceptors.request.use(
   (config) => {
+    const companySlug = getActiveCompanySlug();
+    config.headers['X-Company-Slug'] = companySlug;
+
     const token =
+      (typeof window !== 'undefined' && window.sessionStorage?.getItem(`garment_qms_token_${companySlug}`)) ||
       (typeof window !== 'undefined' && window.sessionStorage?.getItem('garment_qms_token')) ||
+      (typeof window !== 'undefined' && window.localStorage?.getItem(`garment_qms_token_${companySlug}`)) ||
       (typeof window !== 'undefined' && window.localStorage?.getItem('garment_qms_token'));
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -131,6 +151,11 @@ export const unitService = {
   updateUnit: (id, data) => api.put(`/units/${id}`, data),
   getUnassignedRecords: () => api.get('/units/unassigned'),
   assignRecords: (data) => api.post('/units/assign-records', data),
+};
+
+export const companyService = {
+  getCompanies: () => api.get('/companies'),
+  getCompany: (slug) => api.get(`/companies/${slug}`),
 };
 
 export default api;

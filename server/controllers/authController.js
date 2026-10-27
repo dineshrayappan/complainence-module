@@ -18,9 +18,9 @@ const {
   normalizeUnit,
 } = require('../models/unitModels');
 
-const generateToken = (id, unitId = 'UNIT-1') => {
+const generateToken = (id, unitId = 'UNIT-1', companySlug = 'esstee') => {
   return jwt.sign(
-    { id, unitId: getCanonicalUnitId(unitId) },
+    { id, unitId: getCanonicalUnitId(unitId), companySlug },
     process.env.JWT_SECRET || 'garment_qms_super_secret_jwt_key_2026_sewing_audit',
     {
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -238,11 +238,17 @@ const login = async (req, res) => {
           user.unitId = targetUnit;
           user.unitName = getCanonicalUnitName(targetUnit);
 
-          const token = generateToken(user._id.toString(), targetUnit);
+          const currentCompanySlug = req.company?.slug || 'esstee';
+          const token = generateToken(user._id.toString(), targetUnit, currentCompanySlug);
           return res.status(200).json({
             success: true,
             token,
             user: formatUserResponse(user, expectedRole),
+            company: req.company ? {
+              id: req.company.id,
+              name: req.company.name,
+              slug: req.company.slug,
+            } : null,
           });
         }
       } catch (dbErr) {
@@ -334,11 +340,17 @@ const login = async (req, res) => {
       },
     });
 
-    const token = generateToken(user._id || user.id);
+    const currentCompanySlug = req.company?.slug || 'esstee';
+    const token = generateToken(user._id || user.id, 'UNIT-1', currentCompanySlug);
     return res.status(200).json({
       success: true,
       token,
       user: formatUserResponse(user, expectedRole),
+      company: req.company ? {
+        id: req.company.id,
+        name: req.company.name,
+        slug: req.company.slug,
+      } : null,
     });
   } catch (error) {
     console.error('[AuthController:login] Error:', error);
@@ -490,6 +502,11 @@ const getMe = async (req, res) => {
           return res.status(200).json({
             success: true,
             user: formatUserResponse(data),
+            company: req.company ? {
+              id: req.company.id,
+              name: req.company.name,
+              slug: req.company.slug,
+            } : null,
           });
         }
       } catch (e) {
@@ -508,6 +525,11 @@ const getMe = async (req, res) => {
     res.status(200).json({
       success: true,
       user: formatUserResponse(fallbackUser),
+      company: req.company ? {
+        id: req.company.id,
+        name: req.company.name,
+        slug: req.company.slug,
+      } : null,
     });
   } catch (error) {
     res.status(500).json({

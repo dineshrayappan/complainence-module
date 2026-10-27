@@ -1788,7 +1788,6 @@ const findTask = async (id, targetUnit = null) => {
         };
       }
     }
-  }
   return task ? enrichTaskWithMeta(task) : null;
 };
 
