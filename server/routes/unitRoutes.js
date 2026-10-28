@@ -9,7 +9,10 @@ const {
 } = require('../controllers/unitController');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
-// All unit routes require authenticated session
+// Public endpoint for unit list (used by QR compliance raising)
+router.get('/public', getUnits);
+
+// All unit routes below require authenticated session
 router.use(verifyToken);
 
 router.get('/', getUnits);

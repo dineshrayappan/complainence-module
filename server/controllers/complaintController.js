@@ -2755,8 +2755,226 @@ const createAuditRound = async (req, res) => {
   }
 };
 
+// @desc    Public Compliance Raising via QR code scan (Anyone can raise without login)
+// @route   POST /api/complaints/public-raise or /api/complaints/public
+// @access  Public
+const createPublicComplaint = async (req, res) => {
+  try {
+    const {
+      department,
+      location = 'Production Floor Section',
+      priority = 'HIGH',
+      description = '',
+      findingDescription = '',
+      reporterName,
+      reporterContact,
+      isAnonymous,
+      unitId,
+    } = req.body;
+
+    if (!department) {
+      return res.status(400).json({
+        success: false,
+        message: 'Department is required for raising a compliance issue.',
+      });
+    }
+
+    const rawFinding = (findingDescription || description || '').trim();
+    if (!rawFinding) {
+      return res.status(400).json({
+        success: false,
+        message: 'Findings/defect description is required.',
+      });
+    }
+
+    // Resolve target Unit (default to UNIT-1)
+    const targetUnitId = resolveRequestUnit(req, unitId);
+    const targetUnitName = getCanonicalUnitName(targetUnitId);
+
+    const now = new Date();
+    const hours = 16;
+    const deadlineTimestamp = new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+    const effectivePriority = (priority || 'HIGH').toUpperCase();
+    const effectiveRequirement = 'Plant Floor Workmanship & Safety Standard';
+    const effectiveVerification = 'Physical Floor Re-inspection';
+
+    // Build enriched description
+    const isAnon = String(isAnonymous) === 'true' || isAnonymous === true;
+    const reporterTitle = isAnon
+      ? 'Anonymous Floor Reporter'
+      : (reporterName?.trim() || 'Floor Operator / Visitor');
+    const contactInfo = !isAnon && reporterContact?.trim() ? ` [Contact: ${reporterContact.trim()}]` : '';
+
+    const enrichedDescription = `[Workflow Status: Open] [Source: Public QR Scan] [Reported By: ${reporterTitle}${contactInfo}] [Audit Requirement: ${effectiveRequirement}] [Risk: ${effectivePriority}] [CAP Required: YES] [Verification: ${effectiveVerification}]\n\n${rawFinding}`;
+
+    // Extract Before Photo (memory buffer, disk file, base64 or SVG fallback)
+    let beforePhotoUrl = extractPhotoPayload(req, 'beforePhoto', 'beforePhotoBase64');
+    if (!beforePhotoUrl) {
+      beforePhotoUrl = generateDefaultAuditPhoto(department, effectivePriority, rawFinding);
+    }
+
+    // Auto-match responsible line supervisor for this department in target unit
+    let supervisor = null;
+    const UserModel = getUserModel(targetUnitId);
+    if (isMongoConnected()) {
+      try {
+        const users = await UserModel.find({ isActive: { $ne: false } }).lean();
+        const deptMatches = users.filter((u) => {
+          if (!u.department) return false;
+          const uDept = u.department.toLowerCase();
+          const targetDept = department.toLowerCase();
+          return uDept.includes(targetDept) || targetDept.includes(uDept);
+        });
+        if (deptMatches.length > 0) {
+          supervisor = deptMatches[0];
+        } else if (users.length > 0) {
+          supervisor = users[0];
+        }
+      } catch (err) {
+        console.warn('[createPublicComplaint] Supervisor lookup notice:', err.message);
+      }
+    }
+
+    const assignedToData = supervisor
+      ? {
+          userId: supervisor._id?.toString() || supervisor.id,
+          employeeId: supervisor.employeeId || 'SUP-01',
+          name: supervisor.name || 'Responsible Supervisor',
+          department: supervisor.department || department,
+          role: supervisor.role || 'SUPERVISOR',
+        }
+      : {
+          userId: null,
+          employeeId: 'UNASSIGNED',
+          name: `${department} Floor In-Charge`,
+          department: department,
+          role: 'SUPERVISOR',
+        };
+
+    const createdByData = {
+      userId: null,
+      employeeId: isAnon ? 'ANON-QR' : 'PUBLIC-QR',
+      name: reporterTitle,
+      role: 'FLOOR_USER',
+    };
+
+    const initialTimeline = [
+      {
+        action: 'CREATED',
+        performedBy: {
+          name: reporterTitle,
+          role: 'FLOOR_USER',
+          employeeId: isAnon ? 'ANON-QR' : 'PUBLIC-QR',
+        },
+        notes: `Compliance defect raised via floor QR code scan. Routed to ${assignedToData.name}.`,
+        timestamp: now,
+      },
+    ];
+
+    const initialCap = {
+      required: true,
+      status: 'PENDING',
+      immediateCorrection: '',
+      rootCause: '',
+      correctiveAction: '',
+      preventiveAction: '',
+      responsiblePerson: assignedToData,
+      targetDate: deadlineTimestamp.toISOString().split('T')[0],
+      evidence: null,
+      verificationMethod: effectiveVerification,
+      verificationCriteria: 'Zero defect recurrence & floor containment',
+      verificationReadinessNotes: '',
+      submittedAt: null,
+      verifiedEffective: false,
+      verifiedAt: null,
+      verifiedBy: null,
+    };
+
+    let newComplaint = null;
+
+    if (isMongoConnected()) {
+      const ComplaintModel = getComplaintModel(targetUnitId);
+
+      // Generate next sequential NC number for this unit
+      const year = now.getFullYear();
+      const count = await ComplaintModel.countDocuments();
+      const seq = String(count + 1).padStart(4, '0');
+      const complaintId = `NC-${year}-${seq}`;
+
+      const doc = new ComplaintModel({
+        complaintId,
+        department,
+        location: location || `${department} Floor Section`,
+        priority: effectivePriority,
+        riskSeverity: effectivePriority,
+        description: enrichedDescription,
+        findingDescription: rawFinding,
+        requirement: effectiveRequirement,
+        capRequired: true,
+        verificationMethod: effectiveVerification,
+        beforePhoto: beforePhotoUrl,
+        afterPhoto: null,
+        assignedTo: assignedToData,
+        createdBy: createdByData,
+        deadlineHours: hours,
+        deadlineTimestamp,
+        timeline: initialTimeline,
+        cap: initialCap,
+        status: 'Open',
+        unitId: targetUnitId,
+        unitName: targetUnitName,
+      });
+
+      newComplaint = await doc.save();
+    } else {
+      newComplaint = mockStore.addComplaint({
+        department,
+        location: location || `${department} Floor Section`,
+        priority: effectivePriority,
+        riskSeverity: effectivePriority,
+        description: enrichedDescription,
+        findingDescription: rawFinding,
+        requirement: effectiveRequirement,
+        capRequired: true,
+        verificationMethod: effectiveVerification,
+        beforePhoto: beforePhotoUrl,
+        assignedTo: assignedToData,
+        createdBy: createdByData,
+        deadlineHours: hours,
+        deadlineTimestamp,
+        timeline: initialTimeline,
+        cap: initialCap,
+        status: 'Open',
+        unitId: targetUnitId,
+        unitName: targetUnitName,
+      });
+    }
+
+    logEvent('PUBLIC_NC_RAISED', {
+      complaintId: newComplaint.complaintId,
+      department,
+      unitId: targetUnitId,
+      reportedBy: reporterTitle,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Compliance defect logged successfully via Floor QR Code.',
+      complaint: formatComplaintOutput(newComplaint),
+    });
+  } catch (error) {
+    console.error('Error in createPublicComplaint:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error creating public compliance issue.',
+    });
+  }
+};
+
 module.exports = {
   createComplaint,
+  createPublicComplaint,
   getComplaints,
   getComplaintById,
   markInProgress,

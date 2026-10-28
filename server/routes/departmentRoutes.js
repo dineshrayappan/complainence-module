@@ -8,8 +8,16 @@ const {
 } = require('../controllers/departmentController');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
-// Public/Authenticated view of departments
-router.get('/', verifyToken, getDepartments);
+// Public view of departments for QR compliance raising
+router.get('/public', getDepartments);
+
+// Authenticated view of departments
+router.get('/', (req, res, next) => {
+  if (req.headers.authorization) {
+    return verifyToken(req, res, next);
+  }
+  next();
+}, getDepartments);
 
 // Admin-Only Department Management & Deletion
 router.get('/:id/dependencies', verifyToken, requireRole(['ADMIN']), checkDepartmentDependencies);

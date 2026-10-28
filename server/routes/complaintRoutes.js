@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   createComplaint,
+  createPublicComplaint,
   getComplaints,
   getComplaintById,
   markInProgress,
@@ -79,6 +80,10 @@ router.post('/admin/audits', verifyToken, requireRole(['AUDITOR', 'ADMIN']), cre
 
 // KPI Stats endpoint (must be declared before :id)
 router.get('/stats/kpi', verifyToken, getKpiStats);
+
+// Public QR Compliance Raising (Anyone can raise NC via QR code without logging in)
+router.post('/public-raise', safeUploadBeforePhoto, createPublicComplaint);
+router.post('/public', safeUploadBeforePhoto, createPublicComplaint);
 
 // Complaints CRUD & List
 router.get('/', verifyToken, getComplaints);

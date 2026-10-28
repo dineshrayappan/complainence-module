@@ -17,7 +17,9 @@ import {
 import { userService, complaintService, taskService, departmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useUnit } from '../context/UnitContext';
+import { useCompany } from '../context/CompanyContext';
 import { compressImage } from '../utils/imageCompressor';
+import PublicComplianceQrCard from './PublicComplianceQrCard';
 
 // Exact and fuzzy department matching helper ensuring department isolation
 const isDeptMatch = (userDept, targetDept) => {
@@ -106,6 +108,7 @@ const generateDefaultAuditPhoto = (dept, prio, desc) => {
 export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = null }) => {
   const { user } = useAuth();
   const { units, activeUnitId, isCompanyAdmin } = useUnit();
+  const { companySlug, companyName } = useCompany();
 
   const getDefaultUnitId = () => {
     if (user?.unitId === 'UNIT-2' || activeUnitId === 'UNIT-2') return 'UNIT-2';
@@ -931,6 +934,14 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
             </div>
 
           </div>
+
+          {/* DESCRIPTION BAR AT END OF COMPLIANCE RAISING FORM: QR GENERATION FOR ANYONE */}
+          <PublicComplianceQrCard
+            companySlug={companySlug}
+            companyName={companyName}
+            unitId={selectedUnitId}
+            unitName={units.find((u) => u.unitId === selectedUnitId)?.name || (selectedUnitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
+          />
 
           {/* MODAL FOOTER BUTTONS */}
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3 shrink-0">

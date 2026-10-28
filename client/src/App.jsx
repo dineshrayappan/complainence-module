@@ -10,6 +10,7 @@ import NewComplaintModal from './components/NewComplaintModal';
 import ActionTakenModal from './components/ActionTakenModal';
 import ComplaintDetailModal from './components/ComplaintDetailModal';
 import LoginPage from './components/LoginPage';
+import PublicRaiseComplaintPage from './pages/PublicRaiseComplaintPage';
 
 // Routed Pages
 import ProtectedRoute from './pages/ProtectedRoute';
@@ -573,11 +574,19 @@ export const App = () => {
       <Route path="/work-operations" element={<Navigate to="/esstee/work-operations" replace />} />
       <Route path="/department" element={<Navigate to="/esstee/department" replace />} />
       <Route path="/reports" element={<Navigate to="/esstee/reports" replace />} />
+      <Route path="/raise" element={<Navigate to="/esstee/raise" replace />} />
+      <Route path="/report" element={<Navigate to="/esstee/raise" replace />} />
+      <Route path="/public-raise" element={<Navigate to="/esstee/raise" replace />} />
 
       {/* Company Workspace Routes: /:companySlug/... */}
       <Route path="/:companySlug" element={<CompanyWorkspaceRoute />}>
         {/* Workspace Login */}
         <Route path="login" element={<LoginPage />} />
+
+        {/* Public QR Compliance Raising Page - Anyone can raise NC without login */}
+        <Route path="raise" element={<PublicRaiseComplaintPage />} />
+        <Route path="report" element={<PublicRaiseComplaintPage />} />
+        <Route path="public-raise" element={<PublicRaiseComplaintPage />} />
 
         {/* Protected Application Routes under Active Company Workspace */}
         <Route

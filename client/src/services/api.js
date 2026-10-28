@@ -158,5 +158,11 @@ export const companyService = {
   getCompany: (slug) => api.get(`/companies/${slug}`),
 };
 
+export const publicComplaintService = {
+  getDepartments: () => api.get('/departments/public'),
+  getUnits: () => api.get('/units/public'),
+  raisePublicComplaint: (formData) => api.post('/complaints/public-raise', formData),
+};
+
 export default api;
 
