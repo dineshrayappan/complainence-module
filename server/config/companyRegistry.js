@@ -8,8 +8,8 @@ const DEFAULT_COMPANIES = [
     id: 'esstee',
     name: 'Esstee Exports',
     slug: 'esstee',
-    // Uses compliance_esstee, transparently falling back to compliance_module if not yet duplicated
-    dbName: process.env.ESSTEE_DB_NAME || 'compliance_esstee',
+    // Primary database hosting all active project records
+    dbName: process.env.ESSTEE_DB_NAME || 'compliance_module',
     fallbackDbName: 'compliance_module',
     status: 'active',
     description: 'Esstee Garments & Quality Assurance Division',
