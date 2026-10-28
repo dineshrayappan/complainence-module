@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ShieldAlert,
-  Building2,
-  AlertCircle,
   FileText,
   Camera,
   UploadCloud,
@@ -12,9 +10,6 @@ import {
   User,
   ShieldCheck,
   Check,
-  Lock,
-  ArrowLeft,
-  Sparkles,
 } from 'lucide-react';
 import { publicComplaintService } from '../services/api';
 import { useCompany } from '../context/CompanyContext';
@@ -154,11 +149,6 @@ export const PublicRaiseComplaintPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-
-    if (!department) {
-      setError('Please select the affected factory department.');
-      return;
-    }
 
     if (!description.trim()) {
       setError('Please provide a description of the defect or observation.');
@@ -311,13 +301,7 @@ export const PublicRaiseComplaintPage = () => {
       {/* MAIN FORM CONTAINER */}
       <main className="max-w-2xl mx-auto w-full my-6 bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl backdrop-blur-md">
         
-        {/* Intro Banner */}
-        <div className="mb-5 p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-800/60 flex items-start gap-3">
-          <Sparkles className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-          <div className="text-xs text-slate-300">
-            <strong className="text-white">Floor Non-Conformance Portal:</strong> Any factory employee, operator, technician, or visitor can report an observed defect or hazard. No account or password required.
-          </div>
-        </div>
+
 
         {error && (
           <div className="mb-5 p-3.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 flex items-center gap-2 text-xs font-medium animate-fadeIn">
@@ -327,105 +311,6 @@ export const PublicRaiseComplaintPage = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          
-          {/* 1. FACTORY UNIT SELECTION */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-            <label className="block font-bold text-white text-xs flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Factory Plant Unit <strong className="text-rose-400">*</strong></span>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {units.map((u) => (
-                <button
-                  key={u.unitId}
-                  type="button"
-                  onClick={() => setSelectedUnitId(u.unitId)}
-                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                    selectedUnitId === u.unitId
-                      ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/30'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  {u.name || (u.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. DEPARTMENT & LOCATION */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-              <label className="block font-bold text-white text-xs">
-                Department <strong className="text-rose-400">*</strong>
-              </label>
-              <select
-                value={department}
-                onChange={(e) => handleDepartmentChange(e.target.value)}
-                className="w-full p-2.5 text-xs rounded-xl border border-slate-800 bg-slate-900 text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                {loadingDepts ? (
-                  <option value="">Loading factory departments...</option>
-                ) : departments.length === 0 ? (
-                  <>
-                    <option value="Production">Production</option>
-                    <option value="Quality">Quality / QA</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Store">Store</option>
-                    <option value="EHS">EHS / Safety</option>
-                  </>
-                ) : (
-                  departments.map((d) => (
-                    <option key={d.id || d.name} value={d.name}>
-                      {d.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-              <label className="block font-bold text-white text-xs">
-                Floor Section / Line
-              </label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Line 3, Table 4, Sewing Section"
-                className="w-full p-2.5 text-xs rounded-xl border border-slate-800 bg-slate-900 text-white focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* 3. RISK / SEVERITY LEVEL */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-            <label className="block font-bold text-white text-xs flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
-              <span>Risk / Severity Level <strong className="text-rose-400">*</strong></span>
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {RISK_LEVELS.map((r) => (
-                <button
-                  key={r.level}
-                  type="button"
-                  onClick={() => setPriority(r.level)}
-                  className={`p-2 rounded-xl text-center font-bold text-xs border transition-all cursor-pointer ${
-                    priority === r.level
-                      ? r.level === 'CRITICAL'
-                        ? 'bg-rose-600 border-rose-500 text-white'
-                        : r.level === 'MAJOR'
-                        ? 'bg-amber-600 border-amber-500 text-white'
-                        : r.level === 'MINOR'
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-purple-600 border-purple-500 text-white'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
-                  }`}
-                >
-                  {r.level}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* 4. DEFECT FINDINGS & OBSERVATIONS */}
           <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
