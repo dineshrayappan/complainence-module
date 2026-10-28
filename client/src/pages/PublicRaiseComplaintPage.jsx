@@ -7,9 +7,6 @@ import {
   UploadCloud,
   CheckCircle2,
   AlertTriangle,
-  User,
-  ShieldCheck,
-  Check,
 } from 'lucide-react';
 import { publicComplaintService } from '../services/api';
 import { useCompany } from '../context/CompanyContext';
@@ -312,45 +309,12 @@ export const PublicRaiseComplaintPage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
 
-          {/* 4. DEFECT FINDINGS & OBSERVATIONS */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
-            <label className="block font-bold text-white text-xs flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Describe the Non-Conformance Finding <strong className="text-rose-400">*</strong></span>
-            </label>
-
-            <textarea
-              rows="3"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Explain clearly what defect or non-conformance was observed..."
-              className="w-full p-3 text-xs rounded-xl border border-slate-800 bg-slate-900 text-white focus:ring-2 focus:ring-indigo-500 leading-relaxed"
-            />
-
-            {/* Quick Preset Buttons */}
-            <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[10px] text-slate-400 font-semibold mr-1">Quick Tags:</span>
-              {PREDEFINED_FINDINGS.map((phrase) => (
-                <button
-                  key={phrase}
-                  type="button"
-                  onClick={() =>
-                    setDescription((prev) => (prev ? `${prev}. ${phrase}` : phrase))
-                  }
-                  className="px-2 py-0.5 rounded-lg text-[10px] bg-slate-900 border border-slate-800 hover:border-indigo-500 text-slate-300 transition-colors cursor-pointer"
-                >
-                  + {phrase}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 5. PHOTO EVIDENCE (MOBILE CAMERA FRIENDLY) */}
+          {/* 1. PHOTO EVIDENCE (MOBILE CAMERA FRIENDLY) */}
           <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <label className="block font-bold text-white text-xs flex items-center gap-1.5">
                 <Camera className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Photo Evidence</span>
+                <span>Photo of Complaint / Defect Evidence</span>
               </label>
               {previewUrl && (
                 <button
@@ -373,7 +337,7 @@ export const PublicRaiseComplaintPage = () => {
             />
 
             {previewUrl ? (
-              <div className="relative rounded-xl overflow-hidden border border-emerald-500/50 bg-slate-900 h-36 flex items-center justify-center">
+              <div className="relative rounded-xl overflow-hidden border border-emerald-500/50 bg-slate-900 h-44 flex items-center justify-center">
                 <img src={previewUrl} alt="Defect Snapshot" className="h-full w-full object-cover" />
                 <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-600 text-white">
                   Photo Attached
@@ -382,65 +346,50 @@ export const PublicRaiseComplaintPage = () => {
             ) : (
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="p-4 border-2 border-dashed border-slate-800 hover:border-indigo-500 rounded-xl bg-slate-900/60 flex items-center justify-center gap-2.5 cursor-pointer transition-colors"
+                className="p-6 border-2 border-dashed border-slate-800 hover:border-indigo-500 rounded-xl bg-slate-900/60 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
               >
-                <UploadCloud className="w-5 h-5 text-indigo-400" />
-                <span className="text-xs font-semibold text-slate-300">
+                <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                  <UploadCloud className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-semibold text-slate-200">
                   {compressing ? 'Compressing photo...' : 'Tap to take camera photo or upload evidence'}
                 </span>
+                <span className="text-[10px] text-slate-500">Supports JPG, PNG, WEBP</span>
               </div>
             )}
           </div>
 
-          {/* 6. REPORTER DETAILS & ANONYMITY */}
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="font-bold text-white text-xs flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Reporter Details (Optional)</span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-300">
-                <input
-                  type="checkbox"
-                  checked={isAnonymous}
-                  onChange={(e) => setIsAnonymous(e.target.checked)}
-                  className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
-                />
-                <span>Submit Anonymously</span>
-              </label>
-            </div>
+          {/* 2. DESCRIPTION ABOUT THE PHOTO */}
+          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+            <label className="block font-bold text-white text-xs flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Description About the Photo <strong className="text-rose-400">*</strong></span>
+            </label>
 
-            {!isAnonymous && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-fadeIn">
-                <input
-                  type="text"
-                  value={reporterName}
-                  onChange={(e) => setReporterName(e.target.value)}
-                  placeholder="Your Name (e.g. John Operator)"
-                  className="w-full p-2.5 text-xs rounded-xl border border-slate-800 bg-slate-900 text-white focus:ring-2 focus:ring-indigo-500"
-                />
-                <input
-                  type="text"
-                  value={reporterContact}
-                  onChange={(e) => setReporterContact(e.target.value)}
-                  placeholder="Phone or Employee ID (Optional)"
-                  className="w-full p-2.5 text-xs rounded-xl border border-slate-800 bg-slate-900 text-white focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            )}
-          </div>
+            <textarea
+              rows="3"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Explain clearly what defect or non-conformance is shown in the photo..."
+              className="w-full p-3 text-xs rounded-xl border border-slate-800 bg-slate-900 text-white focus:ring-2 focus:ring-indigo-500 leading-relaxed"
+            />
 
-          {/* DESCRIPTION BAR AT END OF COMPLIANCE RAISING FORM */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/50 via-slate-900 to-indigo-950/50 border border-indigo-800/60 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <h4 className="text-xs font-bold text-white">
-                Official Plant Quality &amp; Confidentiality Guarantee
-              </h4>
+            {/* Quick Preset Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <span className="text-[10px] text-slate-400 font-semibold mr-1">Quick Tags:</span>
+              {PREDEFINED_FINDINGS.map((phrase) => (
+                <button
+                  key={phrase}
+                  type="button"
+                  onClick={() =>
+                    setDescription((prev) => (prev ? `${prev}. ${phrase}` : phrase))
+                  }
+                  className="px-2 py-0.5 rounded-lg text-[10px] bg-slate-900 border border-slate-800 hover:border-indigo-500 text-slate-300 transition-colors cursor-pointer"
+                >
+                  + {phrase}
+                </button>
+              ))}
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              Every raised non-conformance is entered into the official factory audit register. Containment actions are directly assigned to the Department Floor Supervisor under our 12-16 hour SLA. Your submission is protected and strictly treated with professional confidentiality.
-            </p>
           </div>
 
           {/* SUBMIT BUTTON */}
