@@ -1,0 +1,65 @@
+[
+  {
+    "_id": "6adeed32087886a06cb812ce",
+    "name": "Production",
+    "code": "PRD",
+    "manager": "Unassigned",
+    "headcount": 20,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6adeed32087886a06cb812cf",
+    "name": "Quality",
+    "code": "QA",
+    "manager": "Unassigned",
+    "headcount": 10,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6adeed32087886a06cb812d0",
+    "name": "Maintenance",
+    "code": "MNT",
+    "manager": "Unassigned",
+    "headcount": 8,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6adeed32087886a06cb812d1",
+    "name": "Store",
+    "code": "STR",
+    "manager": "Unassigned",
+    "headcount": 6,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6adeed32087886a06cb812d2",
+    "name": "EHS",
+    "code": "EHS",
+    "manager": "Unassigned",
+    "headcount": 4,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6adeed32087886a06cb812d3",
+    "name": "EDP",
+    "code": "EDP",
+    "manager": "Unassigned",
+    "headcount": 3,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6adeed32087886a06cb812d4",
+    "name": "HR",
+    "code": "HR",
+    "manager": "Unassigned",
+    "headcount": 5,
+    "unitId": "UNIT-2",
+    "createdAt": "2026-10-26T06:03:30.228Z"
+  }
+]

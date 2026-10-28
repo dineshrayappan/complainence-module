@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "6adee44edcce2966be32f8b3",
+    "unitId": "UNIT-1",
+    "name": "Unit 1",
+    "code": "U1",
+    "description": "Primary Plant / Unit 1 Facility",
+    "address": "",
+    "isActive": true,
+    "createdAt": "2026-10-26T05:25:34.426Z",
+    "updatedAt": "2026-10-28T14:21:49.844Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adee44edcce2966be32f8b4",
+    "unitId": "UNIT-2",
+    "name": "Unit 2",
+    "code": "U2",
+    "description": "Secondary Plant / Unit 2 Facility",
+    "address": "",
+    "isActive": true,
+    "createdAt": "2026-10-26T05:25:34.426Z",
+    "updatedAt": "2026-10-28T14:21:50.057Z",
+    "__v": 0
+  }
+]

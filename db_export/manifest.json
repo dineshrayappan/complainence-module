@@ -1,0 +1,122 @@
+{
+  "exportedAt": "2026-10-28T14:30:42.698Z",
+  "database": "compliance_module",
+  "cluster": "ac-v3qqn7e-shard-00-01.dop3n2g.mongodb.net",
+  "collections": {
+    "unit2_auditlogs": {
+      "recordCount": 0,
+      "file": "unit2_auditlogs.json",
+      "fileSizeBytes": 2
+    },
+    "unit2_departments": {
+      "recordCount": 7,
+      "file": "unit2_departments.json",
+      "fileSizeBytes": 1443
+    },
+    "tasks": {
+      "recordCount": 0,
+      "file": "tasks.json",
+      "fileSizeBytes": 2
+    },
+    "complaints": {
+      "recordCount": 19,
+      "file": "complaints.json",
+      "fileSizeBytes": 8774403
+    },
+    "unit2_tasks": {
+      "recordCount": 0,
+      "file": "unit2_tasks.json",
+      "fileSizeBytes": 2
+    },
+    "unit2_nc_records": {
+      "recordCount": 0,
+      "file": "unit2_nc_records.json",
+      "fileSizeBytes": 2
+    },
+    "audits": {
+      "recordCount": 8,
+      "file": "audits.json",
+      "fileSizeBytes": 4453
+    },
+    "attendances": {
+      "recordCount": 73,
+      "file": "attendances.json",
+      "fileSizeBytes": 37971
+    },
+    "compliancetasks": {
+      "recordCount": 0,
+      "file": "compliancetasks.json",
+      "fileSizeBytes": 2
+    },
+    "units": {
+      "recordCount": 2,
+      "file": "units.json",
+      "fileSizeBytes": 624
+    },
+    "unit1_nc_records": {
+      "recordCount": 20,
+      "file": "unit1_nc_records.json",
+      "fileSizeBytes": 8600192
+    },
+    "unit1_auditlogs": {
+      "recordCount": 314,
+      "file": "unit1_auditlogs.json",
+      "fileSizeBytes": 265367
+    },
+    "unit1_tasks": {
+      "recordCount": 0,
+      "file": "unit1_tasks.json",
+      "fileSizeBytes": 2
+    },
+    "unit1_users": {
+      "recordCount": 39,
+      "file": "unit1_users.json",
+      "fileSizeBytes": 29854
+    },
+    "unit1_audits": {
+      "recordCount": 8,
+      "file": "unit1_audits.json",
+      "fileSizeBytes": 4453
+    },
+    "unit1_departments": {
+      "recordCount": 30,
+      "file": "unit1_departments.json",
+      "fileSizeBytes": 8391
+    },
+    "unit1_attendances": {
+      "recordCount": 47,
+      "file": "unit1_attendances.json",
+      "fileSizeBytes": 25539
+    },
+    "departments": {
+      "recordCount": 29,
+      "file": "departments.json",
+      "fileSizeBytes": 7400
+    },
+    "unit2_attendances": {
+      "recordCount": 0,
+      "file": "unit2_attendances.json",
+      "fileSizeBytes": 2
+    },
+    "unit2_users": {
+      "recordCount": 0,
+      "file": "unit2_users.json",
+      "fileSizeBytes": 2
+    },
+    "unit2_audits": {
+      "recordCount": 0,
+      "file": "unit2_audits.json",
+      "fileSizeBytes": 2
+    },
+    "auditlogs": {
+      "recordCount": 367,
+      "file": "auditlogs.json",
+      "fileSizeBytes": 302578
+    },
+    "users": {
+      "recordCount": 52,
+      "file": "users.json",
+      "fileSizeBytes": 38566
+    }
+  }
+}
