@@ -1,8 +1,8 @@
 # Project Rules
 
-## Continuous Auto-Commit & Push Policy
-- Whenever any code modifications, fixes, or additions are made in the local repository files, ALWAYS automatically stage (`git add`), commit with a descriptive message (`git commit`), and push (`git push origin main`) to GitHub immediately.
-- Do NOT prompt, ask, or wait for user permission before committing and pushing code changes.
+## Git Commit & Push Policy
+- Do NOT automatically commit or push code changes to GitHub.
+- Only stage, commit, or push to Git when explicitly instructed by the user.
 
 ## Strict Prohibition on Dummy / Sample Data & Absolute Preservation of Existing Data
 - NEVER create, generate, seed, or inject dummy/mock NC records, dummy CAP records, dummy users, or sample data during any update, modification, new feature implementation, or bug fix.
