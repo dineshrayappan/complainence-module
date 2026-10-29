@@ -1498,7 +1498,7 @@ export const AdminUserManagement = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      const loginUrl = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://complainence-module.vercel.app';
+                      const loginUrl = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:5173';
                       const text = `TEXTILE QMS LOGIN CREDENTIALS\nName: ${createdCredentials.name}\nRole: ${createdCredentials.role}\nEmployee ID: ${createdCredentials.employeeId}\nEmail: ${createdCredentials.email}\nPassword: ${createdCredentials.password}\nLogin at: ${loginUrl}`;
                       copyToClipboard(text, 'all-creds');
                     }}
