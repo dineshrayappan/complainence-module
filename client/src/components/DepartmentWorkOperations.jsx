@@ -128,8 +128,11 @@ export const DepartmentWorkOperations = ({
   });
   const [savingTask, setSavingTask] = useState(false);
   const [scheduleError, setScheduleError] = useState(null);
+  const inFlightRef = useRef(false);
 
   const loadData = useCallback(async (showSpinner = false) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     try {
       if (showSpinner) setLoading(true);
       else setIsRefreshing(true);
@@ -161,6 +164,7 @@ export const DepartmentWorkOperations = ({
       console.error('Failed to load department work operations:', err);
       setError(err.response?.data?.message || 'Could not load work operations data.');
     } finally {
+      inFlightRef.current = false;
       if (showSpinner) setLoading(false);
       setIsRefreshing(false);
     }
@@ -170,7 +174,7 @@ export const DepartmentWorkOperations = ({
     loadData(true);
     const interval = setInterval(() => {
       loadData(false);
-    }, 12000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [loadData]);
 

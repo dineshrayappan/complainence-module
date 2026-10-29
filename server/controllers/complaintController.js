@@ -2319,12 +2319,15 @@ const getDepartmentComplianceStats = async (req, res) => {
     const AuditModel = getAuditModel(targetUnit);
     let allComplaints = [];
 
-    // Fetch complaints from MongoDB if connected
+    // Fetch complaints from MongoDB if connected - project only metrics fields for maximum speed
     if (isMongoConnected()) {
       try {
-        const dbTickets = await ComplaintModel.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+        const dbTickets = await ComplaintModel.find({ isDeleted: { $ne: true } })
+          .select('department status deadlineTimestamp priority createdAt cap')
+          .sort({ createdAt: -1 })
+          .lean();
         if (Array.isArray(dbTickets)) {
-          allComplaints = dbTickets.map(formatComplaintOutput);
+          allComplaints = dbTickets;
         }
       } catch (err) {
       }

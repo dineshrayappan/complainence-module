@@ -107,7 +107,7 @@ export const DepartmentComplianceDashboard = ({
     loadData(true);
     const interval = setInterval(() => {
       loadData(false);
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [loadData]);
 

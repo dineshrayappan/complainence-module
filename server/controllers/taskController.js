@@ -72,7 +72,7 @@ const findTaskInUnitOrActive = async (req, paramId) => {
           startedAt: c.startedAt || null,
           startedBy: c.startedBy || null,
           completedAt: c.actualCompletedAt || null,
-          proofPhoto: c.afterPhoto || null,
+          proofPhoto: c.afterPhoto ? `/api/complaints/${c.complaintId || c._id}/photo/after` : null,
           unitId,
         },
         unitId,
@@ -357,7 +357,10 @@ const getTasks = async (req, res) => {
     let complaints = [];
     if (isMongoConnected()) {
       try {
-        const cData = await ComplaintModel.find({ isDeleted: { $ne: true } }).sort({ createdAt: -1 }).lean();
+        const cData = await ComplaintModel.find({ isDeleted: { $ne: true } })
+          .select('-beforePhoto -afterPhoto -cap.evidence')
+          .sort({ createdAt: -1 })
+          .lean();
         if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {}
     } else {
@@ -1227,7 +1230,9 @@ const getEmployeeWorkStatus = async (req, res) => {
     let allComplaints = [];
     if (isMongoConnected()) {
       try {
-        const dbComplaints = await ComplaintModel.find({ isDeleted: { $ne: true } }).lean();
+        const dbComplaints = await ComplaintModel.find({ isDeleted: { $ne: true } })
+          .select('status startedBy assignedTo complaintId department')
+          .lean();
         if (dbComplaints) allComplaints = dbComplaints.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
       } catch (e) {
         console.warn('[TaskController:getEmployeeWorkStatus] complaints fetch fallback:', e.message);
