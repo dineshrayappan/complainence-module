@@ -65,12 +65,12 @@ export const AdminUserManagement = () => {
     urlTab === 'units' || urlTab === 'unit-management'
       ? 'UNITS'
       : urlTab === 'logins' || urlTab === 'login-times' || urlTab === 'login-tracker'
-      ? 'LOGIN_TRACKER'
-      : urlTab === 'logs' || urlTab === 'history' || urlTab === 'audit-logs'
-      ? 'LOG_HISTORY'
-      : urlTab === 'departments'
-      ? 'DEPARTMENTS'
-      : 'PERSONNEL';
+        ? 'LOGIN_TRACKER'
+        : urlTab === 'logs' || urlTab === 'history' || urlTab === 'audit-logs'
+          ? 'LOG_HISTORY'
+          : urlTab === 'departments'
+            ? 'DEPARTMENTS'
+            : 'PERSONNEL';
 
   const [adminTab, setAdminTab] = useState(initialTab);
   const [selectedLoginUser, setSelectedLoginUser] = useState(null);
@@ -81,12 +81,12 @@ export const AdminUserManagement = () => {
       newTab === 'UNITS'
         ? 'units'
         : newTab === 'LOGIN_TRACKER'
-        ? 'login-times'
-        : newTab === 'LOG_HISTORY'
-        ? 'history'
-        : newTab === 'DEPARTMENTS'
-        ? 'departments'
-        : 'personnel';
+          ? 'login-times'
+          : newTab === 'LOG_HISTORY'
+            ? 'history'
+            : newTab === 'DEPARTMENTS'
+              ? 'departments'
+              : 'personnel';
     setSearchParams({ tab: tabParam }, { replace: true });
   };
 
@@ -446,8 +446,8 @@ export const AdminUserManagement = () => {
     const defaultDept = isAud
       ? (availableDepartmentNames.includes('Quality') ? 'Quality' : availableDepartmentNames[0] || 'Quality')
       : isSup
-      ? (availableDepartmentNames.includes('Production') ? 'Production' : availableDepartmentNames[0] || 'Production')
-      : (availableDepartmentNames.includes('EDP') ? 'EDP' : availableDepartmentNames[0] || 'EDP');
+        ? (availableDepartmentNames.includes('Production') ? 'Production' : availableDepartmentNames[0] || 'Production')
+        : (availableDepartmentNames.includes('EDP') ? 'EDP' : availableDepartmentNames[0] || 'EDP');
 
     const defaultUnitId = activeUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
     const matchedUnit = units.find((u) => u.unitId === defaultUnitId);
@@ -480,18 +480,18 @@ export const AdminUserManagement = () => {
       employeeId: isAud
         ? `AUD-00${auditorCount + 1}`
         : isSup
-        ? `SUP-10${supervisorCount + 1}`
-        : `ADM-00${adminCount + 1}`,
+          ? `SUP-10${supervisorCount + 1}`
+          : `ADM-00${adminCount + 1}`,
       department: isAud
         ? (availableDepartmentNames.includes('Quality') ? 'Quality' : prev.department)
         : isSup
-        ? (availableDepartmentNames.includes('Production') ? 'Production' : prev.department)
-        : (availableDepartmentNames.includes('EDP') ? 'EDP' : prev.department),
+          ? (availableDepartmentNames.includes('Production') ? 'Production' : prev.department)
+          : (availableDepartmentNames.includes('EDP') ? 'EDP' : prev.department),
       designation: isAud
         ? 'QA Quality Auditor'
         : isSup
-        ? 'Production Supervisor'
-        : 'System Administrator',
+          ? 'Production Supervisor'
+          : 'System Administrator',
     }));
   };
 
@@ -760,11 +760,10 @@ export const AdminUserManagement = () => {
       <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 w-full overflow-x-auto no-scrollbar">
         <button
           onClick={() => handleTabChange('PERSONNEL')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-            adminTab === 'PERSONNEL'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'PERSONNEL'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Users className="w-3.5 h-3.5 text-indigo-500" />
           <span>Personnel Directory</span>
@@ -775,11 +774,10 @@ export const AdminUserManagement = () => {
 
         <button
           onClick={() => handleTabChange('DEPARTMENTS')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-            adminTab === 'DEPARTMENTS'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'DEPARTMENTS'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Building2 className="w-3.5 h-3.5 text-blue-500" />
           <span>Departments</span>
@@ -793,11 +791,10 @@ export const AdminUserManagement = () => {
             setSelectedLoginUser(null);
             handleTabChange('LOGIN_TRACKER');
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-            adminTab === 'LOGIN_TRACKER'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'LOGIN_TRACKER'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Clock className="w-3.5 h-3.5 text-emerald-500" />
           <span>Login Tracker</span>
@@ -805,11 +802,10 @@ export const AdminUserManagement = () => {
 
         <button
           onClick={() => handleTabChange('LOG_HISTORY')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-            adminTab === 'LOG_HISTORY'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'LOG_HISTORY'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <History className="w-3.5 h-3.5 text-purple-500" />
           <span>Past Records & Logs</span>
@@ -817,11 +813,10 @@ export const AdminUserManagement = () => {
 
         <button
           onClick={() => handleTabChange('UNITS')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
-            adminTab === 'UNITS'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'UNITS'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Layers className="w-3.5 h-3.5 text-amber-500" />
           <span>Plant Units & Migration</span>
@@ -965,31 +960,28 @@ export const AdminUserManagement = () => {
             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto py-0.5">
               <button
                 onClick={() => setRoleFilter('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                  roleFilter === 'ALL'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'ALL'
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 All Personnel ({users.length})
               </button>
               <button
                 onClick={() => setRoleFilter('AUDITOR')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                  roleFilter === 'AUDITOR'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'AUDITOR'
                     ? 'bg-purple-600 text-white shadow-xs'
                     : 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 hover:bg-purple-100'
-                }`}
+                  }`}
               >
                 Auditors ({auditorCount})
               </button>
               <button
                 onClick={() => setRoleFilter('SUPERVISOR')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                  roleFilter === 'SUPERVISOR'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'SUPERVISOR'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
-                }`}
+                  }`}
               >
                 Supervisors ({supervisorCount})
               </button>
@@ -1001,54 +993,49 @@ export const AdminUserManagement = () => {
               </button>
               <button
                 onClick={() => setRoleFilter('ADMIN')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                  roleFilter === 'ADMIN'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'ADMIN'
                     ? 'bg-amber-500 text-white shadow-xs'
                     : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
-                }`}
+                  }`}
               >
                 Admins ({adminCount})
               </button>
               {inactiveCount > 0 && (
                 <button
                   onClick={() => setRoleFilter('INACTIVE')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                    roleFilter === 'INACTIVE'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'INACTIVE'
                       ? 'bg-rose-600 text-white shadow-xs'
                       : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
-                  }`}
+                    }`}
                 >
                   Inactive ({inactiveCount})
                 </button>
               )}
               <button
                 onClick={() => setRoleFilter('PRESENT')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                  roleFilter === 'PRESENT'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'PRESENT'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
-                }`}
+                  }`}
               >
                 🟢 Present ({presentCount})
               </button>
               <button
                 onClick={() => setRoleFilter('ABSENT')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
-                  roleFilter === 'ABSENT'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${roleFilter === 'ABSENT'
                     ? 'bg-slate-700 text-white shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                }`}
+                  }`}
               >
                 ⚪ Absent ({absentCount})
               </button>
 
               <button
                 onClick={() => setRoleFilter('ARCHIVED')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
-                  roleFilter === 'ARCHIVED'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 ${roleFilter === 'ARCHIVED'
                     ? 'bg-slate-800 text-white dark:bg-slate-700 shadow-xs ring-2 ring-slate-400/50'
                     : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-                }`}
+                  }`}
               >
                 <Archive className="w-3.5 h-3.5 text-slate-500" />
                 <span>Archived / Deleted ({archivedUsers.length})</span>
@@ -1201,255 +1188,246 @@ export const AdminUserManagement = () => {
               </div>
             )
           ) : loading && users.length === 0 ? (
-        <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
-          <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin mb-3" />
-          <span>Scanning Factory Personnel Directory...</span>
-        </div>
-      ) : filteredUsers.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 font-mono text-xs">
-          No personnel found matching the query.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredUsers.map((u) => {
-            const isAud = u.role === 'AUDITOR';
-            const isAdm = u.role === 'ADMIN';
-            const isSup = u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR';
+            <div className="p-16 text-center text-slate-400 dark:text-slate-500 font-mono text-xs flex flex-col items-center justify-center">
+              <div className="w-8 h-8 rounded-full border-2 border-amber-500 border-t-transparent animate-spin mb-3" />
+              <span>Scanning Factory Personnel Directory...</span>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="p-12 text-center rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 font-mono text-xs">
+              No personnel found matching the query.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredUsers.map((u) => {
+                const isAud = u.role === 'AUDITOR';
+                const isAdm = u.role === 'ADMIN';
+                const isSup = u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR';
 
-            return (
-              <div
-                key={u._id}
-                className={`p-5 rounded-2xl border transition-all relative flex flex-col justify-between ${
-                  !u.isActive
-                    ? 'bg-slate-50/60 dark:bg-slate-900/40 border-dashed border-slate-300 dark:border-slate-800 opacity-75'
-                    : isAdm
-                    ? 'bg-white dark:bg-slate-900 border-amber-500/30 hover:shadow-md hover:border-amber-500/60'
-                    : isAud
-                    ? 'bg-white dark:bg-slate-900 border-purple-500/20 hover:shadow-md hover:border-purple-500/50'
-                    : 'bg-white dark:bg-slate-900 border-emerald-500/20 hover:shadow-md hover:border-emerald-500/50'
-                }`}
-              >
-                <div>
-                  {/* Top Row: Initial Avatar & Badges */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs relative ${
-                          isAdm
-                            ? 'bg-gradient-to-br from-amber-500 to-orange-600'
-                            : isAud
-                            ? 'bg-gradient-to-br from-purple-600 to-indigo-600'
-                            : 'bg-gradient-to-br from-emerald-600 to-teal-600'
-                        }`}
-                      >
-                        {u.name?.charAt(0).toUpperCase()}
+                return (
+                  <div
+                    key={u._id}
+                    className={`p-5 rounded-2xl border transition-all relative flex flex-col justify-between ${!u.isActive
+                        ? 'bg-slate-50/60 dark:bg-slate-900/40 border-dashed border-slate-300 dark:border-slate-800 opacity-75'
+                        : isAdm
+                          ? 'bg-white dark:bg-slate-900 border-amber-500/30 hover:shadow-md hover:border-amber-500/60'
+                          : isAud
+                            ? 'bg-white dark:bg-slate-900 border-purple-500/20 hover:shadow-md hover:border-purple-500/50'
+                            : 'bg-white dark:bg-slate-900 border-emerald-500/20 hover:shadow-md hover:border-emerald-500/50'
+                      }`}
+                  >
+                    <div>
+                      {/* Top Row: Initial Avatar & Badges */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs relative ${isAdm
+                                ? 'bg-gradient-to-br from-amber-500 to-orange-600'
+                                : isAud
+                                  ? 'bg-gradient-to-br from-purple-600 to-indigo-600'
+                                  : 'bg-gradient-to-br from-emerald-600 to-teal-600'
+                              }`}
+                          >
+                            {u.name?.charAt(0).toUpperCase()}
+                            <span
+                              className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 ${u.isPresent
+                                  ? 'bg-emerald-500 ring-2 ring-emerald-400/50'
+                                  : u.isActive
+                                    ? 'bg-slate-400'
+                                    : 'bg-rose-500'
+                                }`}
+                              title={u.isPresent ? 'Present (Daily Attendance: Present)' : 'Absent (Daily Attendance: Absent)'}
+                            />
+                          </div>
+
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                              {u.name}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[11px]">
+                              <span
+                                className={`font-bold ${isAdm
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : isAud
+                                      ? 'text-purple-600 dark:text-purple-400'
+                                      : 'text-emerald-600 dark:text-emerald-400'
+                                  }`}
+                              >
+                                {u.employeeId}
+                              </span>
+                              <span className="text-slate-400">•</span>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                {u.designation}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
                         <span
-                          className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-900 ${
-                            u.isPresent
-                              ? 'bg-emerald-500 ring-2 ring-emerald-400/50'
-                              : u.isActive
-                              ? 'bg-slate-400'
-                              : 'bg-rose-500'
-                          }`}
-                          title={u.isPresent ? 'Present (Daily Attendance: Present)' : 'Absent (Daily Attendance: Absent)'}
-                        />
+                          className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${isAdm
+                              ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                              : isAud
+                                ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
+                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                            }`}
+                        >
+                          {isAdm ? 'Admin' : isAud ? 'Auditor' : 'Supervisor'}
+                        </span>
                       </div>
 
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                          {u.name}
-                        </h3>
-                        <div className="flex items-center gap-1.5 mt-0.5 font-mono text-[11px]">
-                          <span
-                            className={`font-bold ${
-                              isAdm
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : isAud
-                                ? 'text-purple-600 dark:text-purple-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
-                            }`}
-                          >
-                            {u.employeeId}
+                      {/* Details Card */}
+                      <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 mb-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                            <Layers className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Plant Unit:</span>
                           </span>
-                          <span className="text-slate-400">•</span>
-                          <span className="text-slate-500 dark:text-slate-400">
-                            {u.designation}
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${u.unitId === 'UNIT-1'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
+                                : u.unitId === 'UNIT-2'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                                  : u.unitId === 'ALL' || isAdm || u.role === 'OWNER'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                              }`}
+                          >
+                            {u.unitName || (u.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5" />
+                            <span>Department:</span>
+                          </span>
+                          <strong className="font-semibold text-slate-800 dark:text-slate-100 text-right truncate">
+                            {u.department}
+                          </strong>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>Email:</span>
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-[11px] text-slate-700 dark:text-slate-200 truncate">
+                              {u.email}
+                            </span>
+                            <button
+                              onClick={() => copyToClipboard(u.email, `email-${u._id}`)}
+                              title="Copy Email"
+                              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                              {copiedField === `email-${u._id}` ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>Mobile:</span>
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-700 dark:text-slate-200">
+                            {u.mobileNumber || '—'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                          <span className="text-slate-400 text-[10px]">Access Status:</span>
+                          <span
+                            className={`text-[10px] font-bold ${u.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                              }`}
+                          >
+                            {u.isActive ? 'Active • Can Sign In' : 'Deactivated • Login Disabled'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-slate-400 text-[10px]">Daily Attendance:</span>
+                          <span
+                            className={`text-[10px] font-bold inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${u.isPresent
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                                : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                              }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${u.isPresent ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                            <span>{u.isPresent ? 'Present' : 'Absent'}</span>
+                            {u.loginTimestamp && (
+                              <span className="text-[9px] font-normal opacity-80">
+                                • {new Date(u.loginTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <span
-                      className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
-                        isAdm
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
-                          : isAud
-                          ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                      }`}
-                    >
-                      {isAdm ? 'Admin' : isAud ? 'Auditor' : 'Supervisor'}
-                    </span>
-                  </div>
-
-                  {/* Details Card */}
-                  <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 mb-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                        <Layers className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Plant Unit:</span>
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold ${
-                          u.unitId === 'UNIT-1'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800'
-                            : u.unitId === 'UNIT-2'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                            : u.unitId === 'ALL' || isAdm || u.role === 'OWNER'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                        }`}
+                    {/* Bottom Actions Bar */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => handleOpenResetPassword(u)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[11px] transition-colors cursor-pointer"
+                        title="Change or reset this user's password"
                       >
-                        {u.unitName || (u.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
-                      </span>
-                    </div>
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Reset Password</span>
+                      </button>
 
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                        <Building2 className="w-3.5 h-3.5" />
-                        <span>Department:</span>
-                      </span>
-                      <strong className="font-semibold text-slate-800 dark:text-slate-100 text-right truncate">
-                        {u.department}
-                      </strong>
-                    </div>
+                      <button
+                        onClick={() => {
+                          setSelectedLoginUser(u.employeeId);
+                          handleTabChange('LOGIN_TRACKER');
+                        }}
+                        className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
+                        title="Track this user's login times and sessions"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                      </button>
 
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                        <Mail className="w-3.5 h-3.5" />
-                        <span>Email:</span>
-                      </span>
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono text-[11px] text-slate-700 dark:text-slate-200 truncate">
-                          {u.email}
-                        </span>
+                      <button
+                        onClick={() => handleOpenEditUser(u)}
+                        className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                        title="Edit profile and department"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {!isAdm && (
                         <button
-                          onClick={() => copyToClipboard(u.email, `email-${u._id}`)}
-                          title="Copy Email"
-                          className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                          onClick={() => handleToggleStatus(u)}
+                          className={`p-1.5 rounded-xl transition-colors cursor-pointer ${u.isActive
+                              ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600'
+                              : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600'
+                            }`}
+                          title={u.isActive ? 'Deactivate account' : 'Reactivate account'}
                         >
-                          {copiedField === `email-${u._id}` ? (
-                            <Check className="w-3 h-3 text-emerald-500" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
+                          {u.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                         </button>
-                      </div>
-                    </div>
+                      )}
 
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>Mobile:</span>
-                      </span>
-                      <span className="font-mono text-[11px] text-slate-700 dark:text-slate-200">
-                        {u.mobileNumber || '—'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
-                      <span className="text-slate-400 text-[10px]">Access Status:</span>
-                      <span
-                        className={`text-[10px] font-bold ${
-                          u.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                        }`}
-                      >
-                        {u.isActive ? 'Active • Can Sign In' : 'Deactivated • Login Disabled'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-slate-400 text-[10px]">Daily Attendance:</span>
-                      <span
-                        className={`text-[10px] font-bold inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${
-                          u.isPresent
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                            : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                        }`}
-                      >
-                        <span className={`w-2 h-2 rounded-full ${u.isPresent ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                        <span>{u.isPresent ? 'Present' : 'Absent'}</span>
-                        {u.loginTimestamp && (
-                          <span className="text-[9px] font-normal opacity-80">
-                            • {new Date(u.loginTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        )}
-                      </span>
+                      {!isAdm && (
+                        <button
+                          onClick={() => handleOpenDeleteModal('USER', u)}
+                          className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                          title={`Delete ${isAud ? 'Auditor' : 'Supervisor'} Account`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                {/* Bottom Actions Bar */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => handleOpenResetPassword(u)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold text-[11px] transition-colors cursor-pointer"
-                    title="Change or reset this user's password"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>Reset Password</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setSelectedLoginUser(u.employeeId);
-                      handleTabChange('LOGIN_TRACKER');
-                    }}
-                    className="p-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 transition-colors cursor-pointer"
-                    title="Track this user's login times and sessions"
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    onClick={() => handleOpenEditUser(u)}
-                    className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-                    title="Edit profile and department"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-
-                  {!isAdm && (
-                    <button
-                      onClick={() => handleToggleStatus(u)}
-                      className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
-                        u.isActive
-                          ? 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600'
-                          : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-600'
-                      }`}
-                      title={u.isActive ? 'Deactivate account' : 'Reactivate account'}
-                    >
-                      {u.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                    </button>
-                  )}
-
-                  {!isAdm && (
-                    <button
-                      onClick={() => handleOpenDeleteModal('USER', u)}
-                      className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
-                      title={`Delete ${isAud ? 'Auditor' : 'Supervisor'} Account`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
-    </>
-  )}
 
       {/* ================= MODAL 1: ONBOARD NEW USER ================= */}
       {isCreateModalOpen && (
@@ -1520,7 +1498,7 @@ export const AdminUserManagement = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      const loginUrl = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost:5173';
+                      const loginUrl = typeof window !== 'undefined' && window.location ? window.location.origin : 'https://complainence-module.vercel.app';
                       const text = `TEXTILE QMS LOGIN CREDENTIALS\nName: ${createdCredentials.name}\nRole: ${createdCredentials.role}\nEmployee ID: ${createdCredentials.employeeId}\nEmail: ${createdCredentials.email}\nPassword: ${createdCredentials.password}\nLogin at: ${loginUrl}`;
                       copyToClipboard(text, 'all-creds');
                     }}
@@ -1566,11 +1544,10 @@ export const AdminUserManagement = () => {
                     <button
                       type="button"
                       onClick={() => handleRoleChangeInCreate('AUDITOR')}
-                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                        createForm.role === 'AUDITOR'
+                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${createForm.role === 'AUDITOR'
                           ? 'bg-purple-50 dark:bg-purple-950/50 border-purple-500 text-purple-700 dark:text-purple-300 shadow-xs'
                           : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
                       <span>Auditor</span>
@@ -1579,11 +1556,10 @@ export const AdminUserManagement = () => {
                     <button
                       type="button"
                       onClick={() => handleRoleChangeInCreate('SUPERVISOR')}
-                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                        createForm.role === 'SUPERVISOR'
+                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${createForm.role === 'SUPERVISOR'
                           ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
                           : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       <Wrench className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>Supervisor</span>
@@ -1592,11 +1568,10 @@ export const AdminUserManagement = () => {
                     <button
                       type="button"
                       onClick={() => handleRoleChangeInCreate('ADMIN')}
-                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                        createForm.role === 'ADMIN'
+                      className={`flex items-center justify-center gap-1.5 p-2.5 sm:p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${createForm.role === 'ADMIN'
                           ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-500 text-amber-700 dark:text-amber-300 shadow-xs'
                           : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       <UserCog className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>Administrator</span>
@@ -2115,8 +2090,8 @@ export const AdminUserManagement = () => {
                     {deleteTarget.type === 'DEPARTMENT'
                       ? 'Delete Factory Department'
                       : deleteTarget.item.role === 'AUDITOR'
-                      ? 'Delete Auditor Account'
-                      : 'Delete Personnel Account'}
+                        ? 'Delete Auditor Account'
+                        : 'Delete Personnel Account'}
                   </h2>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Confirm deletion with safe data integrity verification
@@ -2293,8 +2268,8 @@ export const AdminUserManagement = () => {
                   {deleteTarget.type === 'DEPARTMENT'
                     ? 'Confirm Delete Department'
                     : deleteTarget.item.role === 'AUDITOR'
-                    ? 'Confirm Archive Auditor'
-                    : 'Confirm Archive Account'}
+                      ? 'Confirm Archive Auditor'
+                      : 'Confirm Archive Account'}
                 </span>
               </button>
             </div>
@@ -2488,13 +2463,12 @@ export const AdminUserManagement = () => {
                           {rec.complaintId}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                            ['Closed', 'Verified'].includes(rec.status)
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${['Closed', 'Verified'].includes(rec.status)
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300'
                               : ['CAP Submitted', 'Under Verification', 'Under Review'].includes(rec.status)
-                              ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300'
-                              : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
-                          }`}
+                                ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300'
+                                : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300'
+                            }`}
                         >
                           {rec.status}
                         </span>

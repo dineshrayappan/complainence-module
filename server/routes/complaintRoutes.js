@@ -19,6 +19,7 @@ const {
   getAudits,
   updateAuditChecklist,
   createAuditRound,
+  getComplaintPhoto,
 } = require('../controllers/complaintController');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -87,6 +88,8 @@ router.post('/public', safeUploadBeforePhoto, createPublicComplaint);
 
 // Complaints CRUD & List
 router.get('/', verifyToken, getComplaints);
+// Photo streaming endpoint (Supports public <img> rendering with HTTP cache headers)
+router.get('/:id/photo/:type', getComplaintPhoto);
 router.get('/:id', verifyToken, getComplaintById);
 
 // Create Complaint (AUDITOR or ADMIN role strictly enforced + Multer file upload for Before Photo)

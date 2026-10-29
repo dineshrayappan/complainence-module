@@ -91,6 +91,11 @@ const toBase64DataUrl = (input, fallbackMime = 'image/jpeg') => {
   const str = input.trim();
   if (!str) return null;
 
+  // 1b. If it is already a photo URL (e.g., /api/complaints/.../photo/before or web URL), preserve as-is
+  if (str.startsWith('/api/') || str.startsWith('http://') || str.startsWith('https://')) {
+    return str;
+  }
+
   // 2. Already a standard data:image/ Data URL with base64
   if (str.startsWith('data:image/') && str.includes(';base64,')) {
     return str;

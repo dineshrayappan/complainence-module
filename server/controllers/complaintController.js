@@ -103,7 +103,7 @@ const ensureDataUrl = (photoPath) => {
 };
 
 // Helper to ensure all complaint outputs have self-contained data URLs and compatible identifiers
-const formatComplaintOutput = (complaint) => {
+const formatComplaintOutput = (complaint, options = {}) => {
   if (!complaint) return null;
   const obj = typeof complaint.toObject === 'function' ? complaint.toObject() : { ...complaint };
   obj._id = obj.id || obj._id;
@@ -111,14 +111,28 @@ const formatComplaintOutput = (complaint) => {
   obj.unitId = obj.unitId || null;
   obj.unitName = obj.unitName || '';
 
-  if (obj.beforePhoto) {
-    obj.beforePhoto = toBase64DataUrl(obj.beforePhoto);
-  }
-  if (obj.afterPhoto) {
-    obj.afterPhoto = toBase64DataUrl(obj.afterPhoto);
-  }
-  if (obj.cap && obj.cap.evidence) {
-    obj.cap.evidence = toBase64DataUrl(obj.cap.evidence);
+  const idForPhoto = obj.complaintId || obj._id;
+
+  if (options.isList) {
+    // List optimization: Use fast streaming photo URLs instead of multi-megabyte inline base64
+    obj.beforePhoto = `/api/complaints/${idForPhoto}/photo/before`;
+    const hasAfter = obj.hasAfterPhoto !== undefined
+      ? Boolean(obj.hasAfterPhoto)
+      : Boolean(obj.afterPhoto || obj.actualCompletedAt || ['CAP Submitted', 'Under Review', 'Verified', 'Closed'].includes(obj.status));
+    obj.afterPhoto = hasAfter ? `/api/complaints/${idForPhoto}/photo/after` : null;
+    if (obj.cap) {
+      obj.cap.evidence = obj.afterPhoto;
+    }
+  } else {
+    if (obj.beforePhoto) {
+      obj.beforePhoto = toBase64DataUrl(obj.beforePhoto);
+    }
+    if (obj.afterPhoto) {
+      obj.afterPhoto = toBase64DataUrl(obj.afterPhoto);
+    }
+    if (obj.cap && obj.cap.evidence) {
+      obj.cap.evidence = toBase64DataUrl(obj.cap.evidence);
+    }
   }
 
   // 1. Workflow Lifecycle Status: Draft -> Open -> CAP Submitted -> Under Review -> Rejected / Rework -> Verified -> Closed
@@ -823,7 +837,12 @@ const getComplaints = async (req, res) => {
           }
         }
 
-        const data = await ComplaintModel.find(query).sort({ createdAt: -1 }).lean();
+        let queryBuilder = ComplaintModel.find(query).sort({ createdAt: -1 });
+        // Exclude massive multi-megabyte Base64 photo strings to make register list queries lightning fast (< 100ms)
+        if (req.query.includeFullPhotos !== 'true') {
+          queryBuilder = queryBuilder.select('-beforePhoto -afterPhoto -cap.evidence');
+        }
+        const data = await queryBuilder.lean();
 
         if (data) {
           mockStore.syncWithDB(data);
@@ -831,7 +850,7 @@ const getComplaints = async (req, res) => {
           return res.status(200).json({
             success: true,
             count: data.length,
-            complaints: data.map(formatComplaintOutput),
+            complaints: data.map((c) => formatComplaintOutput(c, { isList: true })),
           });
         }
       } catch (dbErr) {
@@ -849,7 +868,7 @@ const getComplaints = async (req, res) => {
     res.status(200).json({
       success: true,
       count: complaints.length,
-      complaints: complaints.map(formatComplaintOutput),
+      complaints: complaints.map((c) => formatComplaintOutput(c, { isList: true })),
     });
   } catch (error) {
     console.error('[ComplaintController:getComplaints] Error:', error);
@@ -857,7 +876,7 @@ const getComplaints = async (req, res) => {
     res.status(200).json({
       success: true,
       count: complaints.length,
-      complaints: complaints.map(formatComplaintOutput),
+      complaints: complaints.map((c) => formatComplaintOutput(c, { isList: true })),
     });
   }
 };
@@ -2972,7 +2991,110 @@ const createPublicComplaint = async (req, res) => {
   }
 };
 
+// @desc    Stream complaint photo (before or after) with HTTP caching
+// @route   GET /api/complaints/:id/photo/:type
+// @access  Public / Authenticated
+const getComplaintPhoto = async (req, res) => {
+  try {
+    const { id: paramId, type = 'before' } = req.params;
+    const isBefore = type.toLowerCase() === 'before';
+
+    let photoData = null;
+    let dept = 'Production';
+    let prio = 'HIGH';
+    let desc = 'Non-Conformance Finding';
+
+    if (isMongoConnected()) {
+      try {
+        const query = { $or: [{ complaintId: paramId }] };
+        if (paramId && typeof paramId === 'string' && paramId.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: paramId });
+        }
+
+        const preferredUnit = getCanonicalUnitId(req?.query?.unitId || req?.headers?.['x-active-unit-id'] || req?.activeUnitId);
+        let Model = getComplaintModel(preferredUnit);
+        let doc = await Model.findOne(query, { beforePhoto: 1, afterPhoto: 1, department: 1, priority: 1, description: 1 }).lean();
+
+        if (!doc) {
+          const otherUnit = preferredUnit === 'UNIT-1' ? 'UNIT-2' : 'UNIT-1';
+          const OtherModel = getComplaintModel(otherUnit);
+          doc = await OtherModel.findOne(query, { beforePhoto: 1, afterPhoto: 1, department: 1, priority: 1, description: 1 }).lean();
+        }
+
+        if (doc) {
+          photoData = isBefore ? doc.beforePhoto : doc.afterPhoto;
+          dept = doc.department || dept;
+          prio = doc.priority || prio;
+          desc = doc.description || desc;
+        }
+      } catch (err) {
+        console.warn('[getComplaintPhoto] MongoDB lookup error:', err.message);
+      }
+    }
+
+    if (!photoData) {
+      const fallbackDoc = mockStore.getComplaintById(paramId);
+      if (fallbackDoc) {
+        photoData = isBefore ? fallbackDoc.beforePhoto : fallbackDoc.afterPhoto;
+        dept = fallbackDoc.department || dept;
+        prio = fallbackDoc.priority || prio;
+        desc = fallbackDoc.description || desc;
+      }
+    }
+
+    if (!photoData) {
+      if (isBefore) {
+        const svg = generateDefaultAuditPhoto(dept, prio, desc);
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.send(decodeURIComponent(svg.replace('data:image/svg+xml;charset=utf-8,', '')));
+      } else {
+        return res.status(404).json({ success: false, message: 'After photo not available yet' });
+      }
+    }
+
+    // Handle Data URL (e.g. data:image/jpeg;base64,...)
+    if (typeof photoData === 'string' && photoData.startsWith('data:')) {
+      const match = photoData.match(/^data:([^;]+);base64,(.+)$/s);
+      if (match) {
+        const mime = match[1];
+        const buffer = Buffer.from(match[2], 'base64');
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        return res.end(buffer);
+      }
+      if (photoData.startsWith('data:image/svg+xml')) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        const svgBody = photoData.includes(',') ? decodeURIComponent(photoData.split(',')[1]) : photoData;
+        return res.send(svgBody);
+      }
+    }
+
+    // Handle disk file path (e.g. /uploads/xyz.jpg)
+    if (typeof photoData === 'string' && (photoData.startsWith('/uploads/') || photoData.startsWith('uploads/'))) {
+      const filename = photoData.replace(/^\/?uploads\//, '');
+      const diskPath = path.join(__dirname, '..', '..', '..', '..', '..', 'd:', 'Essteee', 'complainence-module', 'server', 'uploads', filename);
+      if (fs.existsSync(diskPath)) {
+        res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+        return res.sendFile(diskPath);
+      }
+    }
+
+    // Fallback: send as SVG
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const svg = generateDefaultAuditPhoto(dept, prio, desc);
+    return res.send(decodeURIComponent(svg.replace('data:image/svg+xml;charset=utf-8,', '')));
+  } catch (error) {
+    console.error('[getComplaintPhoto] Error:', error);
+    res.status(500).send('Error loading photo');
+  }
+};
+
 module.exports = {
+  getComplaintPhoto,
   createComplaint,
   createPublicComplaint,
   getComplaints,

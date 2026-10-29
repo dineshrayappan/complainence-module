@@ -42,7 +42,7 @@ async function exportDatabase() {
   for (const col of collections) {
     const colName = col.name;
     const records = await conn.db.collection(colName).find({}).toArray();
-    
+
     // Save individual collection JSON file
     const filePath = path.join(EXPORT_DIR, `${colName}.json`);
     fs.writeFileSync(filePath, JSON.stringify(records, null, 2), 'utf8');
