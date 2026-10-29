@@ -13,6 +13,11 @@ export default defineConfig({
       '/api': {
         target: process.env.SERVER_URL || 'http://localhost:5000',
         changeOrigin: true,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
       },
       '/uploads': {
         target: process.env.SERVER_URL || 'http://localhost:5000',

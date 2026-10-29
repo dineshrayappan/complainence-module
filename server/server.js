@@ -25,6 +25,20 @@ const app = express();
 // Disable ETag generation so browser always receives 200 OK with fresh data instead of 304 Not Modified
 app.set('etag', false);
 
+// Global anti-caching middleware: eliminates 304 Not Modified across all API and server routes
+app.use((req, res, next) => {
+  // Strip conditional request headers so Express never triggers 304 Not Modified
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
+
+  // Enforce zero-cache headers across all API and static routes
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  next();
+});
+
 // Enable CORS for frontend
 app.use(
   cors({

@@ -46,6 +46,23 @@ api.interceptors.request.use(
     if (activeUnit) {
       config.headers['X-Unit-Id'] = activeUnit;
     }
+
+    // Strip incoming conditional headers to prevent browser 304 caching
+    delete config.headers['If-None-Match'];
+    delete config.headers['if-none-match'];
+    delete config.headers['If-Modified-Since'];
+    delete config.headers['if-modified-since'];
+
+    // Enforce zero-cache headers on all requests
+    config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    config.headers['Pragma'] = 'no-cache';
+    config.headers['Expires'] = '0';
+
+    // Append unique timestamp cache-buster on all GET requests to guarantee fresh 200 OK responses
+    if (config.method && String(config.method).toLowerCase() === 'get') {
+      config.params = config.params || {};
+      config.params._t = Date.now();
+    }
     // CRITICAL: When data is FormData, remove Content-Type so browser / axios
     // automatically populates multipart/form-data with the required boundary string
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
