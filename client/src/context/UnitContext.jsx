@@ -9,19 +9,37 @@ const DEFAULT_UNITS = [
   { unitId: 'UNIT-2', name: 'Unit 2', code: 'U2', description: 'Secondary Plant / Unit 2 Facility' },
 ];
 
+const BOTH_UNITS_OPTION = {
+  unitId: 'BOTH',
+  name: 'Both Units',
+  code: 'ALL',
+  description: 'Consolidated View Across Both Plants (Unit 1 & Unit 2)',
+};
+
 export const UnitProvider = ({ children }) => {
-  const { user, isAdmin, isOwner } = useAuth();
-  const isCompanyAdmin = isAdmin || isOwner || user?.employeeId === 'ADM-001' || user?.email === 'admin@factory.com';
+  const { user, isAdmin, isOwner, isAuditor } = useAuth();
+  const isCompanyAdmin = Boolean(isAdmin || isOwner || user?.employeeId === 'ADM-001' || user?.email === 'admin@factory.com');
+
+  // Can the user switch units? Admins, Owners, and Auditors with access to Both Units
+  const canSwitchUnits = Boolean(
+    isCompanyAdmin ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'OWNER' ||
+    user?.unitId === 'BOTH' ||
+    user?.unitId === 'ALL' ||
+    (Array.isArray(user?.assignedUnits) && user?.assignedUnits.includes('UNIT-1') && user?.assignedUnits.includes('UNIT-2')) ||
+    (isAuditor && (user?.unitId === 'BOTH' || user?.unitId === 'ALL' || (Array.isArray(user?.assignedUnits) && user?.assignedUnits.length > 1)))
+  );
 
   const [units, setUnits] = useState(DEFAULT_UNITS);
   const [unassignedCounts, setUnassignedCounts] = useState({ ncCount: 0, userCount: 0, taskCount: 0 });
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Initialize active unit: strictly 'UNIT-1' or 'UNIT-2' (defaults to 'UNIT-1')
+  // Initialize active unit: 'UNIT-1', 'UNIT-2', or 'BOTH'
   const [activeUnitId, setActiveUnitIdState] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('garment_qms_active_unit') || localStorage.getItem('garment_qms_active_unit');
-      if (saved === 'UNIT-1' || saved === 'UNIT-2') return saved;
+      if (saved === 'UNIT-1' || saved === 'UNIT-2' || saved === 'BOTH') return saved;
     }
     return 'UNIT-1';
   });
@@ -36,22 +54,29 @@ export const UnitProvider = ({ children }) => {
       return;
     }
 
-    if (!isCompanyAdmin) {
-      // Non-admin user is strictly locked to their assigned unit (default Unit 1)
+    if (!canSwitchUnits) {
+      // User is strictly locked to their assigned unit (default Unit 1)
       const userUnit = (user.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1');
       setActiveUnitIdState(userUnit);
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('garment_qms_active_unit', userUnit);
+        localStorage.setItem('garment_qms_active_unit', userUnit);
       }
     } else {
-      // Company Admin: verify saved preference is strictly UNIT-1 or UNIT-2
-      const saved = sessionStorage.getItem('garment_qms_active_unit');
-      if (saved !== 'UNIT-1' && saved !== 'UNIT-2') {
-        setActiveUnitIdState('UNIT-1');
-        sessionStorage.setItem('garment_qms_active_unit', 'UNIT-1');
+      // User can switch units: verify saved preference is valid ('UNIT-1', 'UNIT-2', 'BOTH')
+      const saved = sessionStorage.getItem('garment_qms_active_unit') || localStorage.getItem('garment_qms_active_unit');
+      if (saved !== 'UNIT-1' && saved !== 'UNIT-2' && saved !== 'BOTH') {
+        const defaultChoice = user.unitId === 'UNIT-2' ? 'UNIT-2' : (user.unitId === 'BOTH' ? 'BOTH' : 'UNIT-1');
+        setActiveUnitIdState(defaultChoice);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('garment_qms_active_unit', defaultChoice);
+          localStorage.setItem('garment_qms_active_unit', defaultChoice);
+        }
+      } else {
+        setActiveUnitIdState(saved);
       }
     }
-  }, [user, isCompanyAdmin]);
+  }, [user, canSwitchUnits]);
 
   // Fetch units from backend (strictly Unit 1 & Unit 2)
   const fetchUnits = useCallback(async () => {
@@ -76,12 +101,12 @@ export const UnitProvider = ({ children }) => {
     fetchUnits();
   }, [fetchUnits]);
 
-  // Switching units strictly between UNIT-1 and UNIT-2
+  // Switching units between UNIT-1, UNIT-2, and BOTH
   const switchUnit = useCallback(
     (newUnitId) => {
-      const cleanId = (newUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1');
-      if (!isCompanyAdmin && user?.unitId && cleanId !== user.unitId) {
-        console.warn('[UnitContext] Cross-unit switch prevented for non-admin user.');
+      const cleanId = (newUnitId === 'UNIT-2' || newUnitId === 'BOTH') ? newUnitId : 'UNIT-1';
+      if (!canSwitchUnits && user?.unitId && cleanId !== user.unitId) {
+        console.warn('[UnitContext] Cross-unit switch prevented for restricted user.');
         return;
       }
       setActiveUnitIdState(cleanId);
@@ -90,15 +115,19 @@ export const UnitProvider = ({ children }) => {
         localStorage.setItem('garment_qms_active_unit', cleanId);
       }
     },
-    [isCompanyAdmin, user]
+    [canSwitchUnits, user]
   );
 
-  const activeUnit = units.find((u) => u.unitId === activeUnitId) || units[0] || DEFAULT_UNITS[0];
+  const availableUnits = canSwitchUnits
+    ? [DEFAULT_UNITS[0], DEFAULT_UNITS[1], BOTH_UNITS_OPTION]
+    : units;
+
+  const activeUnit = availableUnits.find((u) => u.unitId === activeUnitId) || availableUnits[0] || DEFAULT_UNITS[0];
 
   return (
     <UnitContext.Provider
       value={{
-        units,
+        units: availableUnits,
         activeUnitId,
         activeUnit,
         switchUnit,
@@ -106,6 +135,7 @@ export const UnitProvider = ({ children }) => {
         unassignedCounts,
         loadingUnits,
         isCompanyAdmin,
+        canSwitchUnits,
       }}
     >
       {children}

@@ -25,8 +25,9 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
   const att = evaluateUserDailyAttendance(u, attendanceMap, dateString);
   const isPresent = att.isPresent;
 
-  const canonicalUnit = getCanonicalUnitId(u.unitId || 'UNIT-1');
-  const canonicalUnitName = getCanonicalUnitName(canonicalUnit);
+  const isBoth = u.unitId === 'BOTH' || u.unitId === 'ALL' || (Array.isArray(u.assignedUnits) && u.assignedUnits.includes('UNIT-1') && u.assignedUnits.includes('UNIT-2'));
+  const canonicalUnit = isBoth ? 'BOTH' : getCanonicalUnitId(u.unitId || 'UNIT-1');
+  const canonicalUnitName = isBoth ? 'Both Units' : getCanonicalUnitName(canonicalUnit);
 
   return {
     _id: u._id ? u._id.toString() : u.id,
@@ -38,7 +39,7 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
     department: u.department,
     unitId: canonicalUnit,
     unitName: u.unitName || canonicalUnitName,
-    assignedUnits: Array.isArray(u.assignedUnits) && u.assignedUnits.length > 0 ? u.assignedUnits : [canonicalUnit],
+    assignedUnits: isBoth ? ['UNIT-1', 'UNIT-2'] : (Array.isArray(u.assignedUnits) && u.assignedUnits.length > 0 ? u.assignedUnits : [canonicalUnit]),
     designation: u.designation,
     mobileNumber: u.mobileNumber,
     isActive: typeof u.isActive !== 'undefined' ? u.isActive : true,
@@ -59,7 +60,10 @@ const formatUser = (u, attendanceMap, dateString = getTodayISTString()) => {
 
 // Helper: resolve active unit strictly to UNIT-1 or UNIT-2
 const resolveUserRequestUnit = (req, explicitUnit) => {
-  const candidate = explicitUnit || req.query?.unitId || req.body?.unitId || req.activeUnitId || req.user?.unitId || 'UNIT-1';
+  const candidate = (explicitUnit || req.query?.unitId || req.body?.unitId || req.activeUnitId || req.user?.unitId || 'UNIT-1').toString().trim().toUpperCase();
+  if (candidate === 'BOTH' || candidate === 'ALL' || candidate === 'BOTH UNITS') {
+    return 'BOTH';
+  }
   return getCanonicalUnitId(candidate);
 };
 
@@ -230,7 +234,23 @@ const getAllUsers = async (req, res) => {
           ];
         }
 
-        const data = await UserModel.find(query).sort({ role: 1, name: 1 }).lean();
+        let data = [];
+        if (targetUnit === 'BOTH') {
+          const U1 = getUserModel('UNIT-1');
+          const U2 = getUserModel('UNIT-2');
+          const [d1, d2] = await Promise.all([
+            U1.find(query).sort({ role: 1, name: 1 }).lean(),
+            U2.find(query).sort({ role: 1, name: 1 }).lean(),
+          ]);
+          const userMap = new Map();
+          [...(d1 || []), ...(d2 || [])].forEach((u) => {
+            const key = (u.employeeId || u._id.toString()).toUpperCase();
+            if (!userMap.has(key)) userMap.set(key, u);
+          });
+          data = Array.from(userMap.values());
+        } else {
+          data = await UserModel.find(query).sort({ role: 1, name: 1 }).lean();
+        }
 
         if (data) {
           let users = data.map((u) => formatUser(u, attendanceMap, todayDate));
@@ -348,17 +368,27 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Mandatory Unit 1 or Unit 2 validation
+    // Unit assignment validation: allow Unit 1, Unit 2, or Both Units (for Admin and Auditor)
     const candidateUnit = (unitId || req.body.unit || req.activeUnitId || '').toString().trim().toUpperCase();
-    if (!candidateUnit || (candidateUnit !== 'UNIT-1' && candidateUnit !== 'UNIT-2' && candidateUnit !== 'UNIT 1' && candidateUnit !== 'UNIT 2')) {
+    const isBothUnits = candidateUnit === 'BOTH' || candidateUnit === 'ALL' || candidateUnit === 'BOTH UNITS' || req.body.bothUnits === true;
+
+    if (isBothUnits) {
+      if (role !== 'ADMIN' && role !== 'AUDITOR' && role !== 'OWNER') {
+        return res.status(400).json({
+          success: false,
+          message: 'Both Units assignment is only available for Admin and Auditor accounts.',
+        });
+      }
+    } else if (candidateUnit !== 'UNIT-1' && candidateUnit !== 'UNIT-2' && candidateUnit !== 'UNIT 1' && candidateUnit !== 'UNIT 2') {
       return res.status(400).json({
         success: false,
-        message: 'Mandatory unit assignment required: Please select either Unit 1 or Unit 2.',
+        message: 'Mandatory unit assignment required: Please select Unit 1, Unit 2, or Both Units.',
       });
     }
 
-    const cleanUnitId = getCanonicalUnitId(candidateUnit);
-    const cleanUnitName = getCanonicalUnitName(cleanUnitId);
+    const cleanUnitId = isBothUnits ? 'BOTH' : getCanonicalUnitId(candidateUnit);
+    const cleanUnitName = isBothUnits ? 'Both Units' : getCanonicalUnitName(cleanUnitId);
+    const assignedUnits = isBothUnits ? ['UNIT-1', 'UNIT-2'] : [cleanUnitId];
     const normalizedRole = role === 'SUPERVISOR' ? 'ACTION_PERSON' : role;
 
     if (!isMongoConnected()) {
@@ -366,23 +396,25 @@ const createUser = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
-        const TargetUserModel = getUserModel(cleanUnitId);
+        const TargetUserModel = isBothUnits ? getUserModel('UNIT-1') : getUserModel(cleanUnitId);
+        const OtherModel = isBothUnits ? getUserModel('UNIT-2') : null;
 
-        // Check if employeeId or email already exists in target unit
-        const existingEmp = await TargetUserModel.findOne({
-          $or: [
-            { employeeId: new RegExp(`^${employeeId.trim()}$`, 'i') },
-            { email: email.trim().toLowerCase() },
-          ],
-        });
-        if (existingEmp) {
+        // Check if employeeId or email already exists
+        const orChecks = [
+          { employeeId: new RegExp('^' + employeeId.trim() + '$', 'i') },
+          { email: email.trim().toLowerCase() },
+        ];
+        const existingEmp = await TargetUserModel.findOne({ $or: orChecks });
+        const existingOther = OtherModel ? await OtherModel.findOne({ $or: orChecks }) : null;
+
+        if (existingEmp || existingOther) {
           return res.status(400).json({
             success: false,
-            message: `Employee ID '${employeeId.toUpperCase()}' or email '${email}' is already registered in ${cleanUnitName}.`,
+            message: `Employee ID '${employeeId.toUpperCase()}' or email '${email}' is already registered.`,
           });
         }
 
-        const inserted = await TargetUserModel.create({
+        const newUserData = {
           employeeId: employeeId.trim().toUpperCase(),
           name: name.trim(),
           email: email.trim().toLowerCase(),
@@ -393,9 +425,22 @@ const createUser = async (req, res) => {
           mobileNumber: mobileNumber.trim(),
           unitId: cleanUnitId,
           unitName: cleanUnitName,
-          assignedUnits: [cleanUnitId],
+          assignedUnits,
           isActive: true,
-        });
+        };
+
+        const inserted = await TargetUserModel.create(newUserData);
+        if (OtherModel) {
+          try {
+            await OtherModel.create({ ...newUserData, password: inserted.password });
+          } catch (e2) {
+            console.warn('[UserController:createUser] Mirror to Unit 2 notice:', e2.message);
+          }
+        }
+        try {
+          const RootUser = getRootUserModel();
+          await RootUser.create({ ...newUserData, password: inserted.password });
+        } catch (re) {}
 
         // Sync to mockStore with the securely hashed password
         mockStore.createUser({
@@ -410,7 +455,7 @@ const createUser = async (req, res) => {
           mobileNumber: inserted.mobileNumber,
           unitId: cleanUnitId,
           unitName: cleanUnitName,
-          assignedUnits: [cleanUnitId],
+          assignedUnits,
         });
 
         // Record audit event
@@ -515,12 +560,19 @@ const updateUser = async (req, res) => {
 
           let targetUnitChange = null;
           if (typeof unitId !== 'undefined' && unitId) {
-            const requestedUnit = getCanonicalUnitId(unitId);
-            if (requestedUnit && (requestedUnit === 'UNIT-1' || requestedUnit === 'UNIT-2')) {
-              targetUnitChange = requestedUnit;
-              updateData.unitId = requestedUnit;
-              updateData.unitName = getCanonicalUnitName(requestedUnit);
-              updateData.assignedUnits = [requestedUnit];
+            const rawU = (unitId || '').toString().trim().toUpperCase();
+            if (rawU === 'BOTH' || rawU === 'ALL' || rawU === 'BOTH UNITS') {
+              updateData.unitId = 'BOTH';
+              updateData.unitName = 'Both Units';
+              updateData.assignedUnits = ['UNIT-1', 'UNIT-2'];
+            } else {
+              const requestedUnit = getCanonicalUnitId(rawU);
+              if (requestedUnit && (requestedUnit === 'UNIT-1' || requestedUnit === 'UNIT-2')) {
+                targetUnitChange = requestedUnit;
+                updateData.unitId = requestedUnit;
+                updateData.unitName = getCanonicalUnitName(requestedUnit);
+                updateData.assignedUnits = [requestedUnit];
+              }
             }
           }
 

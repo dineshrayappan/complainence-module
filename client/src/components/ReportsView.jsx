@@ -62,7 +62,7 @@ export const ReportsView = ({
   initialTab = 'audit-register',
 }) => {
   const { user } = useAuth();
-  const { units, activeUnitId, isCompanyAdmin } = useUnit();
+  const { units, activeUnitId, isCompanyAdmin, canSwitchUnits } = useUnit();
   const [downloadingCSV, setDownloadingCSV] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
 
@@ -124,11 +124,11 @@ export const ReportsView = ({
   // 11. Record Status Filter ('ALL' | 'ACTIVE' | 'DELETED')
   const [recordStatusFilter, setRecordStatusFilter] = useState('ALL');
 
-  // 12. Unit Filter (Strictly 'UNIT-1' or 'UNIT-2')
-  const [unitFilter, setUnitFilter] = useState(() => (activeUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1'));
+  // 12. Unit Filter ('UNIT-1', 'UNIT-2', or 'BOTH')
+  const [unitFilter, setUnitFilter] = useState(() => (activeUnitId === 'UNIT-2' ? 'UNIT-2' : (activeUnitId === 'BOTH' ? 'BOTH' : 'UNIT-1')));
 
   useEffect(() => {
-    if (activeUnitId === 'UNIT-1' || activeUnitId === 'UNIT-2') {
+    if (activeUnitId === 'UNIT-1' || activeUnitId === 'UNIT-2' || activeUnitId === 'BOTH' || activeUnitId === 'ALL') {
       setUnitFilter(activeUnitId);
     }
   }, [activeUnitId]);
@@ -689,9 +689,9 @@ export const ReportsView = ({
         if (!matchesSearch) return false;
       }
 
-      // 12. Unit Filter (Strictly Unit 1 or Unit 2)
+      // 12. Unit Filter (Unit 1, Unit 2, or Both Units)
       const cUnit = c.unitId || 'UNIT-1';
-      if (cUnit !== unitFilter) return false;
+      if (unitFilter !== 'ALL' && unitFilter !== 'BOTH' && cUnit !== unitFilter) return false;
 
       return true;
     });
@@ -1817,17 +1817,20 @@ export const ReportsView = ({
             )}
           </div>
 
-          {/* Unit Filter (Strictly Unit 1 and Unit 2) */}
+          {/* Unit Filter (Unit 1, Unit 2, or Both Units) */}
           <select
             id="filter-unit-reports"
             value={unitFilter}
             onChange={(e) => setUnitFilter(e.target.value)}
-            disabled={!isCompanyAdmin && user?.unitId}
+            disabled={!isCompanyAdmin && !canSwitchUnits && Boolean(user?.unitId)}
             className="px-3 py-1.5 text-xs rounded-xl border border-indigo-300 font-bold cursor-pointer transition-colors bg-indigo-50/90 text-indigo-900 dark:bg-indigo-950/70 dark:border-indigo-700 dark:text-cyan-200"
             title="Filter by Factory Plant Unit"
           >
             <option value="UNIT-1">📍 Unit 1</option>
             <option value="UNIT-2">📍 Unit 2</option>
+            {(isCompanyAdmin || canSwitchUnits) && (
+              <option value="BOTH">🏢 Both Units</option>
+            )}
           </select>
 
           {/* Record Status Filter */}

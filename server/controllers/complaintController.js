@@ -25,11 +25,31 @@ const { logEvent } = require('../utils/eventLogger');
  * Non-admins are locked to their account's assigned unit.
  */
 const resolveRequestUnit = (req, explicitUnitId = null) => {
-  if (req?.user && req.user.role !== 'ADMIN') {
-    return getCanonicalUnitId(req.user.unitId || req.activeUnitId);
+  const candidate = (explicitUnitId || req?.body?.unitId || req?.query?.unitId || req?.headers?.['x-unit-id'] || req?.headers?.['x-active-unit-id'] || req?.activeUnitId || '').toString().trim().toUpperCase();
+
+  const user = req?.user;
+  const canAccessBoth = Boolean(
+    req?.canSwitchUnits ||
+    req?.isCompanyAdmin ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'OWNER' ||
+    user?.unitId === 'BOTH' ||
+    user?.unitId === 'ALL' ||
+    (Array.isArray(user?.assignedUnits) && user?.assignedUnits.includes('UNIT-1') && user?.assignedUnits.includes('UNIT-2')) ||
+    (user?.role === 'AUDITOR' && (user?.unitId === 'BOTH' || user?.unitId === 'ALL' || (Array.isArray(user?.assignedUnits) && user?.assignedUnits.length > 1)))
+  );
+
+  if (canAccessBoth) {
+    if (candidate === 'BOTH' || candidate === 'ALL' || candidate === 'BOTH UNITS') {
+      return 'BOTH';
+    }
+    if (candidate === 'UNIT-2' || candidate === 'UNIT 2' || candidate === 'U2') {
+      return 'UNIT-2';
+    }
+    return 'UNIT-1';
   }
-  const candidate = explicitUnitId || req?.body?.unitId || req?.query?.unitId || req?.headers?.['x-active-unit-id'] || req?.activeUnitId;
-  return getCanonicalUnitId(candidate);
+
+  return user?.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
 };
 
 /**
@@ -110,6 +130,8 @@ const formatComplaintOutput = (complaint, options = {}) => {
   obj.id = obj.id || obj._id;
   obj.unitId = obj.unitId || null;
   obj.unitName = obj.unitName || '';
+  obj.category = obj.category || obj.defectCategory || 'Workplace Safety';
+  obj.defectCategory = obj.defectCategory || obj.category || 'Workplace Safety';
 
   const idForPhoto = obj.complaintId || obj._id;
 
@@ -464,6 +486,8 @@ const getFileUrl = (req, filename) => {
 const createComplaint = async (req, res) => {
   try {
     const {
+      defectCategory,
+      category,
       department,
       location = 'Production Floor',
       priority = 'HIGH',
@@ -498,6 +522,7 @@ const createComplaint = async (req, res) => {
       deadlineTimestamp = new Date(now.getTime() + hours * 60 * 60 * 1000);
     }
 
+    const effectiveCategory = (defectCategory || category || req.body.defectCategory || req.body.category || 'Workplace Safety').trim();
     const effectivePriority = (riskSeverity || priority || 'HIGH').toUpperCase();
     const effectiveRequirement = requirement || 'AQL 1.5 Workmanship Standard';
     const isCapRequired = String(capRequired) === 'true' || capRequired === true;
@@ -639,6 +664,8 @@ const createComplaint = async (req, res) => {
         const ComplaintModel = getComplaintModel(targetUnitId);
         const mongoPayload = {
           complaintId,
+          category: effectiveCategory,
+          defectCategory: effectiveCategory,
           department: department || supervisor?.department || 'Production',
           location: location || 'Production Floor',
           priority: effectivePriority,
@@ -695,6 +722,8 @@ const createComplaint = async (req, res) => {
 
     // Fallback when MongoDB is not connected
     const fallbackTicket = mockStore.createComplaint({
+      category: effectiveCategory,
+      defectCategory: effectiveCategory,
       department: department || supervisor.department || 'Production',
       location: location || 'Production Floor',
       priority: effectivePriority,
@@ -837,12 +866,26 @@ const getComplaints = async (req, res) => {
           }
         }
 
-        let queryBuilder = ComplaintModel.find(query).sort({ createdAt: -1 });
-        // Exclude massive multi-megabyte Base64 photo strings to make register list queries lightning fast (< 100ms)
-        if (req.query.includeFullPhotos !== 'true') {
-          queryBuilder = queryBuilder.select('-beforePhoto -afterPhoto -cap.evidence');
+        let data = [];
+        if (targetUnit === 'BOTH') {
+          const Model1 = getComplaintModel('UNIT-1');
+          const Model2 = getComplaintModel('UNIT-2');
+          let q1 = Model1.find(query).sort({ createdAt: -1 });
+          let q2 = Model2.find(query).sort({ createdAt: -1 });
+          if (req.query.includeFullPhotos !== 'true') {
+            q1 = q1.select('-beforePhoto -afterPhoto -cap.evidence');
+            q2 = q2.select('-beforePhoto -afterPhoto -cap.evidence');
+          }
+          const [d1, d2] = await Promise.all([q1.lean(), q2.lean()]);
+          data = [...(d1 || []), ...(d2 || [])];
+          data.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        } else {
+          let queryBuilder = ComplaintModel.find(query).sort({ createdAt: -1 });
+          if (req.query.includeFullPhotos !== 'true') {
+            queryBuilder = queryBuilder.select('-beforePhoto -afterPhoto -cap.evidence');
+          }
+          data = await queryBuilder.lean();
         }
-        const data = await queryBuilder.lean();
 
         if (data) {
           mockStore.syncWithDB(data);
@@ -1728,7 +1771,18 @@ const getKpiStats = async (req, res) => {
           }
         }
 
-        const allComplaints = await ComplaintModel.find(query).select('status deadlineTimestamp assignedTo department isDeleted').lean();
+        let allComplaints = [];
+        if (targetUnit === 'BOTH') {
+          const M1 = getComplaintModel('UNIT-1');
+          const M2 = getComplaintModel('UNIT-2');
+          const [c1, c2] = await Promise.all([
+            M1.find(query).select('status deadlineTimestamp assignedTo department isDeleted').lean(),
+            M2.find(query).select('status deadlineTimestamp assignedTo department isDeleted').lean(),
+          ]);
+          allComplaints = [...(c1 || []), ...(c2 || [])];
+        } else {
+          allComplaints = await ComplaintModel.find(query).select('status deadlineTimestamp assignedTo department isDeleted').lean();
+        }
 
         if (allComplaints) {
           const draftTickets = allComplaints.filter((c) => c.status === 'Draft').length;
@@ -1856,16 +1910,39 @@ const getAdminOversightStats = async (req, res) => {
         const complaintFilter = { isDeleted: { $ne: true } };
         const userFilter = { isActive: true };
 
-        const [complaintsDocs, usersDocs] = await Promise.all([
-          ComplaintModel.find(complaintFilter).sort({ createdAt: -1 }).lean(),
-          UserModel.find(userFilter).lean(),
-        ]);
+        if (targetUnit === 'BOTH') {
+          const C1 = getComplaintModel('UNIT-1');
+          const C2 = getComplaintModel('UNIT-2');
+          const U1 = getUserModel('UNIT-1');
+          const U2 = getUserModel('UNIT-2');
+          const [c1Docs, c2Docs, u1Docs, u2Docs] = await Promise.all([
+            C1.find(complaintFilter).sort({ createdAt: -1 }).lean(),
+            C2.find(complaintFilter).sort({ createdAt: -1 }).lean(),
+            U1.find(userFilter).lean(),
+            U2.find(userFilter).lean(),
+          ]);
+          const combinedComplaints = [...(c1Docs || []), ...(c2Docs || [])];
+          combinedComplaints.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+          allComplaints = combinedComplaints.map(formatComplaintOutput);
 
-        if (complaintsDocs) {
-          allComplaints = complaintsDocs.map(formatComplaintOutput);
-        }
-        if (usersDocs) {
-          allUsers = usersDocs.map((u) => ({ ...u, _id: u._id.toString(), id: u._id.toString() }));
+          const userMap = new Map();
+          [...(u1Docs || []), ...(u2Docs || [])].forEach((u) => {
+            const key = (u.employeeId || u._id.toString()).toUpperCase();
+            if (!userMap.has(key)) userMap.set(key, { ...u, _id: u._id.toString(), id: u._id.toString() });
+          });
+          allUsers = Array.from(userMap.values());
+        } else {
+          const [complaintsDocs, usersDocs] = await Promise.all([
+            ComplaintModel.find(complaintFilter).sort({ createdAt: -1 }).lean(),
+            UserModel.find(userFilter).lean(),
+          ]);
+
+          if (complaintsDocs) {
+            allComplaints = complaintsDocs.map(formatComplaintOutput);
+          }
+          if (usersDocs) {
+            allUsers = usersDocs.map((u) => ({ ...u, _id: u._id.toString(), id: u._id.toString() }));
+          }
         }
       } catch (dbErr) {
         console.warn('[ComplaintController:getAdminOversightStats] MongoDB notice:', dbErr.message);
@@ -2322,12 +2399,22 @@ const getDepartmentComplianceStats = async (req, res) => {
     // Fetch complaints from MongoDB if connected - project only metrics fields for maximum speed
     if (isMongoConnected()) {
       try {
-        const dbTickets = await ComplaintModel.find({ isDeleted: { $ne: true } })
-          .select('department status deadlineTimestamp priority createdAt cap')
-          .sort({ createdAt: -1 })
-          .lean();
-        if (Array.isArray(dbTickets)) {
-          allComplaints = dbTickets;
+        if (targetUnit === 'BOTH') {
+          const M1 = getComplaintModel('UNIT-1');
+          const M2 = getComplaintModel('UNIT-2');
+          const [d1, d2] = await Promise.all([
+            M1.find({ isDeleted: { $ne: true } }).select('department status deadlineTimestamp priority createdAt cap').sort({ createdAt: -1 }).lean(),
+            M2.find({ isDeleted: { $ne: true } }).select('department status deadlineTimestamp priority createdAt cap').sort({ createdAt: -1 }).lean(),
+          ]);
+          allComplaints = [...(d1 || []), ...(d2 || [])];
+        } else {
+          const dbTickets = await ComplaintModel.find({ isDeleted: { $ne: true } })
+            .select('department status deadlineTimestamp priority createdAt cap')
+            .sort({ createdAt: -1 })
+            .lean();
+          if (Array.isArray(dbTickets)) {
+            allComplaints = dbTickets;
+          }
         }
       } catch (err) {
       }

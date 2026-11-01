@@ -20,6 +20,16 @@ const isCompanyAdmin = (user) => {
   );
 };
 
+const canAccessBothUnits = (user) => {
+  if (!user) return false;
+  if (isCompanyAdmin(user)) return true;
+  if (user.role === 'ADMIN' || user.role === 'OWNER') return true;
+  if (user.unitId === 'BOTH' || user.unitId === 'ALL') return true;
+  if (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2')) return true;
+  if (user.role === 'AUDITOR' && (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.length > 1))) return true;
+  return false;
+};
+
 const verifyToken = async (req, res, next) => {
   let token;
 
@@ -144,31 +154,47 @@ const verifyToken = async (req, res, next) => {
         });
       }
 
-      // Ensure unit assignment is strictly Unit 1 or Unit 2
-      user.unitId = user.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
-      user.unitName = user.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1';
+      // Normalize unit assignment
+      if (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) {
+        user.unitId = 'BOTH';
+        user.unitName = 'Both Units';
+      } else if (user.unitId === 'UNIT-2') {
+        user.unitId = 'UNIT-2';
+        user.unitName = 'Unit 2';
+      } else {
+        user.unitId = 'UNIT-1';
+        user.unitName = 'Unit 1';
+      }
 
       req.user = user;
       req.isCompanyAdmin = isCompanyAdmin(user);
+      const canAccessBoth = canAccessBothUnits(user);
+      req.canSwitchUnits = canAccessBoth;
 
       // Extract requested unit from header or query param
-      const rawHeaderUnit = req.headers['x-unit-id'] || req.headers['unit-id'];
+      const rawHeaderUnit = req.headers['x-unit-id'] || req.headers['unit-id'] || req.headers['x-active-unit-id'];
       const rawQueryUnit = req.query?.unitId;
       const requestedUnit = ((rawHeaderUnit || rawQueryUnit || '').toString()).trim().toUpperCase();
 
-      if (req.isCompanyAdmin) {
-        // Company Admin can toggle strictly between Unit 1 and Unit 2 (No 'ALL')
-        req.activeUnitId = requestedUnit === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
+      if (canAccessBoth) {
+        // Multi-unit user (Admin / Auditor with Both Units access)
+        if (requestedUnit === 'BOTH' || requestedUnit === 'ALL' || requestedUnit === 'BOTH UNITS') {
+          req.activeUnitId = 'BOTH';
+        } else if (requestedUnit === 'UNIT-2' || requestedUnit === 'UNIT 2' || requestedUnit === 'U2') {
+          req.activeUnitId = 'UNIT-2';
+        } else {
+          req.activeUnitId = 'UNIT-1';
+        }
       } else {
-        // Unit-level member is strictly locked to their assigned unit
-        const userUnit = user.unitId;
+        // Single unit locked member
+        const userUnit = user.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
         req.activeUnitId = userUnit;
 
         // Block unauthorized cross-unit requests
-        if (requestedUnit && requestedUnit !== userUnit) {
+        if (requestedUnit && requestedUnit !== userUnit && requestedUnit !== 'ALL' && requestedUnit !== 'BOTH') {
           return res.status(403).json({
             success: false,
-            message: `Access denied. You are assigned to ${user.unitName} and cannot access data for ${requestedUnit === 'UNIT-2' ? 'Unit 2' : 'Unit 1'}.`,
+            message: `Access denied. You are assigned to ${user.unitName || userUnit} and cannot access data for ${requestedUnit === 'UNIT-2' ? 'Unit 2' : 'Unit 1'}.`,
           });
         }
       }
@@ -260,5 +286,5 @@ const enforceUnitMatch = (recordUnitId, req, res) => {
   return true;
 };
 
-module.exports = { verifyToken, requireRole, requireOwner, isCompanyAdmin, enforceUnitMatch };
+module.exports = { verifyToken, requireRole, requireOwner, isCompanyAdmin, canAccessBothUnits, enforceUnitMatch };
 

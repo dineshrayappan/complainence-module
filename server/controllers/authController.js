@@ -61,9 +61,10 @@ const formatUserResponse = (user, expectedRole) => {
     department: user.department,
     designation: user.designation,
     mobileNumber: user.mobileNumber,
-    unitId: getCanonicalUnitId(user.unitId),
-    unitName: getCanonicalUnitName(user.unitId),
-    assignedUnits: [getCanonicalUnitId(user.unitId)],
+    unitId: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) ? 'BOTH' : getCanonicalUnitId(user.unitId),
+    unitName: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) ? 'Both Units' : getCanonicalUnitName(user.unitId),
+    assignedUnits: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) ? ['UNIT-1', 'UNIT-2'] : [getCanonicalUnitId(user.unitId)],
+    canSwitchUnits: Boolean(isUniversal || isOwner || user.role === 'ADMIN' || user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2')) || (user.role === 'AUDITOR' && (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.length > 1)))),
     isActive: typeof user.isActive !== 'undefined' ? user.isActive : true,
     isPresent,
     attendance: isPresent ? 'Present' : 'Absent',
@@ -149,10 +150,24 @@ const login = async (req, res) => {
             if (otherCandidates && otherCandidates.length > 0) {
               const otherUser = await selectMatchingUser(otherCandidates, password, expectedRole);
               if (otherUser) {
-                return res.status(403).json({
-                  success: false,
-                  message: `This account is assigned to ${getCanonicalUnitName(otherUnit)}. Please select ${getCanonicalUnitName(otherUnit)} workspace on the sign in page.`,
-                });
+                const canAccessBoth = Boolean(
+                  otherUser.role === 'ADMIN' ||
+                  otherUser.role === 'OWNER' ||
+                  otherUser.isOwner ||
+                  otherUser.unitId === 'BOTH' ||
+                  otherUser.unitId === 'ALL' ||
+                  (Array.isArray(otherUser.assignedUnits) && otherUser.assignedUnits.includes('UNIT-1') && otherUser.assignedUnits.includes('UNIT-2')) ||
+                  (otherUser.role === 'AUDITOR' && (otherUser.unitId === 'BOTH' || otherUser.unitId === 'ALL' || (Array.isArray(otherUser.assignedUnits) && otherUser.assignedUnits.length > 1)))
+                );
+                if (canAccessBoth) {
+                  user = otherUser;
+                  targetUnit = requestedUnit;
+                } else {
+                  return res.status(403).json({
+                    success: false,
+                    message: `This account is assigned to ${getCanonicalUnitName(otherUnit)}. Please select ${getCanonicalUnitName(otherUnit)} workspace on the sign in page.`,
+                  });
+                }
               }
             }
           }

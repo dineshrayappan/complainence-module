@@ -62,6 +62,22 @@ const isDeptMatch = (userDept, targetDept) => {
 
 
 
+// Defect Categories
+export const DEFECT_CATEGORIES = [
+  'Workplace Safety',
+  'Building & Structural Safety',
+  'Electrical Safety',
+  'Occupational Health, Hygiene & Sanitation',
+  'Statutory & Legal Compliance',
+  'Workplace Rules & Discipline',
+  'Machinery & Equipment Safety',
+  'Waste Management & Disposal',
+  'Chemical Safety & Handling',
+  'Material Handling & Storage',
+  'Documentation & Record Management',
+  'Security & Access Control',
+];
+
 // Risk / Severity Levels
 const RISK_LEVELS = [
   { level: 'CRITICAL', label: 'Critical Risk (AQL 0.0 - Embargo / Safety)' },
@@ -107,7 +123,7 @@ const generateDefaultAuditPhoto = (dept, prio, desc) => {
 
 export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = null }) => {
   const { user } = useAuth();
-  const { units, activeUnitId, isCompanyAdmin } = useUnit();
+  const { units, activeUnitId, isCompanyAdmin, canSwitchUnits } = useUnit();
   const { companySlug, companyName } = useCompany();
 
   const getDefaultUnitId = () => {
@@ -127,6 +143,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   // Form State - Left Column
   const [department, setDepartment] = useState('Production');
+  const [defectCategory, setDefectCategory] = useState(DEFECT_CATEGORIES[0]);
   const [priority, setPriority] = useState('HIGH');
   const [dueDate, setDueDate] = useState(() => toDatetimeLocal(Date.now() + 16 * 60 * 60 * 1000));
   const [deadlineHours, setDeadlineHours] = useState(16);
@@ -276,12 +293,22 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
   // Apply prefill data if opened from an audit item
   useEffect(() => {
-    if (isOpen && prefillData) {
-      if (prefillData.department) {
-        handleDepartmentChange(prefillData.department);
-      }
-      if (prefillData.description) {
-        setDescription(prefillData.description);
+    if (isOpen) {
+      if (prefillData) {
+        if (prefillData.department) {
+          handleDepartmentChange(prefillData.department);
+        }
+        if (prefillData.defectCategory || prefillData.category) {
+          const prefCat = prefillData.defectCategory || prefillData.category;
+          if (DEFECT_CATEGORIES.includes(prefCat)) {
+            setDefectCategory(prefCat);
+          }
+        }
+        if (prefillData.description) {
+          setDescription(prefillData.description);
+        }
+      } else {
+        setDefectCategory(DEFECT_CATEGORIES[0]);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -405,7 +432,11 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
       formData.append('unitId', finalUnitId);
       formData.append('unitName', finalUnitName);
 
+      const effectiveCategory = (defectCategory || DEFECT_CATEGORIES[0]).trim();
+
       formData.append('department', department);
+      formData.append('category', effectiveCategory);
+      formData.append('defectCategory', effectiveCategory);
       formData.append('location', location.trim() || `${department} Floor`);
       formData.append('priority', priority || 'HIGH');
       formData.append('riskSeverity', priority || 'HIGH');
@@ -533,11 +564,11 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                     </span>
                   </label>
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300">
-                    {isCompanyAdmin ? 'Admin Configurable' : 'Assigned Unit'}
+                    {(isCompanyAdmin || canSwitchUnits) ? 'Unit Selectable' : 'Assigned Unit'}
                   </span>
                 </div>
 
-                {isCompanyAdmin ? (
+                {(isCompanyAdmin || canSwitchUnits) ? (
                   <select
                     value={selectedUnitId}
                     onChange={(e) => {
@@ -585,6 +616,27 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                   <span>Selected zone: <strong className="text-indigo-600 dark:text-cyan-400">{department}</strong></span>
                   <span className="font-mono text-slate-400">{location}</span>
                 </div>
+              </div>
+
+              {/* 1.5. DEFECT CATEGORY DROPDOWN */}
+              <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 space-y-2">
+                <label className="block font-bold text-slate-900 dark:text-white text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
+                    <span>Defect Category <strong className="text-rose-500">*</strong></span>
+                  </span>
+                </label>
+                <select
+                  value={defectCategory}
+                  onChange={(e) => setDefectCategory(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                >
+                  {DEFECT_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* 2. RISK / SEVERITY DROPDOWN */}

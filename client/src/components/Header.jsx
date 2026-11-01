@@ -30,7 +30,7 @@ export const Header = ({
   onSelectOverdue,
 }) => {
   const { user, isOwner, isAdmin, isAuditor, isSupervisor, logout } = useAuth();
-  const { units, activeUnitId, activeUnit, switchUnit, isCompanyAdmin } = useUnit();
+  const { units, activeUnitId, activeUnit, switchUnit, isCompanyAdmin, canSwitchUnits } = useUnit();
   const { basePath, companyName } = useCompany();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -140,8 +140,8 @@ export const Header = ({
 
           {/* Right Header Controls: Unit Switcher, Refresh, 🔔 Notifications, Theme, Profile Pill, Sign Out */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Unit Switcher for Company Admin / Unit Indicator for Members */}
-            {isCompanyAdmin ? (
+            {/* Unit Switcher for Multi-Unit Users (Admin / Auditor with Both Units) / Unit Indicator for Restricted Members */}
+            {(isCompanyAdmin || canSwitchUnits) ? (
               <div className="relative flex items-center">
                 <div className="relative flex items-center">
                   <div className="absolute left-2.5 pointer-events-none text-indigo-600 dark:text-cyan-400">
@@ -149,7 +149,7 @@ export const Header = ({
                   </div>
                   <select
                     id="select-active-unit"
-                    value={activeUnitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1'}
+                    value={activeUnitId}
                     onChange={(e) => {
                       switchUnit(e.target.value);
                       if (onRefresh) onRefresh();
@@ -160,6 +160,7 @@ export const Header = ({
                   >
                     <option value="UNIT-1">Unit 1</option>
                     <option value="UNIT-2">Unit 2</option>
+                    <option value="BOTH">Both Units</option>
                   </select>
                   <div className="absolute right-2 pointer-events-none text-indigo-500 dark:text-indigo-400">
                     <ChevronDown className="w-3 h-3" />

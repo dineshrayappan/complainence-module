@@ -25,11 +25,31 @@ const { toBase64DataUrl } = require('../utils/base64Helper');
  * Non-admins are locked to their assigned unit.
  */
 const resolveRequestUnit = (req, explicitUnitId = null) => {
-  if (req?.user && req.user.role !== 'ADMIN') {
-    return getCanonicalUnitId(req.user.unitId || req.activeUnitId);
+  const candidate = (explicitUnitId || req?.body?.unitId || req?.query?.unitId || req?.headers?.['x-unit-id'] || req?.headers?.['x-active-unit-id'] || req?.activeUnitId || '').toString().trim().toUpperCase();
+
+  const user = req?.user;
+  const canAccessBoth = Boolean(
+    req?.canSwitchUnits ||
+    req?.isCompanyAdmin ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'OWNER' ||
+    user?.unitId === 'BOTH' ||
+    user?.unitId === 'ALL' ||
+    (Array.isArray(user?.assignedUnits) && user?.assignedUnits.includes('UNIT-1') && user?.assignedUnits.includes('UNIT-2')) ||
+    (user?.role === 'AUDITOR' && (user?.unitId === 'BOTH' || user?.unitId === 'ALL' || (Array.isArray(user?.assignedUnits) && user?.assignedUnits.length > 1)))
+  );
+
+  if (canAccessBoth) {
+    if (candidate === 'BOTH' || candidate === 'ALL' || candidate === 'BOTH UNITS') {
+      return 'BOTH';
+    }
+    if (candidate === 'UNIT-2' || candidate === 'UNIT 2' || candidate === 'U2') {
+      return 'UNIT-2';
+    }
+    return 'UNIT-1';
   }
-  const candidate = explicitUnitId || req?.body?.unitId || req?.query?.unitId || req?.headers?.['x-active-unit-id'] || req?.activeUnitId;
-  return getCanonicalUnitId(candidate);
+
+  return user?.unitId === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
 };
 
 /**
@@ -343,8 +363,18 @@ const getTasks = async (req, res) => {
     let tasks = [];
     if (isMongoConnected()) {
       try {
-        const data = await TaskModel.find({}).sort({ createdAt: -1 }).lean();
-        tasks = (data || []).map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
+        if (targetUnit === 'BOTH') {
+          const T1 = getTaskModel('UNIT-1');
+          const T2 = getTaskModel('UNIT-2');
+          const [d1, d2] = await Promise.all([
+            T1.find({}).sort({ createdAt: -1 }).lean(),
+            T2.find({}).sort({ createdAt: -1 }).lean(),
+          ]);
+          tasks = [...(d1 || []), ...(d2 || [])].map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
+        } else {
+          const data = await TaskModel.find({}).sort({ createdAt: -1 }).lean();
+          tasks = (data || []).map((t) => ({ ...t, id: t._id ? t._id.toString() : t.id }));
+        }
       } catch (dbErr) {
         console.warn('[TaskController:getTasks] MongoDB fallback:', dbErr.message);
         tasks = mockStore.getTasks();
@@ -357,11 +387,21 @@ const getTasks = async (req, res) => {
     let complaints = [];
     if (isMongoConnected()) {
       try {
-        const cData = await ComplaintModel.find({ isDeleted: { $ne: true } })
-          .select('-beforePhoto -afterPhoto -cap.evidence')
-          .sort({ createdAt: -1 })
-          .lean();
-        if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
+        if (targetUnit === 'BOTH') {
+          const C1 = getComplaintModel('UNIT-1');
+          const C2 = getComplaintModel('UNIT-2');
+          const [c1, c2] = await Promise.all([
+            C1.find({ isDeleted: { $ne: true } }).select('-beforePhoto -afterPhoto -cap.evidence').sort({ createdAt: -1 }).lean(),
+            C2.find({ isDeleted: { $ne: true } }).select('-beforePhoto -afterPhoto -cap.evidence').sort({ createdAt: -1 }).lean(),
+          ]);
+          complaints = [...(c1 || []), ...(c2 || [])].map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
+        } else {
+          const cData = await ComplaintModel.find({ isDeleted: { $ne: true } })
+            .select('-beforePhoto -afterPhoto -cap.evidence')
+            .sort({ createdAt: -1 })
+            .lean();
+          if (cData) complaints = cData.map((c) => ({ ...c, id: c._id ? c._id.toString() : c.id }));
+        }
       } catch (e) {}
     } else {
       complaints = mockStore.getComplaints().filter((c) => !c.isDeleted);

@@ -60,11 +60,12 @@ export const DepartmentWorkOperations = ({
   embedded = false,
 }) => {
   const { isAdmin, isAuditor, user } = useAuth();
-  const { units, activeUnitId, activeUnit, isCompanyAdmin } = useUnit();
+  const { units, activeUnitId, activeUnit, isCompanyAdmin, canSwitchUnits } = useUnit();
   const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR' || (!isAdmin && !isAuditor);
 
   const getDefaultUnitId = useCallback(() => {
-    if (user?.unitId === 'UNIT-2' || activeUnitId === 'UNIT-2') return 'UNIT-2';
+    if (activeUnitId === 'UNIT-2' || user?.unitId === 'UNIT-2') return 'UNIT-2';
+    if (activeUnitId === 'BOTH') return 'BOTH';
     return 'UNIT-1';
   }, [user, activeUnitId]);
 

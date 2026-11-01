@@ -30,6 +30,18 @@ const complaintSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    category: {
+      type: String,
+      required: false,
+      trim: true,
+      default: 'Workplace Safety',
+    },
+    defectCategory: {
+      type: String,
+      required: false,
+      trim: true,
+      default: 'Workplace Safety',
+    },
     department: {
       type: String,
       required: [true, 'Department is required'],

@@ -1702,21 +1702,29 @@ export const AdminUserManagement = () => {
                     required
                     value={createForm.unitId || 'UNIT-1'}
                     onChange={(e) => {
-                      const uId = e.target.value === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
-                      const matched = units.find((u) => u.unitId === uId);
+                      const val = e.target.value;
+                      let uName = 'Unit 1';
+                      let aUnits = [val];
+                      if (val === 'UNIT-2') {
+                        uName = 'Unit 2';
+                      } else if (val === 'BOTH') {
+                        uName = 'Both Units';
+                        aUnits = ['UNIT-1', 'UNIT-2'];
+                      }
                       setCreateForm({
                         ...createForm,
-                        unitId: uId,
-                        unitName: matched ? matched.name : (uId === 'UNIT-2' ? 'Unit 2' : 'Unit 1'),
+                        unitId: val,
+                        unitName: uName,
+                        assignedUnits: aUnits,
                       });
                     }}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none font-semibold cursor-pointer"
                   >
-                    {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
-                      <option key={u.unitId} value={u.unitId}>
-                        📍 {u.name}
-                      </option>
-                    ))}
+                    <option value="UNIT-1">📍 Unit 1</option>
+                    <option value="UNIT-2">📍 Unit 2</option>
+                    {(createForm.role === 'ADMIN' || createForm.role === 'AUDITOR') && (
+                      <option value="BOTH">🏢 Both Units</option>
+                    )}
                   </select>
                 </div>
 
@@ -2018,21 +2026,29 @@ export const AdminUserManagement = () => {
                   required
                   value={editForm.unitId || 'UNIT-1'}
                   onChange={(e) => {
-                    const uId = e.target.value === 'UNIT-2' ? 'UNIT-2' : 'UNIT-1';
-                    const matched = units.find((u) => u.unitId === uId);
+                    const val = e.target.value;
+                    let uName = 'Unit 1';
+                    let aUnits = [val];
+                    if (val === 'UNIT-2') {
+                      uName = 'Unit 2';
+                    } else if (val === 'BOTH') {
+                      uName = 'Both Units';
+                      aUnits = ['UNIT-1', 'UNIT-2'];
+                    }
                     setEditForm({
                       ...editForm,
-                      unitId: uId,
-                      unitName: matched ? matched.name : (uId === 'UNIT-2' ? 'Unit 2' : 'Unit 1'),
+                      unitId: val,
+                      unitName: uName,
+                      assignedUnits: aUnits,
                     });
                   }}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-semibold cursor-pointer"
                 >
-                  {units.filter((u) => u.unitId === 'UNIT-1' || u.unitId === 'UNIT-2').map((u) => (
-                    <option key={u.unitId} value={u.unitId}>
-                      📍 {u.name}
-                    </option>
-                  ))}
+                  <option value="UNIT-1">📍 Unit 1</option>
+                  <option value="UNIT-2">📍 Unit 2</option>
+                  {(editForm.role === 'ADMIN' || editForm.role === 'AUDITOR' || selectedUser?.role === 'ADMIN' || selectedUser?.role === 'AUDITOR') && (
+                    <option value="BOTH">🏢 Both Units</option>
+                  )}
                 </select>
               </div>
 
