@@ -63,8 +63,8 @@ const formatUserResponse = (user, expectedRole) => {
     mobileNumber: user.mobileNumber,
     unitId: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) ? 'BOTH' : getCanonicalUnitId(user.unitId),
     unitName: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) ? 'Both Units' : getCanonicalUnitName(user.unitId),
-    assignedUnits: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))) ? ['UNIT-1', 'UNIT-2'] : [getCanonicalUnitId(user.unitId)],
-    canSwitchUnits: Boolean(isUniversal || isOwner || user.role === 'ADMIN' || user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2')) || (user.role === 'AUDITOR' && (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.length > 1)))),
+    assignedUnits: (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2')) || user.role === 'ADMIN' || user.role === 'AUDITOR' || isOwner || isUniversal) ? ['UNIT-1', 'UNIT-2'] : [getCanonicalUnitId(user.unitId)],
+    canSwitchUnits: Boolean(isUniversal || isOwner || user.role === 'ADMIN' || user.role === 'AUDITOR' || user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2'))),
     isActive: typeof user.isActive !== 'undefined' ? user.isActive : true,
     isPresent,
     attendance: isPresent ? 'Present' : 'Absent',
@@ -157,7 +157,7 @@ const login = async (req, res) => {
                   otherUser.unitId === 'BOTH' ||
                   otherUser.unitId === 'ALL' ||
                   (Array.isArray(otherUser.assignedUnits) && otherUser.assignedUnits.includes('UNIT-1') && otherUser.assignedUnits.includes('UNIT-2')) ||
-                  (otherUser.role === 'AUDITOR' && (otherUser.unitId === 'BOTH' || otherUser.unitId === 'ALL' || (Array.isArray(otherUser.assignedUnits) && otherUser.assignedUnits.length > 1)))
+                  otherUser.role === 'AUDITOR'
                 );
                 if (canAccessBoth) {
                   user = otherUser;

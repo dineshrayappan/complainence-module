@@ -23,10 +23,9 @@ const isCompanyAdmin = (user) => {
 const canAccessBothUnits = (user) => {
   if (!user) return false;
   if (isCompanyAdmin(user)) return true;
-  if (user.role === 'ADMIN' || user.role === 'OWNER') return true;
+  if (user.role === 'ADMIN' || user.role === 'OWNER' || user.role === 'AUDITOR') return true;
   if (user.unitId === 'BOTH' || user.unitId === 'ALL') return true;
   if (Array.isArray(user.assignedUnits) && user.assignedUnits.includes('UNIT-1') && user.assignedUnits.includes('UNIT-2')) return true;
-  if (user.role === 'AUDITOR' && (user.unitId === 'BOTH' || user.unitId === 'ALL' || (Array.isArray(user.assignedUnits) && user.assignedUnits.length > 1))) return true;
   return false;
 };
 

@@ -28,7 +28,7 @@ export const UnitProvider = ({ children }) => {
     user?.unitId === 'BOTH' ||
     user?.unitId === 'ALL' ||
     (Array.isArray(user?.assignedUnits) && user?.assignedUnits.includes('UNIT-1') && user?.assignedUnits.includes('UNIT-2')) ||
-    (isAuditor && (user?.unitId === 'BOTH' || user?.unitId === 'ALL' || (Array.isArray(user?.assignedUnits) && user?.assignedUnits.length > 1)))
+    isAuditor || user?.role === 'AUDITOR'
   );
 
   const [units, setUnits] = useState(DEFAULT_UNITS);

@@ -36,7 +36,7 @@ const resolveRequestUnit = (req, explicitUnitId = null) => {
     user?.unitId === 'BOTH' ||
     user?.unitId === 'ALL' ||
     (Array.isArray(user?.assignedUnits) && user?.assignedUnits.includes('UNIT-1') && user?.assignedUnits.includes('UNIT-2')) ||
-    (user?.role === 'AUDITOR' && (user?.unitId === 'BOTH' || user?.unitId === 'ALL' || (Array.isArray(user?.assignedUnits) && user?.assignedUnits.length > 1)))
+    user?.role === 'AUDITOR'
   );
 
   if (canAccessBoth) {

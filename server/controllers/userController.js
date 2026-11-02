@@ -131,17 +131,34 @@ const getLineSupervisors = async (req, res) => {
     if (isMongoConnected()) {
       try {
         const activeUnit = resolveUserRequestUnit(req);
-        const UserModel = getUserModel(activeUnit);
-
         const supervisorFilter = {
           role: { $in: ['ACTION_PERSON', 'SUPERVISOR'] },
           isActive: true,
           isDeleted: { $ne: true },
         };
 
-        const data = await UserModel.find(supervisorFilter)
-          .sort({ department: 1, name: 1 })
-          .lean();
+        let data = [];
+        if (activeUnit === 'BOTH') {
+          const U1 = getUserModel('UNIT-1');
+          const U2 = getUserModel('UNIT-2');
+          const [d1, d2] = await Promise.all([
+            U1.find(supervisorFilter).sort({ department: 1, name: 1 }).lean(),
+            U2.find(supervisorFilter).sort({ department: 1, name: 1 }).lean(),
+          ]);
+          const seen = new Set();
+          for (const u of [...d1, ...d2]) {
+            const key = u.employeeId || String(u._id);
+            if (!seen.has(key)) {
+              seen.add(key);
+              data.push(u);
+            }
+          }
+        } else {
+          const UserModel = getUserModel(activeUnit);
+          data = await UserModel.find(supervisorFilter)
+            .sort({ department: 1, name: 1 })
+            .lean();
+        }
 
         if (data) {
           const supervisors = data.map((u) => formatUser(u, attendanceMap, todayDate));
@@ -149,7 +166,7 @@ const getLineSupervisors = async (req, res) => {
             success: true,
             count: supervisors.length,
             unitId: activeUnit,
-            unitName: getCanonicalUnitName(activeUnit),
+            unitName: activeUnit === 'BOTH' ? 'Both Units' : getCanonicalUnitName(activeUnit),
             supervisors,
           });
         }
