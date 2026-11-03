@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import CertificateManagementPanel from './CertificateManagementPanel';
 import {
+  Award,
   Users,
   UserPlus,
   KeyRound,
@@ -70,9 +72,27 @@ export const AdminUserManagement = () => {
           ? 'LOG_HISTORY'
           : urlTab === 'departments'
             ? 'DEPARTMENTS'
-            : 'PERSONNEL';
+            : urlTab === 'certificates' || urlTab === 'certifications' || urlTab === 'certs'
+              ? 'CERTIFICATES'
+              : 'PERSONNEL';
 
   const [adminTab, setAdminTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (urlTab === 'certificates' || urlTab === 'certifications' || urlTab === 'certs') {
+      setAdminTab('CERTIFICATES');
+    } else if (urlTab === 'units' || urlTab === 'unit-management') {
+      setAdminTab('UNITS');
+    } else if (urlTab === 'logins' || urlTab === 'login-times' || urlTab === 'login-tracker') {
+      setAdminTab('LOGIN_TRACKER');
+    } else if (urlTab === 'logs' || urlTab === 'history' || urlTab === 'audit-logs') {
+      setAdminTab('LOG_HISTORY');
+    } else if (urlTab === 'departments') {
+      setAdminTab('DEPARTMENTS');
+    } else if (urlTab === 'personnel') {
+      setAdminTab('PERSONNEL');
+    }
+  }, [urlTab]);
   const [selectedLoginUser, setSelectedLoginUser] = useState(null);
 
   const handleTabChange = (newTab) => {
@@ -86,7 +106,9 @@ export const AdminUserManagement = () => {
             ? 'history'
             : newTab === 'DEPARTMENTS'
               ? 'departments'
-              : 'personnel';
+              : newTab === 'CERTIFICATES'
+                ? 'certificates'
+                : 'personnel';
     setSearchParams({ tab: tabParam }, { replace: true });
   };
 
@@ -812,6 +834,20 @@ export const AdminUserManagement = () => {
         </button>
 
         <button
+          onClick={() => handleTabChange('CERTIFICATES')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'CERTIFICATES'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+        >
+          <Award className="w-3.5 h-3.5 text-amber-500" />
+          <span>Certifications</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold border border-amber-200/50">
+            11
+          </span>
+        </button>
+
+        <button
           onClick={() => handleTabChange('UNITS')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'UNITS'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
@@ -827,7 +863,9 @@ export const AdminUserManagement = () => {
       </div>
 
       {/* Render Active View Based on Selected Admin Tab */}
-      {adminTab === 'UNITS' ? (
+      {adminTab === 'CERTIFICATES' ? (
+        <CertificateManagementPanel showToast={showToast} />
+      ) : adminTab === 'UNITS' ? (
         <UnitManagementPanel
           showToast={showToast}
           onMigrateSuccess={() => {

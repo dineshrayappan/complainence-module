@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
+  Award,
   LayoutDashboard,
   FileCheck,
   BarChart3,
@@ -123,6 +124,15 @@ export const SidebarNavigation = ({
                 badgeColor:
                   'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
               },
+              {
+                id: 'certificates',
+                path: `${basePath}/admin?tab=certificates`,
+                label: 'Certifications',
+                icon: Award,
+                badge: '11',
+                badgeColor:
+                  'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
+              },
             ]
           : []),
       ];
@@ -174,11 +184,18 @@ export const SidebarNavigation = ({
         currentPath.startsWith('/compliance/reports')
       );
     }
+    if (item.id === 'certificates') {
+      return (
+        (currentPath.startsWith(`${basePath}/admin`) || currentPath.startsWith('/compliance/admin')) &&
+        location.search.includes('tab=certificates')
+      );
+    }
     if (item.id === 'admin' || item.id === 'settings') {
       return (
-        currentPath.startsWith(`${basePath}/admin`) ||
-        currentPath.startsWith(`${basePath}/settings`) ||
-        currentPath.startsWith('/compliance/admin')
+        (currentPath.startsWith(`${basePath}/admin`) ||
+          currentPath.startsWith(`${basePath}/settings`) ||
+          currentPath.startsWith('/compliance/admin')) &&
+        !location.search.includes('tab=certificates')
       );
     }
     if (currentSection) {

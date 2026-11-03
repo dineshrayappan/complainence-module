@@ -176,5 +176,28 @@ export const publicComplaintService = {
   raisePublicComplaint: (formData) => api.post('/complaints/public-raise', formData),
 };
 
+export const certificateService = {
+  getCertificates: (params) => api.get('/certificates', { params }),
+  getCertificateById: (id) => api.get(`/certificates/${id}`),
+  createCertificate: (data) => {
+    if (data instanceof FormData) {
+      return api.post('/certificates', data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.post('/certificates', data);
+  },
+  updateCertificate: (id, data) => {
+    if (data instanceof FormData) {
+      return api.put(`/certificates/${id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    }
+    return api.put(`/certificates/${id}`, data);
+  },
+  deleteCertificate: (id) => api.delete(`/certificates/${id}`),
+  downloadCertificateUrl: (id) => `${api.defaults.baseURL || '/api'}/certificates/${id}/download`,
+};
+
 export default api;
 

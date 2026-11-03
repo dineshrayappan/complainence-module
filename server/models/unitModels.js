@@ -13,6 +13,7 @@ const User = require('./User');
 const AuditLog = require('./AuditLog');
 const Attendance = require('./Attendance');
 const Unit = require('./Unit');
+const Certificate = require('./Certificate');
 
 /**
  * Normalizes input unit identifier to 'unit1' or 'unit2'.
@@ -145,6 +146,10 @@ const getRootAttendanceModel = (targetConn = null) => {
   return getOrCreateUnitModel('Root_Attendance', Attendance.schema, 'attendances', targetConn);
 };
 
+const getCertificateModel = (targetConn = null) => {
+  return getOrCreateUnitModel('Certificate', Certificate.schema, 'certificates', targetConn);
+};
+
 module.exports = {
   companyContextStorage,
   normalizeUnit,
@@ -157,6 +162,7 @@ module.exports = {
   getUserModel,
   getAuditLogModel,
   getAttendanceModel,
+  getCertificateModel,
   getRootUserModel,
   getRootComplaintModel,
   getRootUnitModel,

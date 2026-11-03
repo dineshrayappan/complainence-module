@@ -18,6 +18,7 @@ const departmentRoutes = require('./routes/departmentRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const companyRoutes = require('./routes/companyRoutes');
+const certificateRoutes = require('./routes/certificateRoutes');
 const { identifyCompany } = require('./middleware/companyMiddleware');
 
 const app = express();
@@ -124,7 +125,7 @@ app.use('/api', async (req, res, next) => {
 
 // Company Workspace Isolation Middleware (runs request context inside AsyncLocalStorage)
 app.use('/api', identifyCompany);
-app.use(['/auth', '/users', '/complaints', '/tasks', '/departments', '/audit-logs', '/units', '/companies'], identifyCompany);
+app.use(['/auth', '/users', '/complaints', '/tasks', '/departments', '/audit-logs', '/units', '/companies', '/certificates'], identifyCompany);
 
 // API Overview & Documentation helper (useful for Postman testing & browser verification)
 const apiOverview = (req, res) => {
@@ -199,6 +200,8 @@ app.use('/api/audit-logs', auditLogRoutes);
 app.use('/audit-logs', auditLogRoutes);
 app.use('/api/units', unitRoutes);
 app.use('/units', unitRoutes);
+app.use('/api/certificates', certificateRoutes);
+app.use('/certificates', certificateRoutes);
 
 // Central Error Handler
 app.use((err, req, res, next) => {
