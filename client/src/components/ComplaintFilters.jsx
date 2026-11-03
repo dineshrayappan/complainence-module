@@ -19,9 +19,9 @@ export const ComplaintFilters = ({
   counts,
 }) => {
   const tabs = [
-    { id: 'all', label: 'All NC/CAP', count: counts?.total },
+    { id: 'all', label: 'All NC/CAPA', count: counts?.total },
     { id: 'open', label: 'Open', count: counts?.open ?? counts?.activeTickets },
-    { id: 'cap-submitted', label: 'CAP Submitted', count: counts?.capSubmitted },
+    { id: 'cap-submitted', label: 'CAPA Submitted', count: counts?.capSubmitted },
     { id: 'under-review', label: 'Under Review', count: counts?.underReview },
     { id: 'rejected-rework', label: 'Rejected / Rework', count: counts?.rejectedRework },
     { id: 'verified', label: 'Verified', count: counts?.verified },

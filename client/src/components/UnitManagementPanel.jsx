@@ -419,7 +419,7 @@ export const UnitManagementPanel = ({ showToast }) => {
               className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
               <option value="ALL">All Unassigned Records (NCs + Personnel)</option>
-              <option value="COMPLAINTS">NC &amp; CAP Records Only</option>
+              <option value="COMPLAINTS">NC &amp; CAPA Records Only</option>
               <option value="USERS">Personnel Accounts Only</option>
             </select>
           </div>

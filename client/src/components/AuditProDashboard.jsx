@@ -144,7 +144,7 @@ export const AuditProDashboard = ({
   }, [activeComplaints, dateRangePreset, searchQuery]);
 
   // ---------------------------------------------------------------------------
-  // 1. TOP 8 NC & CAP METRICS (100% Dynamic from live records)
+  // 1. TOP 8 NC & CAPA METRICS (100% Dynamic from live records)
   // ---------------------------------------------------------------------------
   const metrics = useMemo(() => {
     const totalNCs = filteredComplaints.length;
@@ -298,7 +298,7 @@ export const AuditProDashboard = ({
   }, [filteredComplaints]);
 
   // ---------------------------------------------------------------------------
-  // 5. DEPARTMENT NC & CAP MATRIX (100% Dynamic from live complaints)
+  // 5. DEPARTMENT NC & CAPA MATRIX (100% Dynamic from live complaints)
   // ---------------------------------------------------------------------------
   const departmentPerformanceList = useMemo(() => {
     const deptIcons = {
@@ -652,7 +652,7 @@ export const AuditProDashboard = ({
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              NC &amp; CAP Dashboard
+              NC &amp; CAPA Dashboard
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
               📍 {activeUnit ? activeUnit.name : 'Unit 1'}
@@ -788,7 +788,7 @@ export const AuditProDashboard = ({
             }`}
           >
             <ClipboardList className="w-3.5 h-3.5" />
-            <span>NC &amp; CAP Compliance Dashboard</span>
+            <span>NC &amp; CAPA Compliance Dashboard</span>
           </button>
 
           <button
@@ -839,7 +839,7 @@ export const AuditProDashboard = ({
       ) : (
         <>
           {/* -----------------------------------------------------------------------
-              ROW 1: 8 NC & CAP KPI METRIC CARDS
+              ROW 1: 8 NC & CAPA KPI METRIC CARDS
               ----------------------------------------------------------------------- */}
           <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 sm:gap-3">
         {/* CARD 1: Total NCs */}
@@ -1969,7 +1969,7 @@ export const AuditProDashboard = ({
                 }}
                 className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
-                Open Ticket in NC/CAP Register
+                Open Ticket in NC/CAPA Register
               </button>
               <button
                 type="button"

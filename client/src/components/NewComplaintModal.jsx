@@ -909,7 +909,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
-                    <span>CAP (Corrective & Preventive Action)</span>
+                    <span>CAPA (Corrective & Preventive Action)</span>
                   </label>
                   <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
                     <input
@@ -918,7 +918,7 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
                       onChange={(e) => setCapRequired(e.target.checked)}
                       className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
                     />
-                    <span>CAP Mandatory</span>
+                    <span>CAPA Mandatory</span>
                   </label>
                 </div>
 

@@ -31,7 +31,7 @@ export const SidebarNavigation = ({
         {
           id: 'nc-cap',
           path: `${basePath}/nc-cap`,
-          label: 'NC/CAP',
+          label: 'NC/CAPA',
           icon: FileCheck,
           badge:
             (counts.openNC || 0) + (counts.cap || 0) > 0
@@ -74,7 +74,7 @@ export const SidebarNavigation = ({
         {
           id: 'nc-cap',
           path: `${basePath}/nc-cap`,
-          label: 'NC/CAP',
+          label: 'NC/CAPA',
           icon: FileCheck,
           badge:
             (counts.openNC || 0) + (counts.cap || 0) > 0

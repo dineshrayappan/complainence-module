@@ -636,7 +636,7 @@ export const App = () => {
           {/* Reports Route */}
           <Route path="reports" element={<ReportsPage />} />
 
-          {/* NC / CAP Defect Register */}
+          {/* NC / CAPA Defect Register */}
           <Route path="nc-cap" element={<NcCapPage />} />
           <Route path="nc" element={<Navigate to="nc-cap" replace />} />
           <Route path="cap" element={<Navigate to="nc-cap?tab=cap-submitted" replace />} />

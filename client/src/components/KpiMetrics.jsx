@@ -20,7 +20,7 @@ export const KpiMetrics = ({ metrics, onSelectTab }) => {
       borderStyle: 'border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500',
     },
     {
-      title: 'CAP Submitted / Review',
+      title: 'CAPA Submitted / Review',
       value:
         (metrics?.capSubmitted !== undefined || metrics?.underReview !== undefined)
           ? (Number(metrics?.capSubmitted) || 0) + (Number(metrics?.underReview) || 0)

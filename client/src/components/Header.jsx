@@ -132,7 +132,7 @@ export const Header = ({
                   </span>
                 </div>
                 <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block truncate">
-                  Continuous Closed-Loop Quality Assurance &amp; NC/CAP System
+                  Continuous Closed-Loop Quality Assurance &amp; NC/CAPA System
                 </p>
               </div>
             </Link>

@@ -74,7 +74,7 @@ export const LoginPage = () => {
             Welcome back!
           </h1>
           <p className="text-xs sm:text-[13px] text-slate-500 mt-1 mb-6 leading-relaxed">
-            Sign in to access {companyName}&apos;s compliance &amp; NC/CAP tracking portal.
+            Sign in to access {companyName}&apos;s compliance &amp; NC/CAPA tracking portal.
           </p>
 
           {/* Error Alert */}

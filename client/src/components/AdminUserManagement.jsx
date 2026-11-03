@@ -1105,7 +1105,7 @@ export const AdminUserManagement = () => {
                 <Archive className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
                 <p>No archived or soft-deleted user accounts found.</p>
                 <p className="text-[11px] text-slate-500">
-                  When personnel accounts are removed, they will appear here with full NC/CAP record history preserved.
+                  When personnel accounts are removed, they will appear here with full NC/CAPA record history preserved.
                 </p>
               </div>
             ) : (
@@ -1114,7 +1114,7 @@ export const AdminUserManagement = () => {
                   <div className="flex items-center gap-2">
                     <Archive className="w-4 h-4 text-slate-500" />
                     <span>
-                      Showing <strong>{filteredArchivedUsers.length}</strong> archived account(s). All associated NC/CAP records, attachments, evidence photos, and audit logs are permanently preserved.
+                      Showing <strong>{filteredArchivedUsers.length}</strong> archived account(s). All associated NC/CAPA records, attachments, evidence photos, and audit logs are permanently preserved.
                     </span>
                   </div>
                 </div>
@@ -1204,7 +1204,7 @@ export const AdminUserManagement = () => {
                           <button
                             onClick={() => handleOpenNcHistory(u)}
                             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs"
-                            title="View all preserved NC/CAP records, attachments, and photos"
+                            title="View all preserved NC/CAPA records, attachments, and photos"
                           >
                             <FileText className="w-3.5 h-3.5" />
                             <span>View NC History</span>
@@ -2450,7 +2450,7 @@ export const AdminUserManagement = () => {
         </div>
       )}
 
-      {/* ================= MODAL 6: PRESERVED NC/CAP RECORD HISTORY ================= */}
+      {/* ================= MODAL 6: PRESERVED NC/CAPA RECORD HISTORY ================= */}
       {isNcHistoryModalOpen && ncHistoryUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs p-3 sm:p-5 overflow-y-auto">
           <div className="w-full max-w-4xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
@@ -2463,7 +2463,7 @@ export const AdminUserManagement = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
-                      Preserved NC / CAP Records History
+                      Preserved NC / CAPA Records History
                     </h2>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 font-mono">
                       {ncHistoryRecords.length} Records
@@ -2502,7 +2502,7 @@ export const AdminUserManagement = () => {
                 </div>
               ) : ncHistoryRecords.length === 0 ? (
                 <div className="p-12 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-slate-500 font-mono text-xs">
-                  No Non-Conformance or CAP records were logged by or assigned to this user.
+                  No Non-Conformance or CAPA records were logged by or assigned to this user.
                 </div>
               ) : (
                 ncHistoryRecords.map((rec) => (
@@ -2581,7 +2581,7 @@ export const AdminUserManagement = () => {
                       <div className="p-3 rounded-xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-800/50 text-xs space-y-1.5">
                         <div className="font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5 text-[11px]">
                           <CheckSquare className="w-3.5 h-3.5" />
-                          <span>Corrective & Preventive Action Plan (CAP)</span>
+                          <span>Corrective & Preventive Action Plan (CAPA)</span>
                         </div>
                         {rec.cap.rootCause && (
                           <div className="text-[11px]">
@@ -2654,7 +2654,7 @@ export const AdminUserManagement = () => {
             {/* Footer */}
             <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
               <span className="text-xs text-slate-500">
-                Preserved NC/CAP Records Archive • Read-Only Integrity Mode
+                Preserved NC/CAPA Records Archive • Read-Only Integrity Mode
               </span>
               <button
                 onClick={() => setIsNcHistoryModalOpen(false)}

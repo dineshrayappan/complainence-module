@@ -103,11 +103,11 @@ export const ComplaintCard = ({
             </span>
             {complaint.capRequired && (
               <span
-                title="Structured Corrective & Preventive Action (CAP) Required"
+                title="Structured Corrective & Preventive Action (CAPA) Required"
                 className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/80 dark:text-cyan-300 dark:border-indigo-800 flex items-center gap-1"
               >
                 <Layers className="w-2.5 h-2.5 text-indigo-600 dark:text-cyan-400" />
-                CAP
+                CAPA
               </span>
             )}
           </div>

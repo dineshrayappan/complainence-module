@@ -52,7 +52,7 @@ import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 import { useUnit } from '../context/UnitContext';
 import { drawNCWithPhotos, generateSingleNCPdf } from '../utils/ncPdfGenerator';
-// Pure NC/CAP Report - no external mock collections
+// Pure NC/CAPA Report - no external mock collections
 
 export const ReportsView = ({
   complaints = [],
@@ -340,9 +340,9 @@ export const ReportsView = ({
   };
 
   // ---------------------------------------------------------------------------
-  // LIVE NC / CAP MASTER DATASETS (Extracted Strictly from Complaints Dataset)
+  // LIVE NC / CAPA MASTER DATASETS (Extracted Strictly from Complaints Dataset)
   // ---------------------------------------------------------------------------
-  // 1. Departments extracted strictly from actual NC / CAP complaints
+  // 1. Departments extracted strictly from actual NC / CAPA complaints
   const consolidatedDepartmentsList = useMemo(() => {
     const deptMap = new Map();
 
@@ -365,7 +365,7 @@ export const ReportsView = ({
     );
   }, [complaints]);
 
-  // 2. Members/Resolvers extracted strictly from actual NC / CAP complaints
+  // 2. Members/Resolvers extracted strictly from actual NC / CAPA complaints
   const consolidatedMembersList = useMemo(() => {
     const memberMap = new Map();
 
@@ -1018,13 +1018,13 @@ export const ReportsView = ({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(15);
 
-      let reportTitle = 'Master Non-Conformance & CAP Audit Register';
+      let reportTitle = 'Master Non-Conformance & CAPA Audit Register';
       if (activeReportTab === 'dept-report') {
         reportTitle = selectedDeptDetail
           ? `Department Audit Report: ${selectedDeptDetail}`
-          : 'Department-wise Non-Conformance & CAP Matrix';
+          : 'Department-wise Non-Conformance & CAPA Matrix';
       } else if (activeReportTab === 'members-report') {
-        reportTitle = 'Department Members NC & CAP Accountability Report';
+        reportTitle = 'Department Members NC & CAPA Accountability Report';
       } else if (activeReportTab === 'member-detail') {
         reportTitle = `Member NC Audit Dossier: ${activeMember ? activeMember.name : 'Individual Member'}`;
       }
@@ -1637,7 +1637,7 @@ export const ReportsView = ({
               <BarChart3 className="w-5 h-5" />
             </span>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
-              Compliance Audit &amp; CAP Analytical Reports
+              Compliance Audit &amp; CAPA Analytical Reports
             </h1>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
@@ -2512,7 +2512,7 @@ export const ReportsView = ({
                               <th className="py-2.5 px-3">Finding Description</th>
                               <th className="py-2.5 px-3">Assigned Resolver</th>
                               <th className="py-2.5 px-3">5-Why Root Cause</th>
-                              <th className="py-2.5 px-3">Corrective Action (CAP)</th>
+                              <th className="py-2.5 px-3">Corrective Action (CAPA)</th>
                               <th className="py-2.5 px-3">Target Due</th>
                               <th className="py-2.5 px-3 text-center">Status</th>
                               <th className="py-2.5 px-3 text-center">Risk</th>
@@ -2653,7 +2653,7 @@ export const ReportsView = ({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-                  <span className="text-[10px] font-semibold text-slate-400 block">Plant CAP Adherence</span>
+                  <span className="text-[10px] font-semibold text-slate-400 block">Plant CAPA Adherence</span>
                   <div className="text-base font-black text-indigo-600 dark:text-cyan-400 font-mono">
                     {overallCapRate}%
                   </div>
@@ -2665,7 +2665,7 @@ export const ReportsView = ({
                 <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-indigo-500" />
-                    <span>Department-wise Quality &amp; CAP Performance Matrix</span>
+                    <span>Department-wise Quality &amp; CAPA Performance Matrix</span>
                   </h3>
                   <span className="text-xs text-slate-400 font-mono">
                     {departmentStatsList.length} Operating Departments
@@ -2684,7 +2684,7 @@ export const ReportsView = ({
                         <th className="py-2.5 px-3 text-center">Review</th>
                         <th className="py-2.5 px-3 text-center">Closed</th>
                         <th className="py-2.5 px-3 text-center">Overdue</th>
-                        <th className="py-2.5 px-3 text-center w-36">CAP Adherence</th>
+                        <th className="py-2.5 px-3 text-center w-36">CAPA Adherence</th>
                         <th className="py-2.5 px-3 text-center">Status</th>
                         <th className="py-2.5 px-3 text-center">Members</th>
                         <th className="py-2.5 px-3 text-center">Actions</th>
@@ -2821,7 +2821,7 @@ export const ReportsView = ({
                   </span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Individual resolver accountability, open non-conformances, and CAP adherence rates.
+                  Individual resolver accountability, open non-conformances, and CAPA adherence rates.
                 </p>
               </div>
 
@@ -2874,7 +2874,7 @@ export const ReportsView = ({
                         <th className="py-2.5 px-3 text-center">Review</th>
                         <th className="py-2.5 px-3 text-center">Closed</th>
                         <th className="py-2.5 px-3 text-center">Overdue</th>
-                        <th className="py-2.5 px-3 text-center w-36">CAP Adherence</th>
+                        <th className="py-2.5 px-3 text-center w-36">CAPA Adherence</th>
                         <th className="py-2.5 px-3">Contact</th>
                         <th className="py-2.5 px-3 text-center">Action</th>
                       </tr>
@@ -3070,7 +3070,7 @@ export const ReportsView = ({
                       <th className="py-2.5 px-3">Finding Description</th>
                       <th className="py-2.5 px-3">Immediate Containment</th>
                       <th className="py-2.5 px-3">5-Why Root Cause</th>
-                      <th className="py-2.5 px-3">Corrective Action (CAP)</th>
+                      <th className="py-2.5 px-3">Corrective Action (CAPA)</th>
                       <th className="py-2.5 px-3">Target Due</th>
                       <th className="py-2.5 px-3 text-center">Status</th>
                       <th className="py-2.5 px-3 text-center">Risk</th>
@@ -3415,7 +3415,7 @@ export const ReportsView = ({
             {/* Stage 3: Root Cause & CAP Directives */}
             <div className="p-4 rounded-2xl bg-amber-50/40 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-2.5">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 block">
-                Stage 3: 5-Why Root Cause &amp; CAP Corrective Actions
+                Stage 3: 5-Why Root Cause &amp; CAPA Corrective Actions
               </span>
               <div className="text-xs">
                 <strong className="text-amber-900 dark:text-amber-300 block mb-0.5">
@@ -3540,7 +3540,7 @@ export const ReportsView = ({
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
-                  <span>View in NC/CAP Register</span>
+                  <span>View in NC/CAPA Register</span>
                 </button>
               ) : <div />}
 

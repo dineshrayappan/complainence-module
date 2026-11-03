@@ -218,7 +218,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                  CAP Resolution Management
+                  CAPA Resolution Management
                 </h2>
                 <span className="font-mono text-xs font-bold text-indigo-700 dark:text-cyan-300 bg-indigo-50 dark:bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
                   {complaint.complaintId}
@@ -295,7 +295,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
           {/* CAP Visual Hierarchy Diagram */}
           <div className="p-3 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
             <span className="font-mono font-bold text-indigo-700 dark:text-cyan-400 text-xs block">
-              CAP Hierarchy: NC ──► Immediate Correction ──► Root Cause ──► Corrective Action ──► Preventive Action ──► Evidence ──► Verification
+              CAPA Hierarchy: NC ──► Immediate Correction ──► Root Cause ──► Corrective Action ──► Preventive Action ──► Evidence ──► Verification
             </span>
             <p className="text-slate-500 dark:text-slate-400 leading-snug">
               ISO 9001 / IATF 16949 compliant structure ensuring non-conformances are contained immediately, root causes eradicated, and recurrences prevented across the plant.
@@ -561,7 +561,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Provide instructions or pass-criteria for the auditor to verify the effectiveness of this CAP.
+                Provide instructions or pass-criteria for the auditor to verify the effectiveness of this CAPA.
               </p>
               <textarea
                 rows="2"
@@ -580,11 +580,11 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
               <span className="font-bold text-slate-800 dark:text-slate-200">
                 Audit Verification Gateway:
               </span>{' '}
-              Submitting this 8-point CAP shifts ticket status to{' '}
+              Submitting this 8-point CAPA shifts ticket status to{' '}
               <span className="text-amber-700 dark:text-amber-300 font-mono font-bold">
                 Under Verification
               </span>
-              . Only an authorized Internal Auditor can verify each CAP node and formally close this NC.
+              . Only an authorized Internal Auditor can verify each CAPA node and formally close this NC.
             </div>
           </div>
 
@@ -603,7 +603,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
               className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-md shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{submitting ? 'Submitting CAP...' : 'Submit Full CAP for Audit Verification'}</span>
+              <span>{submitting ? 'Submitting CAPA...' : 'Submit Full CAPA for Audit Verification'}</span>
             </button>
           </div>
         </form>

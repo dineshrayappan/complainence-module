@@ -283,7 +283,7 @@ export const DepartmentComplianceDashboard = ({
               <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Real-time audit performance, open NC backlogs, SLA overdue breaches, and CAP implementation rate across all 7 manufacturing plant divisions.
+              Real-time audit performance, open NC backlogs, SLA overdue breaches, and CAPA implementation rate across all 7 manufacturing plant divisions.
             </p>
           </div>
 
@@ -381,7 +381,7 @@ export const DepartmentComplianceDashboard = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  {topDepartment.openNC ?? 0} Open • {topDepartment.overdueNC ?? 0} Overdue • {topDepartment.capPercent ?? 0}% CAP
+                  {topDepartment.openNC ?? 0} Open • {topDepartment.overdueNC ?? 0} Overdue • {topDepartment.capPercent ?? 0}% CAPA
                 </p>
               </>
             ) : (
@@ -546,8 +546,8 @@ export const DepartmentComplianceDashboard = ({
                 <th className="py-3.5 px-3 font-bold text-center">Critical NC</th>
                 <th className="py-3.5 px-3 font-bold text-center">Overdue</th>
                 <th className="py-3.5 px-3 font-bold text-center">Rework</th>
-                <th className="py-3.5 px-3 font-bold text-center">Overdue CAP</th>
-                <th className="py-3.5 px-4 font-bold">CAP %</th>
+                <th className="py-3.5 px-3 font-bold text-center">Overdue CAPA</th>
+                <th className="py-3.5 px-4 font-bold">CAPA %</th>
                 <th className="py-3.5 px-4 font-bold text-right">Drill-Down</th>
               </tr>
             </thead>

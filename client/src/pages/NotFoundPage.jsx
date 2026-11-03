@@ -54,7 +54,7 @@ export const NotFoundPage = () => {
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-cyan-400 hover:underline"
             >
               <FileCheck className="w-3.5 h-3.5" />
-              <span>Access NC/CAP Defect Register →</span>
+              <span>Access NC/CAPA Defect Register →</span>
             </Link>
           </div>
         </div>

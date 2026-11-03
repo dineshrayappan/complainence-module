@@ -128,7 +128,7 @@ export const NcCapPage = () => {
     const cleanSearch = searchTerm.trim().toLowerCase();
 
     return complaints.filter((c) => {
-      // 0. Exclude archived / soft-deleted records from active NC/CAP workflow page
+      // 0. Exclude archived / soft-deleted records from active NC/CAPA workflow page
       if (c.isDeleted) return false;
 
       // Strict Personal Assignment Isolation for Supervisor
@@ -225,14 +225,14 @@ export const NcCapPage = () => {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-black text-white text-sm tracking-tight">
-                NC / CAP Integrated Management
+                NC / CAPA Integrated Management
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                 Closed-Loop Defect &amp; Rework Tracking
               </span>
             </div>
             <p className="text-[11px] text-slate-300 mt-0.5">
-              Non-Conformance (NC) Logging • Root Cause Analysis • Corrective &amp; Preventive Action (CAP) • Floor Verification
+              Non-Conformance (NC) Logging • Root Cause Analysis • Corrective &amp; Preventive Action (CAPA) • Floor Verification
             </p>
           </div>
         </div>
