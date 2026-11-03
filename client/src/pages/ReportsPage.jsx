@@ -9,6 +9,7 @@ export const ReportsPage = () => {
   const { complaints = [], handleOpenDetailModal } = useAppContext();
 
   const initialTab = searchParams.get('tab') || 'audit-register';
+  const initialCategory = searchParams.get('category') || null;
 
   const handleNavigateNC = (targetTab, filterVal) => {
     const params = new URLSearchParams();
@@ -21,6 +22,7 @@ export const ReportsPage = () => {
     <ReportsView
       complaints={complaints}
       initialTab={initialTab}
+      initialCategory={initialCategory}
       onViewDetails={handleOpenDetailModal}
       onNavigateNC={handleNavigateNC}
     />

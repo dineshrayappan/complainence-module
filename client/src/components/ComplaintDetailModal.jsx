@@ -501,8 +501,8 @@ export const ComplaintDetailModal = ({
             </div>
           </div>
 
-          {/* Section 2: NC Audit Governance & CAP Status */}
-          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs shadow-2xs">
+          {/* Section 2: NC Audit Governance & CAPA Status */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs shadow-2xs">
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block">
                 Department &amp; Location
@@ -513,12 +513,20 @@ export const ComplaintDetailModal = ({
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block">
-                CAP Status
+                Defect Category
+              </span>
+              <span className="font-extrabold text-indigo-600 dark:text-cyan-400 truncate block mt-0.5">
+                {complaint.defectCategory || complaint.category || 'Workplace Safety'}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider block">
+                CAPA Status
               </span>
               <span className={`inline-flex items-center gap-1 font-bold mt-0.5 ${
                 complaint.capRequired ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'
               }`}>
-                {complaint.capRequired ? 'Mandatory CAP (Root Cause Required)' : 'Direct Rectification'}
+                {complaint.capRequired ? 'Mandatory CAPA (Root Cause Required)' : 'Direct Rectification'}
               </span>
             </div>
           </div>

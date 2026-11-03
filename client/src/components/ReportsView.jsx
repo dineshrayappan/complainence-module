@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { DEFECT_CATEGORIES } from './NewComplaintModal';
 import {
   BarChart3,
   Download,
@@ -46,6 +47,7 @@ import {
   BadgeCheck,
   Shield,
   HelpCircle,
+  Tag,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -60,6 +62,7 @@ export const ReportsView = ({
   onViewDetails = null,
   onNavigateNC = null,
   initialTab = 'audit-register',
+  initialCategory = null,
 }) => {
   const { user } = useAuth();
   const { units, activeUnitId, isCompanyAdmin, canSwitchUnits } = useUnit();
@@ -71,10 +74,12 @@ export const ReportsView = ({
   // ---------------------------------------------------------------------------
   // 'audit-register': Master NC Report (KPI Scorecard, Filter Bar, Charts, Table)
   // 'dept-report': Department-wise NC Report (Total NCs, Open/Closed/Pending, CAP Status, Drilldown)
+  // 'category-report': Defect Category-wise Report (Summary Scorecards, Category Matrix, Category Defect Register)
   // 'members-report': Department Members Report (Roster, Assigned NCs, Open/Closed/Pending, CAP Status)
   // 'member-detail': Individual Member NC Details (NC ID, Finding, Requirement, CAP 5-Why, Photos, Verification)
   const [activeReportTab, setActiveReportTab] = useState(initialTab || 'audit-register');
   const [selectedDeptDetail, setSelectedDeptDetail] = useState(null);
+  const [selectedCategoryDetail, setSelectedCategoryDetail] = useState(initialCategory || null);
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [lightboxPhoto, setLightboxPhoto] = useState(null);
@@ -82,7 +87,11 @@ export const ReportsView = ({
     if (initialTab) {
       setActiveReportTab(initialTab);
     }
-  }, [initialTab]);
+    if (initialCategory) {
+      setSelectedCategoryDetail(initialCategory);
+      setActiveReportTab('category-report');
+    }
+  }, [initialTab, initialCategory]);
 
   // ---------------------------------------------------------------------------
   // FILTER STATES (Fulfilling all user requirements + dropdown filters)
@@ -97,6 +106,9 @@ export const ReportsView = ({
 
   // 3. Department Wise Filter
   const [departmentFilter, setDepartmentFilter] = useState('ALL');
+
+  // 3.5 Defect Category Filter
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
 
   // 4. Individual Member Filter
   const [memberFilter, setMemberFilter] = useState('ALL');
@@ -220,6 +232,30 @@ export const ReportsView = ({
       'Pending'
     );
   };
+
+  const getDefectCategory = (c) => {
+    return (c?.defectCategory || c?.category || 'Workplace Safety').trim();
+  };
+
+  const allDefectCategories = useMemo(() => {
+    const list = [...DEFECT_CATEGORIES];
+    (complaints || []).forEach((c) => {
+      const cat = (c?.defectCategory || c?.category || '').trim();
+      if (cat && !list.includes(cat)) {
+        list.push(cat);
+      }
+    });
+    return list;
+  }, [complaints]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    (complaints || []).forEach((c) => {
+      const cat = getDefectCategory(c);
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [complaints]);
 
   const getAssignedToName = (c) => {
     if (c.assignedTo?.name && c.assignedTo.name !== 'Unassigned') {
@@ -556,6 +592,11 @@ export const ReportsView = ({
         if (!isDeptMatch(c.department, departmentFilter)) return false;
       }
 
+      // 3.5 Defect Category Filter
+      if (categoryFilter !== 'ALL') {
+        if (norm(getDefectCategory(c)) !== norm(categoryFilter)) return false;
+      }
+
       // 4. Individual Member Filter
       if (memberFilter !== 'ALL') {
         const targetMem = consolidatedMembersList.find((m) => m.id === memberFilter);
@@ -722,6 +763,7 @@ export const ReportsView = ({
     if (searchTerm.trim()) count++;
     if (datePreset !== 'ALL' || startDate || endDate) count++;
     if (departmentFilter !== 'ALL') count++;
+    if (categoryFilter !== 'ALL') count++;
     if (memberFilter !== 'ALL') count++;
     if (statusFilter !== 'ALL') count++;
     if (riskFilter !== 'ALL') count++;
@@ -759,6 +801,8 @@ export const ReportsView = ({
     setStartDate('');
     setEndDate('');
     setDepartmentFilter('ALL');
+    setCategoryFilter('ALL');
+    setSelectedCategoryDetail(null);
     setMemberFilter('ALL');
     setStatusFilter('ALL');
     setRiskFilter('ALL');
@@ -1023,6 +1067,83 @@ export const ReportsView = ({
         reportTitle = selectedDeptDetail
           ? `Department Audit Report: ${selectedDeptDetail}`
           : 'Department-wise Non-Conformance & CAPA Matrix';
+      } else if (activeReportTab === 'category-report') {
+        reportTitle = selectedCategoryDetail
+          ? `Defect Category Audit Report: ${selectedCategoryDetail}`
+          : 'Category-wise Defect & CAPA Performance Register';
+      } else if (activeReportTab === 'category-report') {
+        if (selectedCategoryDetail) {
+          const safeName = selectedCategoryDetail.replace(/[^a-zA-Z0-9]/g, '_');
+          filename = `Garment_QMS_Category_${safeName}_NC_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+          const currentCat = categoryStatsList.find((cat) => norm(cat.category) === norm(selectedCategoryDetail));
+          const catComplaints = currentCat ? currentCat.complaints : [];
+          headers = [
+            'Non-Conformance ID',
+            'Defect Category',
+            'Department',
+            'Plant Unit',
+            'Risk Severity',
+            'Lifecycle Status',
+            'Finding Description',
+            'Assigned Resolver',
+            'Logged Date',
+            'Target Due Date',
+            'Immediate Correction',
+            'Root Cause',
+            'Corrective Action (CAPA)',
+            'Preventive Action',
+            'Closed Date',
+          ];
+          rows = catComplaints.map((c) => [
+            `"${c.complaintId || ''}"`,
+            `"${getDefectCategory(c)}"`,
+            `"${c.department || ''}"`,
+            `"${c.unitName || (c.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}"`,
+            `"${(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}"`,
+            `"${c.status || ''}"`,
+            `"${(getFindingText(c) || '').replace(/"/g, '""')}"`,
+            `"${getAssignedToName(c)}"`,
+            `"${c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''}"`,
+            `"${c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : ''}"`,
+            `"${(getImmediateCorrectionText(c) || '').replace(/"/g, '""')}"`,
+            `"${(getRootCauseText(c) || '').replace(/"/g, '""')}"`,
+            `"${(getCorrectiveActionText(c) || '').replace(/"/g, '""')}"`,
+            `"${(getPreventiveActionText(c) || '').replace(/"/g, '""')}"`,
+            `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : ''}"`,
+          ]);
+        } else {
+          filename = `Garment_QMS_Defect_Category_Summary_${new Date().toISOString().slice(0, 10)}.csv`;
+          headers = [
+            'Defect Category',
+            'Total NCs Raised',
+            'Critical Risk NCs',
+            'Major Risk NCs',
+            'Minor Risk NCs',
+            'Observation NCs',
+            'Open NCs',
+            'CAPA Under Review',
+            'Verified & Closed NCs',
+            'Overdue SLA Breaches',
+            'Resolution Rate (%)',
+            'Affected Departments',
+            'Status Label',
+          ];
+          rows = categoryStatsList.map((cat) => [
+            `"${cat.category}"`,
+            `"${cat.totalNC}"`,
+            `"${cat.criticalNC}"`,
+            `"${cat.majorNC}"`,
+            `"${cat.minorNC}"`,
+            `"${cat.observationNC}"`,
+            `"${cat.openNC}"`,
+            `"${cat.pendingNC}"`,
+            `"${cat.closedNC}"`,
+            `"${cat.overdueNC}"`,
+            `"${cat.capRate}%"`,
+            `"${cat.departmentsSummary || ''}"`,
+            `"${cat.statusLabel}"`,
+          ]);
+        }
       } else if (activeReportTab === 'members-report') {
         reportTitle = 'Department Members NC & CAPA Accountability Report';
       } else if (activeReportTab === 'member-detail') {
@@ -1042,6 +1163,7 @@ export const ReportsView = ({
       // Active filters summary
       const filterNotes = [];
       if (departmentFilter !== 'ALL') filterNotes.push(`Dept: ${departmentFilter}`);
+      if (categoryFilter !== 'ALL') filterNotes.push(`Category: ${categoryFilter}`);
       if (memberFilter !== 'ALL') filterNotes.push(`Member: ${activeMember?.name || memberFilter}`);
       if (statusFilter !== 'ALL') filterNotes.push(`Status: ${statusFilter}`);
       if (riskFilter !== 'ALL') filterNotes.push(`Risk: ${riskFilter}`);
@@ -1155,6 +1277,117 @@ export const ReportsView = ({
         }
 
         doc.save(`Garment_QMS_Department_NC_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+      }
+      // -----------------------------------------------------------------------
+      // TAB: DEFECT CATEGORY WISE REPORT PDF
+      // -----------------------------------------------------------------------
+      else if (activeReportTab === 'category-report') {
+        const catRows = categoryStatsList.map((cat, idx) => [
+          idx + 1,
+          cat.category,
+          cat.totalNC,
+          cat.criticalNC,
+          cat.openNC,
+          cat.pendingNC,
+          cat.closedNC,
+          cat.overdueNC,
+          `${cat.capRate}%`,
+          cat.statusLabel,
+          cat.departmentsSummary || '—',
+        ]);
+
+        autoTable(doc, {
+          startY,
+          head: [[
+            '#',
+            'Defect Category',
+            'Total',
+            'Critical',
+            'Open',
+            'Pending',
+            'Closed',
+            'Overdue',
+            'CAPA Rate',
+            'Status',
+            'Affected Departments',
+          ]],
+          body: catRows,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [217, 119, 6],
+            textColor: [255, 255, 255],
+            fontSize: 7.5,
+            fontStyle: 'bold',
+          },
+          styles: {
+            fontSize: 7,
+            cellPadding: 3.5,
+          },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 15 },
+            1: { fontStyle: 'bold', cellWidth: 85 },
+            2: { halign: 'center', fontStyle: 'bold' },
+            3: { halign: 'center', textColor: [225, 29, 72], fontStyle: 'bold' },
+            4: { halign: 'center', textColor: [217, 119, 6] },
+            5: { halign: 'center', textColor: [124, 58, 237] },
+            6: { halign: 'center', textColor: [16, 185, 129] },
+            7: { halign: 'center', textColor: [225, 29, 72] },
+            8: { halign: 'center', fontStyle: 'bold' },
+            9: { halign: 'center' },
+            10: { cellWidth: 90 },
+          },
+        });
+
+        const targetCat = selectedCategoryDetail || (categoryFilter !== 'ALL' ? categoryFilter : null);
+        const catObj = targetCat ? categoryStatsList.find((c) => norm(c.category) === norm(targetCat)) : null;
+        const ncListToDraw = catObj ? catObj.complaints : (datasetToExport.length > 0 ? datasetToExport : []);
+
+        if (ncListToDraw.length > 0) {
+          const nextY = doc.lastAutoTable.finalY + 16;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10.5);
+          doc.setTextColor(...brandDark);
+          doc.text(`Non-Conformance Register for Category: ${targetCat || 'All Defect Categories'}`, margin, nextY);
+
+          const ncRows = ncListToDraw.map((c) => [
+            c.complaintId || 'NC-N/A',
+            getDefectCategory(c).slice(0, 25),
+            c.department || '—',
+            getFindingText(c).slice(0, 45),
+            getAssignedToName(c),
+            (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase(),
+            c.status,
+            c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A',
+            c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A',
+          ]);
+
+          autoTable(doc, {
+            startY: nextY + 6,
+            head: [['NC ID', 'Category', 'Dept', 'Finding Description', 'Assigned', 'Risk', 'Status', 'Logged', 'Target']],
+            body: ncRows,
+            theme: 'striped',
+            headStyles: { fillColor: [15, 23, 42], fontSize: 7 },
+            styles: { fontSize: 6.5, cellPadding: 2.5 },
+          });
+
+          // Photographic evidence for category NCs
+          doc.addPage();
+          let catPhotoY = margin + 15;
+          doc.setFillColor(...brandPrimary);
+          doc.roundedRect(margin, catPhotoY, contentWidth, 24, 4, 4, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.setTextColor(255, 255, 255);
+          doc.text(`Photographic Defect & Corrective Verification Evidence (${targetCat || 'Category'})`, margin + 10, catPhotoY + 16);
+          catPhotoY += 34;
+
+          for (let idx = 0; idx < ncListToDraw.length; idx++) {
+            const c = ncListToDraw[idx];
+            catPhotoY = await drawNCWithPhotos(doc, c, catPhotoY, pageWidth, margin, contentWidth, idx);
+          }
+        }
+
+        doc.save(`Garment_QMS_Defect_Category_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
       }
       // -----------------------------------------------------------------------
       // TAB 3: DEPARTMENT MEMBERS REPORT PDF
@@ -1686,6 +1919,8 @@ export const ReportsView = ({
             <span>
               {downloadingPDF
                 ? 'Compiling PDF...'
+                : activeReportTab === 'category-report'
+                ? `Export Category PDF (${selectedCategoryDetail ? (categoryStatsList.find((c) => norm(c.category) === norm(selectedCategoryDetail))?.complaints.length || 0) : categoryStatsList.length})`
                 : activeReportTab === 'dept-report'
                 ? `Export Dept PDF (${departmentStatsList.length})`
                 : activeReportTab === 'members-report'
@@ -1708,6 +1943,8 @@ export const ReportsView = ({
             <span>
               {downloadingCSV
                 ? 'Exporting CSV...'
+                : activeReportTab === 'category-report'
+                ? 'Export Category CSV'
                 : activeReportTab === 'dept-report'
                 ? 'Export Dept CSV'
                 : activeReportTab === 'members-report'
@@ -1848,6 +2085,25 @@ export const ReportsView = ({
             <option value="ALL">Record Status: All Records ({complaints.length})</option>
             <option value="ACTIVE">Record Status: Active NC ({activeCount})</option>
             <option value="DELETED">Record Status: Deleted NC ({deletedCount})</option>
+          </select>
+
+          {/* Defect Category Filter */}
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
+              categoryFilter !== 'ALL'
+                ? 'bg-amber-50/70 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200 font-bold'
+                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+            }`}
+            title="Filter by Defect Category"
+          >
+            <option value="ALL">All Categories ({allDefectCategories.length})</option>
+            {allDefectCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat} ({categoryCounts[cat] || 0} NCs)
+              </option>
+            ))}
           </select>
 
           {/* Department Filter */}
@@ -2312,6 +2568,10 @@ export const ReportsView = ({
                             <div className="text-[10px] text-slate-400 font-mono">
                               {c.location || '—'}
                             </div>
+                            <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 mt-1">
+                              <Tag className="w-2.5 h-2.5 text-amber-500" />
+                              <span>{getDefectCategory(c)}</span>
+                            </span>
                           </td>
 
                           {/* 5. Defect Finding */}
@@ -3231,6 +3491,487 @@ export const ReportsView = ({
               <span className="font-mono text-[11px]">{activeMemberComplaints.length} Records Assigned</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* =======================================================================
+          VIEW 5: DEFECT CATEGORY WISE REPORT (Matrix & Drilldown)
+          ======================================================================= */}
+      {activeReportTab === 'category-report' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Breadcrumb if a specific category is inspected */}
+          {selectedCategoryDetail ? (
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategoryDetail(null)}
+                    className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>All Defect Categories</span>
+                  </button>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-amber-500" />
+                      <span>{selectedCategoryDetail} Detailed Defect Register</span>
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      All non-conformances, 5-Why root causes, affected departments, and CAPA corrective records logged under this category.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onNavigateNC) {
+                        onNavigateNC('all', selectedCategoryDetail);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold text-xs hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open in NC/CAPA Register</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Specific Non-Conformance Table */}
+              {(() => {
+                const currentCat = categoryStatsList.find(
+                  (c) => norm(c.category) === norm(selectedCategoryDetail)
+                );
+                const catComplaints = currentCat ? currentCat.complaints : [];
+
+                return (
+                  <div className="space-y-3">
+                    {/* Category Stat Summary Chips */}
+                    {currentCat && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">Total Defect NCs</span>
+                          <div className="text-lg font-black text-slate-900 dark:text-white font-mono mt-0.5">{currentCat.totalNC}</div>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-rose-500 block uppercase tracking-wider">Critical Risk</span>
+                          <div className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono mt-0.5">{currentCat.criticalNC}</div>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-amber-500 block uppercase tracking-wider">Active Open</span>
+                          <div className="text-lg font-black text-amber-600 dark:text-amber-400 font-mono mt-0.5">{currentCat.openNC}</div>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-purple-500 block uppercase tracking-wider">In Review</span>
+                          <div className="text-lg font-black text-purple-600 dark:text-purple-400 font-mono mt-0.5">{currentCat.pendingNC}</div>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-emerald-500 block uppercase tracking-wider">Verified / Closed</span>
+                          <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">{currentCat.closedNC}</div>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-rose-500 block uppercase tracking-wider">Overdue Breaches</span>
+                          <div className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono mt-0.5">{currentCat.overdueNC}</div>
+                        </div>
+                        <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                          <span className="text-[10px] font-semibold text-indigo-500 block uppercase tracking-wider">Resolution Rate</span>
+                          <div className="text-lg font-black text-indigo-600 dark:text-cyan-400 font-mono mt-0.5">{currentCat.capRate}%</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Affected Departments Chips */}
+                    {currentCat && currentCat.departments.length > 0 && (
+                      <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Affected Departments:</span>
+                        </span>
+                        {currentCat.departments.map((d) => (
+                          <span
+                            key={d.name}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                          >
+                            <span>{d.name}</span>
+                            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-amber-500 text-white">
+                              {d.count}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+                      <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <Tag className="w-4 h-4 text-amber-500" />
+                          <span>{selectedCategoryDetail} Non-Conformance Records</span>
+                          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                            {catComplaints.length} Records
+                          </span>
+                        </h3>
+                        <span className="text-xs text-slate-400 font-mono">
+                          CAPA Completion Rate: {currentCat ? currentCat.capRate : 0}%
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        {catComplaints.length === 0 ? (
+                          <div className="p-12 text-center text-slate-500 text-xs">
+                            No non-conformance records found for this defect category.
+                          </div>
+                        ) : (
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                <th className="py-2.5 px-3 text-center w-10">#</th>
+                                <th className="py-2.5 px-3">NC ID</th>
+                                <th className="py-2.5 px-3">Date Logged</th>
+                                <th className="py-2.5 px-3">Plant Unit</th>
+                                <th className="py-2.5 px-3">Department &amp; Line</th>
+                                <th className="py-2.5 px-3">Finding Description</th>
+                                <th className="py-2.5 px-3">Assigned Resolver</th>
+                                <th className="py-2.5 px-3">5-Why Root Cause</th>
+                                <th className="py-2.5 px-3">Corrective Action (CAPA)</th>
+                                <th className="py-2.5 px-3">Target Due</th>
+                                <th className="py-2.5 px-3 text-center">Status</th>
+                                <th className="py-2.5 px-3 text-center">Risk</th>
+                                <th className="py-2.5 px-3 text-center">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                              {catComplaints.map((c, idx) => {
+                                const isOverdue =
+                                  c.status !== 'Closed' &&
+                                  c.status !== 'Verified' &&
+                                  c.deadlineTimestamp &&
+                                  Date.now() > new Date(c.deadlineTimestamp).getTime();
+
+                                return (
+                                  <tr
+                                    key={c._id || c.id || c.complaintId || idx}
+                                    className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group"
+                                  >
+                                    <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
+                                      {idx + 1}
+                                    </td>
+                                    <td className="py-3 px-3 align-top whitespace-nowrap">
+                                      <span className="font-mono font-bold text-indigo-600 dark:text-cyan-400 block">
+                                        {c.complaintId || 'NC-N/A'}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 align-top whitespace-nowrap text-slate-600 dark:text-slate-400">
+                                      {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}
+                                    </td>
+                                    <td className="py-3 px-3 align-top whitespace-nowrap">
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                        {c.unitName || (c.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 align-top whitespace-nowrap">
+                                      <div className="font-semibold text-slate-900 dark:text-white">
+                                        {c.department || '—'}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        {c.location || '—'}
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-3 align-top max-w-xs">
+                                      <p className="text-slate-800 dark:text-slate-200 line-clamp-2 leading-snug">
+                                        {getFindingText(c)}
+                                      </p>
+                                    </td>
+                                    <td className="py-3 px-3 align-top whitespace-nowrap">
+                                      <div className="font-bold text-slate-900 dark:text-white">
+                                        {getAssignedToName(c)}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400">
+                                        {c.assignedTo?.designation || '—'}
+                                      </div>
+                                    </td>
+                                    <td className="py-3 px-3 align-top max-w-xs text-slate-600 dark:text-slate-400">
+                                      <span className="line-clamp-2">{getRootCauseText(c)}</span>
+                                    </td>
+                                    <td className="py-3 px-3 align-top max-w-xs text-slate-600 dark:text-slate-400">
+                                      <span className="line-clamp-2">{getCorrectiveActionText(c)}</span>
+                                    </td>
+                                    <td className="py-3 px-3 align-top whitespace-nowrap">
+                                      <div className="font-mono text-slate-700 dark:text-slate-300">
+                                        {c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : '—'}
+                                      </div>
+                                      {isOverdue && (
+                                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 animate-pulse">
+                                          ⚠ Overdue
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                        {c.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                        (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
+                                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300'
+                                          : (c.priority || c.riskSeverity || '').toUpperCase() === 'HIGH'
+                                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
+                                          : 'bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300'
+                                      }`}>
+                                        {(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-3 align-top text-center whitespace-nowrap">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => setDrilldownComplaint(c)}
+                                          className="p-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                                          title="Inspect Defect Finding"
+                                        >
+                                          <Eye className="w-3.5 h-3.5" />
+                                        </button>
+                                        {onViewDetails && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onViewDetails(c)}
+                                            className="p-1 rounded bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-cyan-400 transition-colors cursor-pointer"
+                                            title="View Full NC Dossier"
+                                          >
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+
+                      <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+                        <span>Defect Category Records Register</span>
+                        <span className="font-mono text-[11px]">{catComplaints.length} Records</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Category Overview Summary KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-slate-400 block uppercase tracking-wider">Defect Categories</span>
+                  <div className="text-xl font-black text-slate-900 dark:text-white font-mono mt-0.5">
+                    {categoryKpiStats.totalCategories}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    {categoryKpiStats.categoriesWithDefects} with active defects
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-amber-500 block uppercase tracking-wider">Leading Category</span>
+                  <div className="text-sm font-bold text-amber-600 dark:text-amber-400 truncate mt-0.5" title={categoryKpiStats.topCategory?.category || 'None'}>
+                    {categoryKpiStats.topCategory?.category || 'None'}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    {categoryKpiStats.topCategory ? `${categoryKpiStats.topCategory.totalNC} NCs (${categoryKpiStats.topCategoryPercent}% of total)` : 'No defects logged'}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-rose-500 block uppercase tracking-wider">High Risk Defects</span>
+                  <div className="text-xl font-black text-rose-600 dark:text-rose-400 font-mono mt-0.5">
+                    {categoryKpiStats.totalHighRisk}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    Critical &amp; Major categories
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[10px] font-semibold text-emerald-500 block uppercase tracking-wider">Plant Resolution Rate</span>
+                  <div className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+                    {overallCapRate}%
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    {closedCount} of {filteredCount} resolved
+                  </span>
+                </div>
+              </div>
+
+              {/* Defect Category Performance Matrix Table */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+                <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-amber-500" />
+                    <span>Defect Category Performance &amp; Compliance Matrix</span>
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {categoryStatsList.length} Categories Monitored
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/70 text-[11px] font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                        <th className="py-2.5 px-3 text-center w-10">#</th>
+                        <th className="py-2.5 px-3">Defect Category</th>
+                        <th className="py-2.5 px-3 text-center">Total NCs</th>
+                        <th className="py-2.5 px-3 text-center">Critical</th>
+                        <th className="py-2.5 px-3 text-center">Major</th>
+                        <th className="py-2.5 px-3 text-center">Open</th>
+                        <th className="py-2.5 px-3 text-center">In Review</th>
+                        <th className="py-2.5 px-3 text-center">Closed</th>
+                        <th className="py-2.5 px-3 text-center">Overdue</th>
+                        <th className="py-2.5 px-3">Affected Departments</th>
+                        <th className="py-2.5 px-3 text-center w-36">Resolution Rate</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {categoryStatsList.map((cat, idx) => (
+                        <tr
+                          key={cat.category}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                          onClick={() => setSelectedCategoryDetail(cat.category)}
+                        >
+                          <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px]">
+                            {idx + 1}
+                          </td>
+
+                          <td className="py-3 px-3 font-bold text-slate-900 dark:text-white whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                <Tag className="w-3.5 h-3.5" />
+                              </span>
+                              <span className="group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                {cat.category}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
+                            {cat.totalNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {cat.criticalNC > 0 ? cat.criticalNC : '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
+                            {cat.majorNC > 0 ? cat.majorNC : '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
+                            {cat.openNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-purple-600 dark:text-purple-400">
+                            {cat.pendingNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                            {cat.closedNC}
+                          </td>
+
+                          <td className="py-3 px-3 text-center font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {cat.overdueNC > 0 ? cat.overdueNC : '—'}
+                          </td>
+
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-[11px] max-w-xs">
+                            {cat.departments.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {cat.departments.slice(0, 2).map((d) => (
+                                  <span
+                                    key={d.name}
+                                    className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px]"
+                                  >
+                                    {d.name} ({d.count})
+                                  </span>
+                                ))}
+                                {cat.departments.length > 2 && (
+                                  <span className="text-[10px] text-slate-400">
+                                    +{cat.departments.length - 2} more
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-between text-[11px] font-mono mb-1">
+                              <span className="font-bold text-amber-600 dark:text-amber-400">{cat.capRate}%</span>
+                            </div>
+                            <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  cat.capRate === 100
+                                    ? 'bg-emerald-500'
+                                    : cat.capRate >= 60
+                                    ? 'bg-amber-500'
+                                    : 'bg-rose-500'
+                                }`}
+                                style={{ width: `${cat.capRate}%` }}
+                              />
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${cat.statusBadge}`}>
+                              {cat.statusLabel}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCategoryDetail(cat.category)}
+                                className="px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+                                title="Inspect category records"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Inspect</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onNavigateNC) {
+                                    onNavigateNC('all', cat.category);
+                                  }
+                                }}
+                                className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                                title="View in NC/CAPA Register"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 flex items-center justify-between text-xs text-slate-500">
+                  <span>Defect Category Performance Register</span>
+                  <span className="font-mono text-[11px]">{categoryStatsList.length} Categories</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
