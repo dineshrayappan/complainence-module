@@ -22,6 +22,8 @@ import {
   Check,
   ArrowUpDown,
   AlertTriangle,
+  CalendarDays,
+  CalendarRange,
 } from 'lucide-react';
 import { auditLogService } from '../services/api';
 import { useUnit } from '../context/UnitContext';
@@ -29,21 +31,45 @@ import { useUnit } from '../context/UnitContext';
 export const MemberKpiPanel = ({ showToast }) => {
   const { units } = useUnit();
 
-  // Current IST month default 'YYYY-MM'
-  const defaultMonth = useMemo(() => {
+  // Current IST date and month defaults
+  const todayIST = useMemo(() => {
     try {
-      const now = new Date();
       return new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Kolkata',
         year: 'numeric',
         month: '2-digit',
-      }).format(now);
+        day: '2-digit',
+      }).format(new Date());
     } catch {
-      return '2026-11';
+      return '2026-11-05';
     }
   }, []);
 
+  const defaultMonth = useMemo(() => todayIST.slice(0, 7), [todayIST]);
+
+  // Date selection modes: 'MONTH' | 'CUSTOM'
+  const [dateMode, setDateMode] = useState('MONTH');
   const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
+
+  // Custom range dates (defaults to last 30 days)
+  const defaultStartDate = useMemo(() => {
+    try {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(d);
+    } catch {
+      return '2026-10-06';
+    }
+  }, []);
+
+  const [customStartDate, setCustomStartDate] = useState(defaultStartDate);
+  const [customEndDate, setCustomEndDate] = useState(todayIST);
+
   const [selectedUnit, setSelectedUnit] = useState('ALL');
   const [selectedDepartment, setSelectedDepartment] = useState('ALL');
   const [selectedTier, setSelectedTier] = useState('ALL');
@@ -54,6 +80,16 @@ export const MemberKpiPanel = ({ showToast }) => {
   const [inspectedMember, setInspectedMember] = useState(null);
 
   const [kpiData, setKpiData] = useState({
+    rangeMode: 'MONTH',
+    month: defaultMonth,
+    startDate: `${defaultMonth}-01`,
+    endDate: todayIST,
+    rangeLabel: 'November 2026',
+    monthLabel: 'November 2026',
+    daysInMonth: 30,
+    daysInRange: 30,
+    elapsedDays: 5,
+    todayDate: todayIST,
     summary: {
       totalMembers: 0,
       avgKpiScore: 0,
@@ -63,12 +99,9 @@ export const MemberKpiPanel = ({ showToast }) => {
       tierCounts: { EXCEPTIONAL: 0, GOOD: 0, AVERAGE: 0, NEEDS_ATTENTION: 0 },
     },
     members: [],
-    daysInMonth: 30,
-    elapsedDays: 5,
-    monthLabel: 'November 2026',
   });
 
-  // Available months
+  // Available months for quick picker
   const availableMonths = useMemo(() => {
     return [
       { id: '2026-11', label: 'November 2026' },
@@ -79,14 +112,24 @@ export const MemberKpiPanel = ({ showToast }) => {
     ];
   }, []);
 
-  // Fetch KPI data
+  // Fetch KPI data from backend
   const fetchKpiData = async () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const params = {
-        month: selectedMonth,
-      };
+      const params = {};
+
+      if (dateMode === 'CUSTOM') {
+        if (customStartDate && customEndDate) {
+          params.startDate = customStartDate;
+          params.endDate = customEndDate;
+        } else {
+          params.month = selectedMonth;
+        }
+      } else {
+        params.month = selectedMonth;
+      }
+
       if (selectedUnit !== 'ALL') {
         params.unitId = selectedUnit;
       }
@@ -124,7 +167,34 @@ export const MemberKpiPanel = ({ showToast }) => {
 
   useEffect(() => {
     fetchKpiData();
-  }, [selectedMonth, selectedUnit, selectedDepartment, selectedTier]);
+  }, [dateMode, selectedMonth, customStartDate, customEndDate, selectedUnit, selectedDepartment, selectedTier]);
+
+  // Quick preset ranges helper
+  const handleApplyPreset = (preset) => {
+    setDateMode('CUSTOM');
+    if (preset === '7_DAYS') {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      const start = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+      setCustomStartDate(start);
+      setCustomEndDate(todayIST);
+    } else if (preset === '15_DAYS') {
+      const d = new Date();
+      d.setDate(d.getDate() - 15);
+      const start = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+      setCustomStartDate(start);
+      setCustomEndDate(todayIST);
+    } else if (preset === '30_DAYS') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      const start = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+      setCustomStartDate(start);
+      setCustomEndDate(todayIST);
+    } else if (preset === 'OCT_15_NOV_05') {
+      setCustomStartDate('2026-10-15');
+      setCustomEndDate('2026-11-05');
+    }
+  };
 
   // Extract distinct departments for filter dropdown
   const departmentOptions = useMemo(() => {
@@ -157,9 +227,10 @@ export const MemberKpiPanel = ({ showToast }) => {
     const d = new Date(year, month - 1 + offset, 1);
     const newMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     setSelectedMonth(newMonth);
+    setDateMode('MONTH');
   };
 
-  // Export CSV
+  // Export CSV with active custom date range
   const handleExportCSV = () => {
     try {
       const headers = [
@@ -169,10 +240,12 @@ export const MemberKpiPanel = ({ showToast }) => {
         'Role',
         'Department',
         'Unit',
+        'Date Range Mode',
+        'Date Range',
         'Days Logged In',
         'Days Not Logged In',
-        'Elapsed Days',
-        'Total Month Days',
+        'Elapsed Days in Range',
+        'Total Days in Range',
         'Attendance Rate (%)',
         'Total Work Duration',
         'Daily Avg Work Time',
@@ -188,10 +261,12 @@ export const MemberKpiPanel = ({ showToast }) => {
         `"${m.role || ''}"`,
         `"${m.department || ''}"`,
         `"${m.unitName || m.unitId || ''}"`,
+        `"${kpiData.rangeMode || dateMode}"`,
+        `"${kpiData.rangeLabel || kpiData.monthLabel}"`,
         m.loginDays,
         m.absentDays,
         kpiData.elapsedDays,
-        kpiData.daysInMonth,
+        kpiData.daysInRange || kpiData.daysInMonth,
         m.attendancePercentage,
         `"${m.totalDurationFormatted}"`,
         `"${m.avgDailyDurationFormatted}"`,
@@ -207,13 +282,17 @@ export const MemberKpiPanel = ({ showToast }) => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `Member_Work_KPI_${selectedMonth}.csv`);
+      const filename =
+        dateMode === 'CUSTOM'
+          ? `Member_Work_KPI_${customStartDate}_to_${customEndDate}.csv`
+          : `Member_Work_KPI_${selectedMonth}.csv`;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
       if (showToast) {
-        showToast(`Exported KPI report for ${kpiData.monthLabel}.`);
+        showToast(`Exported KPI report for ${kpiData.rangeLabel || kpiData.monthLabel}.`);
       }
     } catch (err) {
       console.error('CSV export failed:', err);
@@ -261,57 +340,89 @@ export const MemberKpiPanel = ({ showToast }) => {
 
   return (
     <div className="space-y-5">
-      {/* 1. Clean Executive Header */}
+      {/* 1. Clean Executive Header with Date Mode Switcher */}
       <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/50 dark:border-indigo-800/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
                 Member Work KPI & Duration Scorecard
               </h2>
               <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
-                Monthly Performance
+                {dateMode === 'CUSTOM' ? 'Custom Date Range' : 'Monthly Performance'}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Tracks days logged in, days absent, and work duration time across plant operations.
+              Active Range:{' '}
+              <strong className="text-slate-800 dark:text-slate-200 font-semibold">
+                {kpiData.rangeLabel || kpiData.monthLabel}
+              </strong>{' '}
+              ({kpiData.elapsedDays} of {kpiData.daysInRange || kpiData.daysInMonth} days elapsed)
             </p>
           </div>
         </div>
 
-        {/* Month Selector & Primary Actions */}
+        {/* Date Mode Toggle & Actions */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Clean Month Stepper */}
-          <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-2xs">
+          {/* Segmented Mode Switcher */}
+          <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <button
-              onClick={() => handleMonthStep(-1)}
-              title="Previous Month"
-              className="p-1 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
+              onClick={() => setDateMode('MONTH')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                dateMode === 'MONTH'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
             >
-              <ChevronLeft className="w-4 h-4" />
+              <CalendarDays className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Month</span>
             </button>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none cursor-pointer"
-            >
-              {availableMonths.map((m) => (
-                <option key={m.id} value={m.id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
-                  {m.label}
-                </option>
-              ))}
-            </select>
             <button
-              onClick={() => handleMonthStep(1)}
-              title="Next Month"
-              className="p-1 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
+              onClick={() => setDateMode('CUSTOM')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                dateMode === 'CUSTOM'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
             >
-              <ChevronRight className="w-4 h-4" />
+              <CalendarRange className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Custom Range</span>
             </button>
           </div>
+
+          {/* Month Stepper (when in MONTH mode) */}
+          {dateMode === 'MONTH' ? (
+            <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-2xs">
+              <button
+                onClick={() => handleMonthStep(-1)}
+                title="Previous Month"
+                className="p-1 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none cursor-pointer"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => handleMonthStep(1)}
+                title="Next Month"
+                className="p-1 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : null}
 
           <button
             onClick={() => setShowFormulaModal(true)}
@@ -319,7 +430,7 @@ export const MemberKpiPanel = ({ showToast }) => {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-all cursor-pointer"
           >
             <Info className="w-3.5 h-3.5 text-slate-500" />
-            <span>Scoring Guide</span>
+            <span>Guide</span>
           </button>
 
           <button
@@ -341,6 +452,79 @@ export const MemberKpiPanel = ({ showToast }) => {
         </div>
       </div>
 
+      {/* Custom Date Range Selector Bar (Shows only when CUSTOM mode is active) */}
+      {dateMode === 'CUSTOM' && (
+        <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/50 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <CalendarRange className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>Select Date Range:</span>
+            </span>
+
+            {/* From Date */}
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">From</span>
+              <input
+                type="date"
+                value={customStartDate}
+                max={customEndDate || todayIST}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="bg-transparent text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            {/* To Date */}
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1 shadow-2xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">To</span>
+              <input
+                type="date"
+                value={customEndDate}
+                min={customStartDate}
+                max={todayIST}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="bg-transparent text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+              />
+            </div>
+
+            <button
+              onClick={fetchKpiData}
+              className="px-3 py-1 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition-all cursor-pointer"
+            >
+              Apply Range
+            </button>
+          </div>
+
+          {/* Quick Range Presets */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-slate-400 font-medium">Quick Presets:</span>
+            <button
+              onClick={() => handleApplyPreset('7_DAYS')}
+              className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
+            >
+              Last 7 Days
+            </button>
+            <button
+              onClick={() => handleApplyPreset('15_DAYS')}
+              className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
+            >
+              Last 15 Days
+            </button>
+            <button
+              onClick={() => handleApplyPreset('30_DAYS')}
+              className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
+            >
+              Last 30 Days
+            </button>
+            <button
+              onClick={() => handleApplyPreset('OCT_15_NOV_05')}
+              className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-all cursor-pointer font-mono"
+            >
+              Oct 15 – Nov 05
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 2. Top Metric Summary Cards (4 Clean, Uniform Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Plant Average KPI */}
@@ -358,7 +542,7 @@ export const MemberKpiPanel = ({ showToast }) => {
             <span className="text-xs text-slate-400 font-mono">/ 100</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
-            Plant productivity index across {kpiData.summary?.totalMembers || 0} members
+            Plant index across {kpiData.summary?.totalMembers || 0} members evaluated
           </div>
         </div>
 
@@ -396,7 +580,7 @@ export const MemberKpiPanel = ({ showToast }) => {
             <span className="text-xs font-normal text-slate-400 ml-1">hrs logged</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
-            Cumulative system activity in {kpiData.monthLabel}
+            Cumulative duration in {kpiData.rangeLabel || kpiData.monthLabel}
           </div>
         </div>
 
@@ -564,7 +748,9 @@ export const MemberKpiPanel = ({ showToast }) => {
                   <th className="py-3 px-3 text-center w-12">#</th>
                   <th className="py-3 px-4">Member Name</th>
                   <th className="py-3 px-4">Department & Unit</th>
-                  <th className="py-3 px-4">Monthly Attendance</th>
+                  <th className="py-3 px-4">
+                    {dateMode === 'CUSTOM' ? 'Attendance (in Range)' : 'Monthly Attendance'}
+                  </th>
                   <th className="py-3 px-4">Work Duration</th>
                   <th className="py-3 px-4 w-44">KPI Score</th>
                   <th className="py-3 px-4 text-center">Grade Rating</th>
@@ -711,7 +897,7 @@ export const MemberKpiPanel = ({ showToast }) => {
         )}
       </div>
 
-      {/* 5. Clean Modal: Member Monthly Attendance & Duration Breakdown */}
+      {/* 5. Clean Modal: Member Attendance & Duration Breakdown in Selected Range */}
       {inspectedMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-3xl max-h-[85vh] bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
@@ -731,7 +917,10 @@ export const MemberKpiPanel = ({ showToast }) => {
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-0.5">
-                    {inspectedMember.department} • {inspectedMember.unitName || inspectedMember.unitId} • {kpiData.monthLabel}
+                    {inspectedMember.department} • {inspectedMember.unitName || inspectedMember.unitId} •{' '}
+                    <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                      {kpiData.rangeLabel || kpiData.monthLabel}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -754,7 +943,7 @@ export const MemberKpiPanel = ({ showToast }) => {
                 </div>
               </div>
               <div>
-                <div className="text-[10px] uppercase font-semibold text-slate-400">Days Logged In</div>
+                <div className="text-[10px] uppercase font-semibold text-slate-400">Days Active</div>
                 <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                   {inspectedMember.loginDays} days
                 </div>
@@ -773,7 +962,7 @@ export const MemberKpiPanel = ({ showToast }) => {
               </div>
             </div>
 
-            {/* Modal Body: Day-by-Day Log Table */}
+            {/* Modal Body: Day-by-Day Log Table across Date Range */}
             <div className="flex-1 overflow-y-auto p-5">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -848,7 +1037,7 @@ export const MemberKpiPanel = ({ showToast }) => {
             {/* Modal Footer */}
             <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">
-                Verified against factory login timestamps.
+                Attendance breakdown for range: {kpiData.rangeLabel || kpiData.monthLabel}
               </span>
               <button
                 onClick={() => setInspectedMember(null)}
@@ -884,11 +1073,11 @@ export const MemberKpiPanel = ({ showToast }) => {
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-1">
                 <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  1. Login Consistency (50 Pts Max)
+                  1. Attendance Consistency (50 Pts Max)
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Formula: <code className="font-mono text-emerald-600 dark:text-emerald-400">(Days Logged In ÷ Elapsed Month Days) × 50</code>.
-                  Rewards consistent daily attendance without penalizing remaining days in the month.
+                  Formula: <code className="font-mono text-emerald-600 dark:text-emerald-400">(Days Logged In ÷ Elapsed Days in Range) × 50</code>.
+                  Rewards consistent presence across the selected date window without penalizing future days.
                 </p>
               </div>
 
@@ -899,7 +1088,7 @@ export const MemberKpiPanel = ({ showToast }) => {
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Formula: <code className="font-mono text-indigo-600 dark:text-indigo-400">(Avg Daily Work Hours ÷ 4.0 hrs benchmark) × 50</code>.
-                  Measures engagement duration per active logged-in day.
+                  Measures engagement duration per active logged-in day within the selected window.
                 </p>
               </div>
 

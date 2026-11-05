@@ -448,6 +448,8 @@ const getMemberKpiStats = async (req, res) => {
   try {
     const {
       month = getTodayISTString().slice(0, 7), // default 'YYYY-MM' (e.g. '2026-11')
+      startDate,
+      endDate,
       department = 'ALL',
       search = '',
       unitId,
@@ -456,24 +458,89 @@ const getMemberKpiStats = async (req, res) => {
 
     const todayDate = getTodayISTString();
     const currentYearMonth = todayDate.slice(0, 7);
-    const currentDayNum = parseInt(todayDate.slice(8, 10), 10);
 
-    // Validate and parse target month
+    let isCustomRange = false;
+    let targetStartDate = '';
+    let targetEndDate = '';
+    let rangeLabel = '';
     let targetMonth = month;
-    if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
-      targetMonth = currentYearMonth;
-    }
-    const [yearStr, monthNumStr] = targetMonth.split('-');
-    const year = parseInt(yearStr, 10);
-    const monthNum = parseInt(monthNumStr, 10); // 1-12
-    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    let year = parseInt(todayDate.slice(0, 4), 10);
+    let monthNum = parseInt(todayDate.slice(5, 7), 10);
 
-    // Determine elapsed days in target month
-    let elapsedDays = daysInMonth;
-    if (targetMonth === currentYearMonth) {
-      elapsedDays = Math.min(daysInMonth, Math.max(1, currentDayNum));
-    } else if (targetMonth > currentYearMonth) {
-      elapsedDays = 0;
+    // Format helper for display
+    const formatDisplayDate = (dStr) => {
+      try {
+        const [y, m, d] = dStr.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        return dateObj.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+      } catch {
+        return dStr;
+      }
+    };
+
+    if (startDate && endDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+      isCustomRange = true;
+      if (startDate <= endDate) {
+        targetStartDate = startDate;
+        targetEndDate = endDate;
+      } else {
+        targetStartDate = endDate;
+        targetEndDate = startDate;
+      }
+      rangeLabel = `${formatDisplayDate(targetStartDate)} – ${formatDisplayDate(targetEndDate)}`;
+      targetMonth = targetStartDate.slice(0, 7);
+      year = parseInt(targetStartDate.slice(0, 4), 10);
+      monthNum = parseInt(targetStartDate.slice(5, 7), 10);
+    } else {
+      // Month mode
+      if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
+        targetMonth = currentYearMonth;
+      }
+      const [yearStr, monthNumStr] = targetMonth.split('-');
+      year = parseInt(yearStr, 10);
+      monthNum = parseInt(monthNumStr, 10);
+      const daysInMonth = new Date(year, monthNum, 0).getDate();
+      targetStartDate = `${targetMonth}-01`;
+      targetEndDate = `${targetMonth}-${String(daysInMonth).padStart(2, '0')}`;
+      rangeLabel = new Date(year, monthNum - 1, 1).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+      });
+    }
+
+    // Build day list for calendar breakdown across targetStartDate to targetEndDate
+    const daysInRangeList = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    let curr = new Date(targetStartDate + 'T00:00:00Z');
+    const endD = new Date(targetEndDate + 'T00:00:00Z');
+    let dayCounter = 1;
+    while (curr <= endD && dayCounter <= 366) {
+      const y = curr.getUTCFullYear();
+      const m = String(curr.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(curr.getUTCDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      const dObj = new Date(y, curr.getUTCMonth(), curr.getUTCDate());
+      const dayOfWeek = dayNames[dObj.getDay()];
+      const isPastOrToday = dateStr <= todayDate;
+      const isFuture = dateStr > todayDate;
+
+      daysInRangeList.push({
+        dayNumber: dayCounter,
+        date: dateStr,
+        dayOfWeek,
+        isPastOrToday,
+        isFuture,
+        isSunday: dObj.getDay() === 0,
+      });
+
+      curr.setUTCDate(curr.getUTCDate() + 1);
+      dayCounter++;
+    }
+
+    const totalDaysInRange = daysInRangeList.length;
+    let elapsedDays = daysInRangeList.filter((d) => d.isPastOrToday).length;
+    if (elapsedDays === 0 && totalDaysInRange > 0 && targetStartDate <= todayDate) {
+      elapsedDays = 1;
     }
 
     if (!isMongoConnected()) {
@@ -481,7 +548,7 @@ const getMemberKpiStats = async (req, res) => {
     }
 
     let rawUsers = [];
-    let monthAttendances = [];
+    let rangeAttendances = [];
 
     if (isMongoConnected()) {
       try {
@@ -496,12 +563,12 @@ const getMemberKpiStats = async (req, res) => {
         const [usersList, attendancesList] = await Promise.all([
           User.find(queryUsers).sort({ name: 1 }).lean(),
           Attendance.find({
-            date: { $regex: new RegExp(`^${targetMonth}-`) },
+            date: { $gte: targetStartDate, $lte: targetEndDate },
           }).lean(),
         ]);
 
         rawUsers = usersList;
-        monthAttendances = attendancesList;
+        rangeAttendances = attendancesList;
       } catch (dbErr) {
         console.warn('⚠️ [AuditLogController:getMemberKpiStats] MongoDB error:', dbErr.message);
         rawUsers = mockStore.getUsers();
@@ -538,7 +605,7 @@ const getMemberKpiStats = async (req, res) => {
     };
 
     // Process attendance duration
-    const processedAtts = monthAttendances.map((att) => {
+    const processedAtts = rangeAttendances.map((att) => {
       let durationMins = 15;
       if (att.lastLoginAt && att.loginTimestamp) {
         const diffMs = new Date(att.lastLoginAt).getTime() - new Date(att.loginTimestamp).getTime();
@@ -554,26 +621,6 @@ const getMemberKpiStats = async (req, res) => {
         durationMinutes: durationMins,
       };
     });
-
-    // Build day list for calendar breakdown
-    const daysInMonthList = [];
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dayStr = String(day).padStart(2, '0');
-      const dateStr = `${targetMonth}-${dayStr}`;
-      const dObj = new Date(year, monthNum - 1, day);
-      const dayOfWeek = dayNames[dObj.getDay()];
-      const isPastOrToday = dateStr <= todayDate;
-      const isFuture = dateStr > todayDate;
-      daysInMonthList.push({
-        dayNumber: day,
-        date: dateStr,
-        dayOfWeek,
-        isPastOrToday,
-        isFuture,
-        isSunday: dObj.getDay() === 0,
-      });
-    }
 
     // Calculate score and breakdown for each member
     let memberScores = rawUsers.map((u) => {
@@ -644,8 +691,8 @@ const getMemberKpiStats = async (req, res) => {
         tierColor = 'amber';
       }
 
-      // Generate day-by-day attendance calendar for this member
-      const dailyBreakdown = daysInMonthList.map((dayInfo) => {
+      // Generate day-by-day attendance calendar for this member across range
+      const dailyBreakdown = daysInRangeList.map((dayInfo) => {
         const att = dateAttMap.get(dayInfo.date);
         const isPresent = Boolean(att && (att.status === 'Present' || att.loginTimestamp));
         let status = 'Upcoming';
@@ -755,12 +802,14 @@ const getMemberKpiStats = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+      rangeMode: isCustomRange ? 'CUSTOM' : 'MONTH',
       month: targetMonth,
-      monthLabel: new Date(year, monthNum - 1, 1).toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric',
-      }),
-      daysInMonth,
+      monthLabel: rangeLabel,
+      rangeLabel,
+      startDate: targetStartDate,
+      endDate: targetEndDate,
+      daysInMonth: totalDaysInRange,
+      daysInRange: totalDaysInRange,
       elapsedDays,
       todayDate,
       summary: {
