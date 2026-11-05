@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getAuditLogs,
   getUserLoginTimes,
+  getMemberKpiStats,
   exportAuditLogs,
   clearAuditLogs,
 } = require('../controllers/auditLogController');
@@ -10,6 +11,9 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 
 // All audit routes require valid authentication
 router.use(verifyToken);
+
+// Track individual member KPI scores based on monthly login days, absent days, and work duration
+router.get('/member-kpi', requireRole(['ADMIN', 'SUPERADMIN']), getMemberKpiStats);
 
 // Track user login times across the application (Admin oversight)
 router.get('/logins', requireRole(['ADMIN', 'SUPERADMIN']), getUserLoginTimes);

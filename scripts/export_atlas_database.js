@@ -1,18 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-require('dotenv').config({ path: path.join(__dirname, '..', 'server', '.env') });
 
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
+const ATLAS_URI =
+  process.env.ATLAS_MONGODB_URI ||
   'mongodb+srv://dineshrayappanr_db_user:cDRacfh8jnr2r8r4@cluster0.dop3n2g.mongodb.net/compliance_module?appName=Cluster0';
 
 const EXPORT_DIR = path.join(__dirname, '..', 'db_export');
 
 async function exportDatabase() {
-  console.log('Connecting to MongoDB Atlas at:', MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
-  await mongoose.connect(MONGODB_URI);
+  console.log('Connecting to MongoDB Atlas at:', ATLAS_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
+  await mongoose.connect(ATLAS_URI);
 
   const conn = mongoose.connection.useDb('compliance_module');
   const collections = await conn.db.listCollections().toArray();

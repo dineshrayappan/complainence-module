@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CertificateManagementPanel from './CertificateManagementPanel';
+import MemberKpiPanel from './MemberKpiPanel';
 import {
   Award,
   Users,
@@ -74,6 +75,8 @@ export const AdminUserManagement = () => {
             ? 'DEPARTMENTS'
             : urlTab === 'certificates' || urlTab === 'certifications' || urlTab === 'certs'
               ? 'CERTIFICATES'
+              : urlTab === 'kpi' || urlTab === 'member-kpi' || urlTab === 'scores'
+                ? 'MEMBER_KPI'
               : 'PERSONNEL';
 
   const [adminTab, setAdminTab] = useState(initialTab);
@@ -81,6 +84,8 @@ export const AdminUserManagement = () => {
   useEffect(() => {
     if (urlTab === 'certificates' || urlTab === 'certifications' || urlTab === 'certs') {
       setAdminTab('CERTIFICATES');
+    } else if (urlTab === 'kpi' || urlTab === 'member-kpi' || urlTab === 'scores') {
+      setAdminTab('MEMBER_KPI');
     } else if (urlTab === 'units' || urlTab === 'unit-management') {
       setAdminTab('UNITS');
     } else if (urlTab === 'logins' || urlTab === 'login-times' || urlTab === 'login-tracker') {
@@ -108,6 +113,8 @@ export const AdminUserManagement = () => {
               ? 'departments'
               : newTab === 'CERTIFICATES'
                 ? 'certificates'
+                : newTab === 'MEMBER_KPI'
+                  ? 'member-kpi'
                 : 'personnel';
     setSearchParams({ tab: tabParam }, { replace: true });
   };
@@ -823,6 +830,20 @@ export const AdminUserManagement = () => {
         </button>
 
         <button
+          onClick={() => handleTabChange('MEMBER_KPI')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'MEMBER_KPI'
+              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+        >
+          <Activity className="w-3.5 h-3.5 text-emerald-500" />
+          <span>Member Work KPI</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200/50">
+            Score
+          </span>
+        </button>
+
+        <button
           onClick={() => handleTabChange('LOG_HISTORY')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${adminTab === 'LOG_HISTORY'
               ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs font-semibold'
@@ -863,7 +884,9 @@ export const AdminUserManagement = () => {
       </div>
 
       {/* Render Active View Based on Selected Admin Tab */}
-      {adminTab === 'CERTIFICATES' ? (
+      {adminTab === 'MEMBER_KPI' ? (
+        <MemberKpiPanel showToast={showToast} />
+      ) : adminTab === 'CERTIFICATES' ? (
         <CertificateManagementPanel showToast={showToast} />
       ) : adminTab === 'UNITS' ? (
         <UnitManagementPanel

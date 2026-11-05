@@ -1,5 +1,6 @@
 const AuditLog = require('../models/AuditLog');
 const User = require('../models/User');
+const Attendance = require('../models/Attendance');
 const mockStore = require('../config/mockStore');
 const { isMongoConnected, connectDB } = require('../config/db');
 const { logEvent } = require('../utils/eventLogger');
@@ -440,9 +441,353 @@ const clearAuditLogs = async (req, res) => {
   }
 };
 
+// @desc    Calculate individual member KPI scores based on monthly login days, absent days, and work duration
+// @route   GET /api/audit-logs/member-kpi
+// @access  Private (ADMIN, SUPERADMIN)
+const getMemberKpiStats = async (req, res) => {
+  try {
+    const {
+      month = getTodayISTString().slice(0, 7), // default 'YYYY-MM' (e.g. '2026-11')
+      department = 'ALL',
+      search = '',
+      unitId,
+      tier = 'ALL',
+    } = req.query;
+
+    const todayDate = getTodayISTString();
+    const currentYearMonth = todayDate.slice(0, 7);
+    const currentDayNum = parseInt(todayDate.slice(8, 10), 10);
+
+    // Validate and parse target month
+    let targetMonth = month;
+    if (!/^\d{4}-\d{2}$/.test(targetMonth)) {
+      targetMonth = currentYearMonth;
+    }
+    const [yearStr, monthNumStr] = targetMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const monthNum = parseInt(monthNumStr, 10); // 1-12
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+
+    // Determine elapsed days in target month
+    let elapsedDays = daysInMonth;
+    if (targetMonth === currentYearMonth) {
+      elapsedDays = Math.min(daysInMonth, Math.max(1, currentDayNum));
+    } else if (targetMonth > currentYearMonth) {
+      elapsedDays = 0;
+    }
+
+    if (!isMongoConnected()) {
+      await connectDB();
+    }
+
+    let rawUsers = [];
+    let monthAttendances = [];
+
+    if (isMongoConnected()) {
+      try {
+        const queryUsers = { isDeleted: { $ne: true } };
+        if (unitId && unitId !== 'ALL') {
+          queryUsers.$or = [
+            { unitId: unitId },
+            { assignedUnits: unitId },
+          ];
+        }
+
+        const [usersList, attendancesList] = await Promise.all([
+          User.find(queryUsers).sort({ name: 1 }).lean(),
+          Attendance.find({
+            date: { $regex: new RegExp(`^${targetMonth}-`) },
+          }).lean(),
+        ]);
+
+        rawUsers = usersList;
+        monthAttendances = attendancesList;
+      } catch (dbErr) {
+        console.warn('⚠️ [AuditLogController:getMemberKpiStats] MongoDB error:', dbErr.message);
+        rawUsers = mockStore.getUsers();
+      }
+    } else {
+      rawUsers = mockStore.getUsers();
+    }
+
+    // Helper to format minutes as "Xh Ym" or "Ym"
+    const formatDuration = (totalMins) => {
+      if (!totalMins || totalMins <= 0) return '0m';
+      const hrs = Math.floor(totalMins / 60);
+      const mins = Math.round(totalMins % 60);
+      if (hrs === 0) return `${mins}m`;
+      if (mins === 0) return `${hrs}h`;
+      return `${hrs}h ${mins}m`;
+    };
+
+    // Helper to format IST timestamp
+    const formatIST = (dateVal) => {
+      if (!dateVal) return null;
+      try {
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return null;
+        return d.toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    // Process attendance duration
+    const processedAtts = monthAttendances.map((att) => {
+      let durationMins = 15;
+      if (att.lastLoginAt && att.loginTimestamp) {
+        const diffMs = new Date(att.lastLoginAt).getTime() - new Date(att.loginTimestamp).getTime();
+        const computed = Math.round(diffMs / 60000);
+        durationMins = Math.max(15, Math.min(840, computed));
+      } else if (att.updatedAt && att.createdAt) {
+        const diffMs = new Date(att.updatedAt).getTime() - new Date(att.createdAt).getTime();
+        const computed = Math.round(diffMs / 60000);
+        durationMins = Math.max(15, Math.min(840, computed));
+      }
+      return {
+        ...att,
+        durationMinutes: durationMins,
+      };
+    });
+
+    // Build day list for calendar breakdown
+    const daysInMonthList = [];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayStr = String(day).padStart(2, '0');
+      const dateStr = `${targetMonth}-${dayStr}`;
+      const dObj = new Date(year, monthNum - 1, day);
+      const dayOfWeek = dayNames[dObj.getDay()];
+      const isPastOrToday = dateStr <= todayDate;
+      const isFuture = dateStr > todayDate;
+      daysInMonthList.push({
+        dayNumber: day,
+        date: dateStr,
+        dayOfWeek,
+        isPastOrToday,
+        isFuture,
+        isSunday: dObj.getDay() === 0,
+      });
+    }
+
+    // Calculate score and breakdown for each member
+    let memberScores = rawUsers.map((u) => {
+      const empId = (u.employeeId || '').toUpperCase().trim();
+      const uId = u._id ? u._id.toString() : String(u.id || '');
+
+      const userAtts = processedAtts.filter((a) =>
+        (a.employeeId && a.employeeId.toUpperCase().trim() === empId) ||
+        (a.userId && a.userId === uId) ||
+        (a.user && a.user.toString() === uId)
+      );
+
+      // Map by date string
+      const dateAttMap = new Map();
+      userAtts.forEach((a) => {
+        if (!dateAttMap.has(a.date)) {
+          dateAttMap.set(a.date, { ...a });
+        } else {
+          // Merge if multiple logins on same date
+          const existing = dateAttMap.get(a.date);
+          existing.durationMinutes = (existing.durationMinutes || 0) + (a.durationMinutes || 0);
+          if (a.lastLoginAt && (!existing.lastLoginAt || new Date(a.lastLoginAt) > new Date(existing.lastLoginAt))) {
+            existing.lastLoginAt = a.lastLoginAt;
+          }
+        }
+      });
+
+      const loginDates = new Set(userAtts.filter((a) => a.status === 'Present' || a.loginTimestamp).map((a) => a.date));
+      const loginDays = loginDates.size;
+      const absentDays = Math.max(0, elapsedDays - loginDays);
+      const totalDurationMinutes = Array.from(dateAttMap.values()).reduce(
+        (sum, a) => sum + (a.durationMinutes || 0),
+        0
+      );
+      const avgDailyDurationMinutes = loginDays > 0 ? Math.round(totalDurationMinutes / loginDays) : 0;
+
+      // KPI formula
+      // 1. Attendance Consistency Rate: 50% max
+      const attendanceRatio = elapsedDays > 0 ? loginDays / elapsedDays : 0;
+      const loginScore = Math.min(50, Math.round(attendanceRatio * 50));
+
+      // 2. Work Session Duration: 50% max (benchmark: 240 mins / 4.0 hrs average daily active session)
+      const durationScore = loginDays > 0 ? Math.min(50, Math.round((avgDailyDurationMinutes / 240) * 50)) : 0;
+
+      // 3. Overall KPI Score (0 - 100)
+      const kpiScore = Math.min(100, Math.max(0, loginScore + durationScore));
+
+      // Performance Tier
+      let tierCode = 'NEEDS_ATTENTION';
+      let tierLabel = 'Needs Attention';
+      let tierGrade = 'Grade C';
+      let tierColor = 'rose';
+
+      if (kpiScore >= 85) {
+        tierCode = 'EXCEPTIONAL';
+        tierLabel = 'Exceptional';
+        tierGrade = 'Grade A+';
+        tierColor = 'emerald';
+      } else if (kpiScore >= 70) {
+        tierCode = 'GOOD';
+        tierLabel = 'Good';
+        tierGrade = 'Grade A';
+        tierColor = 'indigo';
+      } else if (kpiScore >= 50) {
+        tierCode = 'AVERAGE';
+        tierLabel = 'Average';
+        tierGrade = 'Grade B';
+        tierColor = 'amber';
+      }
+
+      // Generate day-by-day attendance calendar for this member
+      const dailyBreakdown = daysInMonthList.map((dayInfo) => {
+        const att = dateAttMap.get(dayInfo.date);
+        const isPresent = Boolean(att && (att.status === 'Present' || att.loginTimestamp));
+        let status = 'Upcoming';
+        if (isPresent) {
+          status = 'Present';
+        } else if (dayInfo.isPastOrToday) {
+          status = 'Absent';
+        }
+
+        const durationMins = isPresent ? (att.durationMinutes || 15) : 0;
+
+        return {
+          date: dayInfo.date,
+          dayNumber: dayInfo.dayNumber,
+          dayOfWeek: dayInfo.dayOfWeek,
+          isPastOrToday: dayInfo.isPastOrToday,
+          isFuture: dayInfo.isFuture,
+          isSunday: dayInfo.isSunday,
+          isPresent,
+          status,
+          loginTimeIST: isPresent ? formatIST(att.loginTimestamp || att.createdAt) : null,
+          lastActiveIST: isPresent ? formatIST(att.lastLoginAt || att.updatedAt) : null,
+          durationMinutes: durationMins,
+          durationFormatted: isPresent ? formatDuration(durationMins) : '0m',
+        };
+      });
+
+      return {
+        id: u._id ? u._id.toString() : u.id,
+        employeeId: u.employeeId,
+        name: u.name,
+        email: u.email,
+        role: u.role === 'SUPERVISOR' ? 'ACTION_PERSON' : u.role,
+        department: u.department || 'General',
+        designation: u.designation || '',
+        unitId: u.unitId || 'UNIT-1',
+        unitName: u.unitName || (u.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1'),
+        loginDays,
+        absentDays,
+        totalDurationMinutes,
+        totalDurationHours: (totalDurationMinutes / 60).toFixed(1),
+        totalDurationFormatted: formatDuration(totalDurationMinutes),
+        avgDailyDurationMinutes,
+        avgDailyDurationFormatted: formatDuration(avgDailyDurationMinutes) + (loginDays > 0 ? '/day' : ''),
+        loginScore,
+        durationScore,
+        kpiScore,
+        attendancePercentage: elapsedDays > 0 ? Math.round((loginDays / elapsedDays) * 100) : 0,
+        tier: {
+          code: tierCode,
+          label: tierLabel,
+          grade: tierGrade,
+          color: tierColor,
+        },
+        dailyBreakdown,
+      };
+    });
+
+    // Apply Filters
+    if (department && department !== 'ALL') {
+      memberScores = memberScores.filter(
+        (m) => (m.department || '').toLowerCase() === department.toLowerCase()
+      );
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      memberScores = memberScores.filter(
+        (m) =>
+          (m.name || '').toLowerCase().includes(q) ||
+          (m.employeeId || '').toLowerCase().includes(q) ||
+          (m.department || '').toLowerCase().includes(q) ||
+          (m.role || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (tier && tier !== 'ALL') {
+      memberScores = memberScores.filter((m) => m.tier.code === tier);
+    }
+
+    // Sort by default: Highest KPI Score descending, then loginDays descending
+    memberScores.sort((a, b) => b.kpiScore - a.kpiScore || b.loginDays - a.loginDays);
+
+    // Compute Plant-wide Summary Statistics
+    const totalMembers = memberScores.length;
+    const totalKpiSum = memberScores.reduce((sum, m) => sum + m.kpiScore, 0);
+    const avgKpiScore = totalMembers > 0 ? Math.round(totalKpiSum / totalMembers) : 0;
+    const totalLoginDaysSum = memberScores.reduce((sum, m) => sum + m.loginDays, 0);
+    const avgLoginDays = totalMembers > 0 ? (totalLoginDaysSum / totalMembers).toFixed(1) : 0;
+    const totalMinutesLogged = memberScores.reduce((sum, m) => sum + m.totalDurationMinutes, 0);
+    const totalHoursLogged = (totalMinutesLogged / 60).toFixed(1);
+    const topPerformer = memberScores.length > 0 && memberScores[0].kpiScore > 0 ? {
+      name: memberScores[0].name,
+      employeeId: memberScores[0].employeeId,
+      department: memberScores[0].department,
+      kpiScore: memberScores[0].kpiScore,
+      grade: memberScores[0].tier.grade,
+      loginDays: memberScores[0].loginDays,
+    } : null;
+
+    const tierCounts = {
+      EXCEPTIONAL: memberScores.filter((m) => m.tier.code === 'EXCEPTIONAL').length,
+      GOOD: memberScores.filter((m) => m.tier.code === 'GOOD').length,
+      AVERAGE: memberScores.filter((m) => m.tier.code === 'AVERAGE').length,
+      NEEDS_ATTENTION: memberScores.filter((m) => m.tier.code === 'NEEDS_ATTENTION').length,
+    };
+
+    return res.status(200).json({
+      success: true,
+      month: targetMonth,
+      monthLabel: new Date(year, monthNum - 1, 1).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric',
+      }),
+      daysInMonth,
+      elapsedDays,
+      todayDate,
+      summary: {
+        totalMembers,
+        avgKpiScore,
+        avgLoginDays,
+        totalHoursLogged,
+        totalMinutesLogged,
+        topPerformer,
+        tierCounts,
+      },
+      members: memberScores,
+    });
+  } catch (err) {
+    console.error('❌ [AuditLogController:getMemberKpiStats] Error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to calculate individual member KPI scores.',
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   getAuditLogs,
   getUserLoginTimes,
+  getMemberKpiStats,
   exportAuditLogs,
   clearAuditLogs,
 };

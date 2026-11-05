@@ -243,7 +243,7 @@
     "employeeId": "STR-MANG-503",
     "name": "RAMASWAMMY K P",
     "email": "accessories@essteeexports.com",
-    "password": "$2a$10$sNPs26bBkQdPqnMG9bHfUOvsRBuhZWBocudL4Kz8xF6JNyo3hKfiK",
+    "password": "$2a$10$Nl2G5EGxzOZ4b8lT3LZMzu45nG3qh3bbzQrsy8v9CghaCNHi86P66",
     "role": "ACTION_PERSON",
     "department": "Stores",
     "designation": "STORES MANAGER",
@@ -257,7 +257,7 @@
     "lastLoginAt": null,
     "lastLogoutAt": null,
     "createdAt": "2026-10-23T06:33:10.275Z",
-    "updatedAt": "2026-10-26T05:38:23.499Z",
+    "updatedAt": "2026-10-29T06:42:52.801Z",
     "__v": 0,
     "assignedUnits": [
       "UNIT-1"
@@ -405,7 +405,7 @@
     "employeeId": "MACH-MAIN-509",
     "name": "SANTHOSH KUMAR D",
     "email": "production@essteeexports.comsanthosh123456",
-    "password": "$2a$10$asVh7Z45oHhMIxFOeIAh1.2V7gP/B.Wh2qsqSbmxLJXnvdRbG/Upq",
+    "password": "$2a$10$PFcXAGdb3TnrWAauyy7Cx..IJsCRyvAXJOxJSi0xg9pLNs2b9AMkq",
     "role": "ACTION_PERSON",
     "department": "MACHINE MAINTENANCE",
     "designation": "SENIOR MACHANIC",
@@ -419,7 +419,7 @@
     "lastLoginAt": null,
     "lastLogoutAt": null,
     "createdAt": "2026-10-23T08:24:09.486Z",
-    "updatedAt": "2026-10-26T05:38:47.688Z",
+    "updatedAt": "2026-10-29T09:14:35.469Z",
     "__v": 0,
     "assignedUnits": [
       "UNIT-1"
@@ -648,7 +648,7 @@
     "employeeId": "SUP-1019",
     "name": "YOGESWARI",
     "email": "rskrishnan@essteeexports.com",
-    "password": "$2a$10$N9gWn6x6Gnajv.0MYN0WPefVeW8Fs1/SYqpnEgamgHyJJumllmZQu",
+    "password": "$2a$10$6eryb7JSPVQpzc1oBb8wc.obHsgRSqAFJg9wbC9fUE/slcUioCWwa",
     "role": "ACTION_PERSON",
     "department": "HR",
     "designation": "ADMIN OFFICER",
@@ -662,7 +662,7 @@
     "lastLoginAt": null,
     "lastLogoutAt": null,
     "createdAt": "2026-10-23T09:15:07.837Z",
-    "updatedAt": "2026-10-26T05:41:30.223Z",
+    "updatedAt": "2026-10-29T14:10:25.238Z",
     "__v": 0,
     "assignedUnits": [
       "UNIT-1"
@@ -1010,15 +1010,19 @@
       "UNIT-1"
     ],
     "isOwner": false,
-    "isActive": true,
-    "isDeleted": false,
-    "deletedAt": null,
-    "deletedBy": null,
+    "isActive": false,
+    "isDeleted": true,
+    "deletedAt": "2026-10-30T08:01:59.474Z",
+    "deletedBy": {
+      "name": "RAJESH KUMAR",
+      "employeeId": "ADM-001",
+      "role": "ADMIN"
+    },
     "isPresent": false,
     "lastLoginAt": null,
     "lastLogoutAt": null,
     "createdAt": "2026-10-28T13:53:01.927Z",
-    "updatedAt": "2026-10-28T13:53:01.927Z",
+    "updatedAt": "2026-10-30T08:01:59.474Z",
     "__v": 0
   },
   {
@@ -1037,6 +1041,37 @@
       "UNIT-1"
     ],
     "isOwner": false,
+    "isActive": false,
+    "isDeleted": true,
+    "deletedAt": "2026-10-30T08:08:08.424Z",
+    "deletedBy": {
+      "name": "RAJESH KUMAR",
+      "employeeId": "ADM-001",
+      "role": "ADMIN"
+    },
+    "isPresent": false,
+    "lastLoginAt": null,
+    "lastLogoutAt": null,
+    "createdAt": "2026-10-28T14:14:17.335Z",
+    "updatedAt": "2026-10-30T08:08:08.424Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae4500f16d9bf972ff8c7bc",
+    "employeeId": "ADM-003",
+    "name": "LEELAVATHI T",
+    "email": "leella@essteexports.com",
+    "password": "$2a$10$HNuTX6tYJdN3f3MnJ3dupesq/Vd05C5kWyGkTdqqlRPcxfBSvO8r2",
+    "role": "ADMIN",
+    "department": "Management",
+    "designation": "Managing Director",
+    "mobileNumber": "+91 9843241971",
+    "unitId": "UNIT-1",
+    "unitName": "Unit 1",
+    "assignedUnits": [
+      "UNIT-1"
+    ],
+    "isOwner": false,
     "isActive": true,
     "isDeleted": false,
     "deletedAt": null,
@@ -1044,8 +1079,35 @@
     "isPresent": false,
     "lastLoginAt": null,
     "lastLogoutAt": null,
-    "createdAt": "2026-10-28T14:14:17.335Z",
-    "updatedAt": "2026-10-28T14:14:17.335Z",
+    "createdAt": "2026-10-30T08:06:39.341Z",
+    "updatedAt": "2026-10-30T08:06:39.341Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae450ce0397fe619cfb207e",
+    "employeeId": "ADM-004",
+    "name": "RAMESHKUMAR",
+    "email": "ramesh@essteexports.com",
+    "password": "$2a$10$gP/WTXz34glTg9RGJej49.ytHKkLz/puPMkgHPda1wLRJjkWdIisG",
+    "role": "ADMIN",
+    "department": "HR",
+    "designation": "Manager-HR/ESG",
+    "mobileNumber": "+919843251971",
+    "unitId": "UNIT-1",
+    "unitName": "Unit 1",
+    "assignedUnits": [
+      "UNIT-1"
+    ],
+    "isOwner": false,
+    "isActive": true,
+    "isDeleted": false,
+    "deletedAt": null,
+    "deletedBy": null,
+    "isPresent": false,
+    "lastLoginAt": null,
+    "lastLogoutAt": null,
+    "createdAt": "2026-10-30T08:09:50.502Z",
+    "updatedAt": "2026-10-30T08:09:50.502Z",
     "__v": 0
   }
 ]

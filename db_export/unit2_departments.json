@@ -61,5 +61,65 @@
     "headcount": 5,
     "unitId": "UNIT-2",
     "createdAt": "2026-10-26T06:03:30.228Z"
+  },
+  {
+    "_id": "6aeab2440c0c51a84a6892f0",
+    "name": "CUTTING",
+    "code": "CUT-001",
+    "manager": "MOHAMED RABEEK",
+    "headcount": 20,
+    "unitId": "UNIT-2",
+    "unitName": "Unit 2",
+    "createdAt": "2026-11-04T04:19:16.158Z",
+    "updatedAt": "2026-11-04T04:19:16.158Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeab2820c0c51a84a6892f1",
+    "name": "MACHINE MAINTENANCE",
+    "code": "MAC-002",
+    "manager": "RAMESH",
+    "headcount": 20,
+    "unitId": "UNIT-2",
+    "unitName": "Unit 2",
+    "createdAt": "2026-11-04T04:20:18.836Z",
+    "updatedAt": "2026-11-04T04:20:18.836Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeab2aa0c0c51a84a6892f2",
+    "name": "ELECTRICAL MAINTANENCE",
+    "code": "ELEC-003",
+    "manager": "PALANISAMMY N",
+    "headcount": 20,
+    "unitId": "UNIT-2",
+    "unitName": "Unit 2",
+    "createdAt": "2026-11-04T04:20:58.595Z",
+    "updatedAt": "2026-11-04T04:20:58.595Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeab2e70c0c51a84a6892f3",
+    "name": "FINISHING",
+    "code": "FINSH-006",
+    "manager": "PRADEESH M",
+    "headcount": 20,
+    "unitId": "UNIT-2",
+    "unitName": "Unit 2",
+    "createdAt": "2026-11-04T04:21:59.806Z",
+    "updatedAt": "2026-11-04T04:21:59.806Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeab4880c0c51a84a6892f4",
+    "name": "TRIMS STORE",
+    "code": "TRIM-008",
+    "manager": "ALAGULAKSHMI M",
+    "headcount": 20,
+    "unitId": "UNIT-2",
+    "unitName": "Unit 2",
+    "createdAt": "2026-11-04T04:28:56.154Z",
+    "updatedAt": "2026-11-04T04:28:56.154Z",
+    "__v": 0
   }
 ]

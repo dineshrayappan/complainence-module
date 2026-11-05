@@ -152,6 +152,7 @@ export const taskService = {
 export const auditLogService = {
   getAuditLogs: (params) => api.get('/audit-logs', { params }),
   getUserLoginTimes: (params) => api.get('/audit-logs/logins', { params }),
+  getMemberKpiStats: (params) => api.get('/audit-logs/member-kpi', { params }),
   exportAuditLogs: (format = 'csv') =>
     api.get('/audit-logs/export', { params: { format }, responseType: 'blob' }),
   clearAuditLogs: () => api.delete('/audit-logs'),

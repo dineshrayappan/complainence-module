@@ -133,6 +133,15 @@ export const SidebarNavigation = ({
                 badgeColor:
                   'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
               },
+              {
+                id: 'member-kpi',
+                path: `${basePath}/admin?tab=member-kpi`,
+                label: 'Member Work KPI',
+                icon: Activity,
+                badge: 'KPI',
+                badgeColor:
+                  'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+              },
             ]
           : []),
       ];
@@ -184,6 +193,12 @@ export const SidebarNavigation = ({
         currentPath.startsWith('/compliance/reports')
       );
     }
+    if (item.id === 'member-kpi') {
+      return (
+        (currentPath.startsWith(`${basePath}/admin`) || currentPath.startsWith('/compliance/admin')) &&
+        (location.search.includes('tab=member-kpi') || location.search.includes('tab=kpi'))
+      );
+    }
     if (item.id === 'certificates') {
       return (
         (currentPath.startsWith(`${basePath}/admin`) || currentPath.startsWith('/compliance/admin')) &&
@@ -195,7 +210,9 @@ export const SidebarNavigation = ({
         (currentPath.startsWith(`${basePath}/admin`) ||
           currentPath.startsWith(`${basePath}/settings`) ||
           currentPath.startsWith('/compliance/admin')) &&
-        !location.search.includes('tab=certificates')
+        !location.search.includes('tab=certificates') &&
+        !location.search.includes('tab=member-kpi') &&
+        !location.search.includes('tab=kpi')
       );
     }
     if (currentSection) {

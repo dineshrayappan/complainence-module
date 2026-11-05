@@ -2,40 +2,51 @@ const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
 
-const LOCAL_MONGODB_URI = 'mongodb://127.0.0.1:27017/compliance_module';
+const LOCAL_MONGODB_URI =
+  process.env.LOCAL_MONGODB_URI ||
+  process.env.MONGODB_URI_LOCAL ||
+  'mongodb://127.0.0.1:27017/compliance_module';
+
 const EXPORT_DIR = path.join(__dirname, '..', 'db_export');
 
-// Helper to revive ObjectId and Date types from exported JSON
-function reviveDocuments(docs) {
-  return docs.map((doc) => {
-    const revived = { ...doc };
+// Recursive helper to revive ObjectId and Date types from exported JSON
+function reviveValue(val, key) {
+  if (val === null || val === undefined) return val;
 
-    for (const key of Object.keys(revived)) {
-      const val = revived[key];
-
-      // Convert 24-character hex strings in _id to ObjectId
-      if (key === '_id' && typeof val === 'string' && /^[0-9a-fA-F]{24}$/.test(val)) {
-        revived._id = new mongoose.Types.ObjectId(val);
-      }
-      // Convert nested user / ref ObjectIds if applicable
-      else if ((key === 'user' || key === 'assignedTo' || key === 'createdBy') && typeof val === 'string' && /^[0-9a-fA-F]{24}$/.test(val)) {
-        revived[key] = new mongoose.Types.ObjectId(val);
-      }
-      // Convert ISO Date strings to Date objects
-      else if (
-        typeof val === 'string' &&
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)
-      ) {
-        revived[key] = new Date(val);
-      }
+  if (typeof val === 'string') {
+    // Convert _id with 24-char hex string to ObjectId
+    if (key === '_id' && /^[0-9a-fA-F]{24}$/.test(val)) {
+      return new mongoose.Types.ObjectId(val);
     }
+    // Convert ISO date strings to Date objects
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/.test(val)) {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return val;
+  }
 
-    return revived;
-  });
+  if (Array.isArray(val)) {
+    return val.map((item) => reviveValue(item, key));
+  }
+
+  if (typeof val === 'object') {
+    const revivedObj = {};
+    for (const [k, v] of Object.entries(val)) {
+      revivedObj[k] = reviveValue(v, k);
+    }
+    return revivedObj;
+  }
+
+  return val;
+}
+
+function reviveDocuments(docs) {
+  return docs.map((doc) => reviveValue(doc, null));
 }
 
 async function importToLocal() {
-  console.log(`Connecting to Local MongoDB Compass at: ${LOCAL_MONGODB_URI}`);
+  console.log(`Connecting to Local MongoDB at: ${LOCAL_MONGODB_URI}`);
   await mongoose.connect(LOCAL_MONGODB_URI);
   const conn = mongoose.connection;
 
@@ -60,7 +71,7 @@ async function importToLocal() {
     if (Array.isArray(rawData) && rawData.length > 0) {
       const revivedData = reviveDocuments(rawData);
 
-      // Clean existing records in target local collection before import to avoid duplicate key errors
+      // Clean existing records in target local collection before import
       await targetCollection.deleteMany({});
 
       // Insert all records in batches
@@ -76,15 +87,16 @@ async function importToLocal() {
 
   console.log('\n=== VERIFYING LOCAL COMPASS DATABASE: compliance_module ===');
   const cols = await conn.db.listCollections().toArray();
+  let totalDocs = 0;
   for (const c of cols) {
     const count = await conn.db.collection(c.name).countDocuments();
-    if (count > 0) {
-      console.log(`  📊 ${c.name.padEnd(25)} : ${count} records`);
-    }
+    totalDocs += count;
+    console.log(`  📊 ${c.name.padEnd(25)} : ${count.toString().padStart(4)} records`);
   }
 
+  console.log(`\n🎉 Total documents imported into local MongoDB: ${totalDocs}`);
   await mongoose.disconnect();
-  console.log('\nAll data successfully imported into Local MongoDB Compass database: compliance_module');
+  console.log('All data successfully imported into Local MongoDB database: compliance_module');
 }
 
 importToLocal().catch((err) => {
