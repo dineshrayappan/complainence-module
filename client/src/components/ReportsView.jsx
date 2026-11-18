@@ -54,6 +54,7 @@ import autoTable from 'jspdf-autotable';
 import { useAuth } from '../context/AuthContext';
 import { useUnit } from '../context/UnitContext';
 import { drawNCWithPhotos, generateSingleNCPdf } from '../utils/ncPdfGenerator';
+import { ExportColumnsModal } from './ExportColumnsModal';
 // Pure NC/CAPA Report - no external mock collections
 
 export const ReportsView = ({
@@ -68,6 +69,8 @@ export const ReportsView = ({
   const { units, activeUnitId, isCompanyAdmin, canSwitchUnits } = useUnit();
   const [downloadingCSV, setDownloadingCSV] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportModalFormat, setExportModalFormat] = useState('CSV');
 
   // ---------------------------------------------------------------------------
   // REPORT VIEW NAVIGATION MODES (Preserving Master Register & Adding Modes)
@@ -1024,11 +1027,339 @@ export const ReportsView = ({
   };
 
   // ---------------------------------------------------------------------------
-  // DYNAMIC PDF & CSV EXPORTS (Dispatched based on Active Report Mode)
+  // 3. DEFECT CATEGORIES SUMMARY LIST
   // ---------------------------------------------------------------------------
-  const handleExportPDF = async () => {
+  const categoryStatsList = useMemo(() => {
+    return allDefectCategories.map((category) => {
+      const catComplaints = filteredComplaints.filter((c) =>
+        norm(getDefectCategory(c)) === norm(category)
+      );
+      const totalNC = catComplaints.length;
+      const criticalNC = catComplaints.filter(
+        (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
+      ).length;
+      const majorNC = catComplaints.filter(
+        (c) =>
+          (c.priority || c.riskSeverity || '').toUpperCase() === 'HIGH' ||
+          (c.priority || c.riskSeverity || '').toUpperCase() === 'MAJOR'
+      ).length;
+      const minorNC = catComplaints.filter(
+        (c) =>
+          (c.priority || c.riskSeverity || '').toUpperCase() === 'MEDIUM' ||
+          (c.priority || c.riskSeverity || '').toUpperCase() === 'LOW' ||
+          (c.priority || c.riskSeverity || '').toUpperCase() === 'MINOR'
+      ).length;
+      const observationNC = catComplaints.filter(
+        (c) => (c.priority || c.riskSeverity || '').toUpperCase() === 'OBSERVATION'
+      ).length;
+      const openNC = catComplaints.filter((c) =>
+        ['Open', 'Assigned', 'In Progress'].includes(c.status)
+      ).length;
+      const pendingNC = catComplaints.filter((c) =>
+        ['CAP Submitted', 'Under Review', 'Under Verification', 'Rejected / Rework', 'Draft'].includes(c.status)
+      ).length;
+      const closedNC = catComplaints.filter((c) =>
+        ['Closed', 'Verified'].includes(c.status)
+      ).length;
+      const overdueNC = catComplaints.filter((c) => {
+        if (['Closed', 'Verified'].includes(c.status)) return false;
+        return c.deadlineTimestamp && Date.now() > new Date(c.deadlineTimestamp).getTime();
+      }).length;
+
+      const capRate = totalNC > 0 ? Math.round((closedNC / totalNC) * 100) : 0;
+      const depts = Array.from(new Set(catComplaints.map((c) => c.department).filter(Boolean)));
+      const departmentsSummary = depts.length > 0 ? depts.join(', ') : 'None';
+
+      let statusLabel = 'Clear';
+      if (totalNC > 0) {
+        if (closedNC === totalNC) statusLabel = '100% Resolved';
+        else if (overdueNC > 0) statusLabel = `${overdueNC} Overdue Breaches`;
+        else if (pendingNC > 0) statusLabel = `${pendingNC} In Review`;
+        else statusLabel = `${openNC} Open Defect Actions`;
+      }
+
+      return {
+        category,
+        totalNC,
+        criticalNC,
+        majorNC,
+        minorNC,
+        observationNC,
+        openNC,
+        pendingNC,
+        closedNC,
+        overdueNC,
+        capRate,
+        departments: depts,
+        departmentsSummary,
+        statusLabel,
+        complaints: catComplaints,
+      };
+    });
+  }, [allDefectCategories, filteredComplaints]);
+
+  // ---------------------------------------------------------------------------
+  // EXPORT COLUMNS DEFINITIONS & PRESETS (For Dynamic CSV & PDF Export Checklist)
+  // ---------------------------------------------------------------------------
+  const { currentAvailableColumns, currentPresets, currentReportTitle, currentDatasetCount } = useMemo(() => {
+    if (activeReportTab === 'dept-report') {
+      return {
+        currentReportTitle: 'Department Summary',
+        currentDatasetCount: departmentStatsList.length,
+        currentAvailableColumns: [
+          { id: 'department', label: 'Department Name', category: 'General', default: true, getValue: (d) => d.department },
+          { id: 'code', label: 'Department Code', category: 'General', default: false, getValue: (d) => d.code || '' },
+          { id: 'manager', label: 'Department Manager / Person', category: 'General', default: true, getValue: (d) => d.manager || '—' },
+          { id: 'headcount', label: 'Factory Headcount', category: 'General', default: false, getValue: (d) => String(d.headcount || 0) },
+          { id: 'totalNC', label: 'Total NCs Raised', category: 'Metrics', default: true, getValue: (d) => String(d.totalNC) },
+          { id: 'openNC', label: 'Open / In Progress NCs', category: 'Metrics', default: true, getValue: (d) => String(d.openNC) },
+          { id: 'closedNC', label: 'Verified & Closed NCs', category: 'Metrics', default: true, getValue: (d) => String(d.closedNC) },
+          { id: 'pendingNC', label: 'Pending CAP Review NCs', category: 'Metrics', default: true, getValue: (d) => String(d.pendingNC) },
+          { id: 'overdueNC', label: 'Overdue SLA Breaches', category: 'Metrics', default: true, getValue: (d) => String(d.overdueNC) },
+          { id: 'criticalNC', label: 'Critical Risk NCs', category: 'Metrics', default: false, getValue: (d) => String(d.criticalNC) },
+          { id: 'capRate', label: 'CAP Completion Rate (%)', category: 'Performance', default: true, getValue: (d) => `${d.capRate}%` },
+          { id: 'capStatusLabel', label: 'CAP Status Label', category: 'Performance', default: true, getValue: (d) => d.capStatusLabel },
+        ],
+        currentPresets: [
+          { id: 'essential', label: 'Essential Metrics', columns: ['department', 'manager', 'totalNC', 'openNC', 'closedNC', 'capRate'] },
+          { id: 'full', label: 'Complete Department Matrix', columns: ['department', 'code', 'manager', 'headcount', 'totalNC', 'openNC', 'closedNC', 'pendingNC', 'overdueNC', 'criticalNC', 'capRate', 'capStatusLabel'] },
+        ],
+      };
+    }
+
+    if (activeReportTab === 'category-report') {
+      if (selectedCategoryDetail) {
+        const currentCat = categoryStatsList.find((cat) => norm(cat.category) === norm(selectedCategoryDetail));
+        const catComplaints = currentCat ? currentCat.complaints : [];
+        return {
+          currentReportTitle: `Defect Category: ${selectedCategoryDetail}`,
+          currentDatasetCount: catComplaints.length,
+          currentAvailableColumns: [
+            { id: 'complaintId', label: 'NC ID', category: 'Basic Details', default: true, getValue: (c) => c.complaintId || '' },
+            { id: 'category', label: 'Defect Category', category: 'Basic Details', default: true, getValue: (c) => getDefectCategory(c) },
+            { id: 'department', label: 'Department', category: 'Basic Details', default: true, getValue: (c) => c.department || '' },
+            { id: 'plantUnit', label: 'Plant Unit', category: 'Basic Details', default: false, getValue: (c) => c.unitName || (c.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1') },
+            { id: 'priority', label: 'Risk Severity', category: 'Basic Details', default: true, getValue: (c) => (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase() },
+            { id: 'status', label: 'Lifecycle Status', category: 'Basic Details', default: true, getValue: (c) => c.status || '' },
+            { id: 'findingDescription', label: 'Finding Description', category: 'Finding Details', default: true, getValue: (c) => getFindingText(c), getPdfValue: (c) => getFindingText(c).slice(0, 45) },
+            { id: 'assignedTo', label: 'Assigned Resolver', category: 'Auditor & Ownership', default: true, getValue: (c) => getAssignedToName(c) },
+            { id: 'createdAt', label: 'Logged Date', category: 'Dates & SLA', default: true, getValue: (c) => c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '' },
+            { id: 'deadlineTimestamp', label: 'Target Due Date', category: 'Dates & SLA', default: false, getValue: (c) => c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : '' },
+            { id: 'immediateCorrection', label: 'Immediate Correction', category: 'CAPA & Root Cause', default: false, getValue: (c) => getImmediateCorrectionText(c) },
+            { id: 'rootCause', label: 'Root Cause', category: 'CAPA & Root Cause', default: false, getValue: (c) => getRootCauseText(c) },
+            { id: 'correctiveAction', label: 'Corrective Action (CAPA)', category: 'CAPA & Root Cause', default: false, getValue: (c) => getCorrectiveActionText(c) },
+            { id: 'preventiveAction', label: 'Preventive Action', category: 'CAPA & Root Cause', default: false, getValue: (c) => getPreventiveActionText(c) },
+            { id: 'actualCompletedAt', label: 'Closed Date', category: 'Dates & SLA', default: false, getValue: (c) => c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : '' },
+          ],
+          currentPresets: [
+            { id: 'cat-summary', label: 'Core Summary', columns: ['complaintId', 'category', 'department', 'priority', 'status', 'findingDescription', 'assignedTo'] },
+            { id: 'cat-capa', label: 'CAPA Details', columns: ['complaintId', 'findingDescription', 'immediateCorrection', 'rootCause', 'correctiveAction', 'preventiveAction'] },
+          ],
+        };
+      }
+
+      return {
+        currentReportTitle: 'Defect Category Matrix',
+        currentDatasetCount: categoryStatsList.length,
+        currentAvailableColumns: [
+          { id: 'category', label: 'Defect Category', category: 'General', default: true, getValue: (cat) => cat.category },
+          { id: 'totalNC', label: 'Total NCs Raised', category: 'Volume', default: true, getValue: (cat) => String(cat.totalNC) },
+          { id: 'criticalNC', label: 'Critical Risk NCs', category: 'Severity', default: true, getValue: (cat) => String(cat.criticalNC) },
+          { id: 'majorNC', label: 'Major Risk NCs', category: 'Severity', default: false, getValue: (cat) => String(cat.majorNC) },
+          { id: 'minorNC', label: 'Minor Risk NCs', category: 'Severity', default: false, getValue: (cat) => String(cat.minorNC) },
+          { id: 'observationNC', label: 'Observation NCs', category: 'Severity', default: false, getValue: (cat) => String(cat.observationNC) },
+          { id: 'openNC', label: 'Open NCs', category: 'Status', default: true, getValue: (cat) => String(cat.openNC) },
+          { id: 'pendingNC', label: 'CAPA Under Review', category: 'Status', default: true, getValue: (cat) => String(cat.pendingNC) },
+          { id: 'closedNC', label: 'Verified & Closed NCs', category: 'Status', default: true, getValue: (cat) => String(cat.closedNC) },
+          { id: 'overdueNC', label: 'Overdue SLA Breaches', category: 'Status', default: true, getValue: (cat) => String(cat.overdueNC) },
+          { id: 'capRate', label: 'Resolution Rate (%)', category: 'Performance', default: true, getValue: (cat) => `${cat.capRate}%` },
+          { id: 'departmentsSummary', label: 'Affected Departments', category: 'General', default: true, getValue: (cat) => cat.departmentsSummary || '' },
+          { id: 'statusLabel', label: 'Status Label', category: 'Performance', default: false, getValue: (cat) => cat.statusLabel },
+        ],
+        currentPresets: [
+          { id: 'cat-essential', label: 'Key Overview', columns: ['category', 'totalNC', 'criticalNC', 'openNC', 'closedNC', 'capRate'] },
+          { id: 'cat-full', label: 'Full Category Matrix', columns: ['category', 'totalNC', 'criticalNC', 'majorNC', 'minorNC', 'openNC', 'pendingNC', 'closedNC', 'overdueNC', 'capRate', 'departmentsSummary'] },
+        ],
+      };
+    }
+
+    if (activeReportTab === 'members-report') {
+      return {
+        currentReportTitle: 'Department Members Report',
+        currentDatasetCount: memberStatsList.length,
+        currentAvailableColumns: [
+          { id: 'name', label: 'Member Name', category: 'Profile', default: true, getValue: (m) => m.name },
+          { id: 'employeeId', label: 'Employee ID', category: 'Profile', default: true, getValue: (m) => m.employeeId || '' },
+          { id: 'department', label: 'Assigned Department', category: 'Profile', default: true, getValue: (m) => m.department },
+          { id: 'designation', label: 'Designation', category: 'Profile', default: true, getValue: (m) => m.designation || '—' },
+          { id: 'role', label: 'User Role', category: 'Profile', default: false, getValue: (m) => m.role || 'ACTION_PERSON' },
+          { id: 'mobileNumber', label: 'Contact Mobile Number', category: 'Contact', default: false, getValue: (m) => m.mobileNumber || '' },
+          { id: 'email', label: 'Email Address', category: 'Contact', default: false, getValue: (m) => m.email || '' },
+          { id: 'totalNC', label: 'Total NCs Assigned', category: 'Metrics', default: true, getValue: (m) => String(m.totalNC) },
+          { id: 'openNC', label: 'Open / In Progress NCs', category: 'Metrics', default: true, getValue: (m) => String(m.openNC) },
+          { id: 'closedNC', label: 'Closed & Verified NCs', category: 'Metrics', default: true, getValue: (m) => String(m.closedNC) },
+          { id: 'pendingNC', label: 'Pending CAP Review NCs', category: 'Metrics', default: true, getValue: (m) => String(m.pendingNC) },
+          { id: 'overdueNC', label: 'Overdue SLA NCs', category: 'Metrics', default: true, getValue: (m) => String(m.overdueNC) },
+          { id: 'capRate', label: 'CAP Completion Rate (%)', category: 'Performance', default: true, getValue: (m) => `${m.capRate}%` },
+          { id: 'capStatusLabel', label: 'Accountability Status', category: 'Performance', default: true, getValue: (m) => m.capStatusLabel },
+        ],
+        currentPresets: [
+          { id: 'mem-core', label: 'Member Core', columns: ['name', 'employeeId', 'department', 'designation', 'totalNC', 'openNC', 'closedNC', 'capRate'] },
+          { id: 'mem-full', label: 'All Member Details', columns: ['name', 'employeeId', 'department', 'designation', 'role', 'mobileNumber', 'email', 'totalNC', 'openNC', 'closedNC', 'pendingNC', 'overdueNC', 'capRate', 'capStatusLabel'] },
+        ],
+      };
+    }
+
+    if (activeReportTab === 'member-detail') {
+      return {
+        currentReportTitle: `Member Dossier: ${activeMember ? activeMember.name : 'Individual'}`,
+        currentDatasetCount: activeMemberComplaints.length,
+        currentAvailableColumns: [
+          { id: 'complaintId', label: 'Non-Conformance ID', category: 'Basic Details', default: true, getValue: (c) => c.complaintId || '' },
+          { id: 'assignedName', label: 'Assigned Member Name', category: 'Basic Details', default: false, getValue: (c) => activeMember?.name || getAssignedToName(c) },
+          { id: 'assignedEmpId', label: 'Member Employee ID', category: 'Basic Details', default: false, getValue: (c) => activeMember?.employeeId || c.assignedTo?.employeeId || '' },
+          { id: 'department', label: 'Department', category: 'Basic Details', default: true, getValue: (c) => c.department || '' },
+          { id: 'location', label: 'Plant Location', category: 'Basic Details', default: false, getValue: (c) => c.location || '' },
+          { id: 'priority', label: 'Risk Severity', category: 'Basic Details', default: true, getValue: (c) => c.priority || c.riskSeverity || 'Medium' },
+          { id: 'status', label: 'Current Lifecycle Status', category: 'Basic Details', default: true, getValue: (c) => c.status || 'Open' },
+          { id: 'findingDescription', label: 'Finding Description', category: 'Finding Details', default: true, getValue: (c) => getFindingText(c), getPdfValue: (c) => getFindingText(c).slice(0, 45) },
+          { id: 'requirement', label: 'Quality Requirement / Standard', category: 'Finding Details', default: false, getValue: (c) => c.requirement || '—' },
+          { id: 'createdAt', label: 'NC Creation Date', category: 'Dates & SLA', default: true, getValue: (c) => c.createdAt ? new Date(c.createdAt).toLocaleString() : '', getPdfValue: (c) => c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '' },
+          { id: 'auditorName', label: 'Auditor Name', category: 'Auditor & Ownership', default: false, getValue: (c) => getAuditorName(c) },
+          { id: 'rootCause', label: '5-Why Root Cause', category: 'CAPA & Root Cause', default: false, getValue: (c) => getRootCauseText(c) },
+          { id: 'immediateCorrection', label: 'Immediate Containment Action', category: 'CAPA & Root Cause', default: false, getValue: (c) => getImmediateCorrectionText(c) },
+          { id: 'correctiveAction', label: 'Permanent Corrective Action', category: 'CAPA & Root Cause', default: false, getValue: (c) => getCorrectiveActionText(c) },
+          { id: 'preventiveAction', label: 'Preventive Recurrence Plan', category: 'CAPA & Root Cause', default: false, getValue: (c) => getPreventiveActionText(c) },
+          { id: 'capTargetDate', label: 'CAP Target Due Date', category: 'Dates & SLA', default: false, getValue: (c) => getCapTargetDate(c) },
+          { id: 'verificationMethod', label: 'Verification Method', category: 'Verification & Evidence', default: false, getValue: (c) => c.verificationMethod || '—' },
+          { id: 'verificationReadinessNotes', label: 'Auditor Readiness Notes', category: 'Verification & Evidence', default: false, getValue: (c) => c.cap?.verificationReadinessNotes || '' },
+          { id: 'actualCompletedAt', label: 'Approved Closure Date', category: 'Dates & SLA', default: true, getValue: (c) => c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure', getPdfValue: (c) => c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : 'Pending' },
+          { id: 'beforePhoto', label: 'Before Photo Status', category: 'Verification & Evidence', default: false, getValue: (c) => c.beforePhoto ? 'Yes (Photo Attached)' : 'No' },
+          { id: 'afterPhoto', label: 'After Photo Status', category: 'Verification & Evidence', default: false, getValue: (c) => c.afterPhoto ? 'Yes (Proof Attached)' : 'Pending' },
+        ],
+        currentPresets: [
+          { id: 'dossier-core', label: 'Core Register', columns: ['complaintId', 'department', 'priority', 'status', 'findingDescription', 'createdAt', 'actualCompletedAt'] },
+          { id: 'dossier-capa', label: 'CAPA Root Cause', columns: ['complaintId', 'findingDescription', 'rootCause', 'immediateCorrection', 'correctiveAction', 'preventiveAction', 'capTargetDate'] },
+        ],
+      };
+    }
+
+    // Default: audit-register (Master Register)
+    return {
+      currentReportTitle: 'Master Non-Conformance Register',
+      currentDatasetCount: datasetToExport.length,
+      currentAvailableColumns: [
+        { id: 'complaintId', label: 'Non-Conformance ID', category: 'Basic Details', default: true, getValue: (c) => c.complaintId || 'NC-N/A' },
+        { id: 'recordStatus', label: 'Record Status', category: 'Basic Details', default: false, getValue: (c) => (c.isDeleted ? 'Deleted NC' : 'Active NC') },
+        { id: 'status', label: 'Lifecycle Status', category: 'Basic Details', default: true, getValue: (c) => (c.isDeleted ? `Deleted (${c.status})` : c.status || 'Open') },
+        { id: 'priority', label: 'Risk Severity / Priority', category: 'Basic Details', default: true, getValue: (c) => (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase() },
+        { id: 'department', label: 'Department', category: 'Basic Details', default: true, getValue: (c) => c.department || '—' },
+        { id: 'location', label: 'Plant Location / Station', category: 'Basic Details', default: false, getValue: (c) => c.location || '—' },
+        { id: 'unit', label: 'Factory Unit', category: 'Basic Details', default: false, getValue: (c) => c.unitName || (c.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1') },
+        { id: 'defectCategory', label: 'Defect Category', category: 'Basic Details', default: false, getValue: (c) => getDefectCategory(c) },
+        { id: 'findingDescription', label: 'Defect Finding Description', category: 'Finding Details', default: true, getValue: (c) => getFindingText(c), getPdfValue: (c) => getFindingText(c).slice(0, 45) },
+        { id: 'requirement', label: 'Quality Requirement', category: 'Finding Details', default: false, getValue: (c) => c.requirement || '—' },
+        { id: 'issueFrequency', label: 'Issue Occurrence Frequency', category: 'Finding Details', default: false, getValue: (c) => String(getIssueFrequency(c)) },
+        { id: 'ticketAging', label: 'Ticket Aging Duration', category: 'Dates & SLA', default: false, getValue: (c) => getTicketAgeLabel(c) },
+        { id: 'createdAt', label: 'Creation Timestamp', category: 'Dates & SLA', default: true, getValue: (c) => (c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A'), getPdfValue: (c) => (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A') },
+        { id: 'deadlineTimestamp', label: 'Target SLA Deadline Date', category: 'Dates & SLA', default: false, getValue: (c) => (c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleString() : '—'), getPdfValue: (c) => (c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : '—') },
+        { id: 'deadlineHours', label: 'SLA Target Duration (Hours)', category: 'Dates & SLA', default: false, getValue: (c) => String(c.deadlineHours || 24) },
+        {
+          id: 'slaCondition',
+          label: 'SLA Condition Status',
+          category: 'Dates & SLA',
+          default: true,
+          getValue: (c) => {
+            const isOverdue = c.status !== 'Closed' && c.status !== 'Verified' && c.deadlineTimestamp && Date.now() > new Date(c.deadlineTimestamp).getTime();
+            return isOverdue ? 'Overdue Breach' : 'Within SLA';
+          },
+        },
+        { id: 'assignedTo', label: 'Assigned To (Responsible)', category: 'Auditor & Ownership', default: true, getValue: (c) => getAssignedToName(c) },
+        { id: 'assignedEmpId', label: 'Assigned Supervisor Employee ID', category: 'Auditor & Ownership', default: false, getValue: (c) => c.assignedTo?.employeeId || '' },
+        { id: 'assignedDesignation', label: 'Assigned Supervisor Designation', category: 'Auditor & Ownership', default: false, getValue: (c) => c.assignedTo?.designation || '' },
+        { id: 'auditorName', label: 'Auditor Name', category: 'Auditor & Ownership', default: false, getValue: (c) => getAuditorName(c) },
+        { id: 'auditorEmpId', label: 'Auditor Employee ID', category: 'Auditor & Ownership', default: false, getValue: (c) => c.createdBy?.employeeId || '' },
+        { id: 'capRequired', label: 'CAP Requirement', category: 'CAPA & Root Cause', default: false, getValue: (c) => (c.capRequired ? 'Mandatory CAP' : 'Direct Correction') },
+        { id: 'capStatus', label: 'CAP Lifecycle Status', category: 'CAPA & Root Cause', default: false, getValue: (c) => c.cap?.status || (c.status === 'Closed' ? 'VERIFIED_EFFECTIVE' : 'IN_PROGRESS') },
+        { id: 'immediateCorrection', label: 'Immediate Correction (Containment)', category: 'CAPA & Root Cause', default: false, getValue: (c) => getImmediateCorrectionText(c) },
+        { id: 'rootCause', label: 'Root Cause (5-Why Analysis)', category: 'CAPA & Root Cause', default: false, getValue: (c) => getRootCauseText(c) },
+        { id: 'correctiveAction', label: 'Corrective Action (Permanent Fix)', category: 'CAPA & Root Cause', default: false, getValue: (c) => getCorrectiveActionText(c) },
+        { id: 'preventiveAction', label: 'Preventive Action Plan', category: 'CAPA & Root Cause', default: false, getValue: (c) => getPreventiveActionText(c) },
+        { id: 'capTargetDate', label: 'CAP Target Date', category: 'CAPA & Root Cause', default: false, getValue: (c) => getCapTargetDate(c) },
+        { id: 'beforePhoto', label: 'Before Photo Attached Status', category: 'Verification & Evidence', default: false, getValue: (c) => (c.beforePhoto ? 'Yes (Photo Captured)' : 'No Photo') },
+        { id: 'afterPhoto', label: 'After Proof Photo Evidence', category: 'Verification & Evidence', default: false, getValue: (c) => (c.afterPhoto ? 'Yes (Proof Uploaded)' : 'Pending After Proof') },
+        { id: 'actualCompletedAt', label: 'Approved Closure Date', category: 'Verification & Evidence', default: false, getValue: (c) => (c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure'), getPdfValue: (c) => (c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : 'Pending') },
+        { id: 'deletedAt', label: 'Deleted Timestamp', category: 'Audit Log', default: false, getValue: (c) => (c.deletedAt ? new Date(c.deletedAt).toLocaleString() : ''), getPdfValue: (c) => (c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : '') },
+        { id: 'deletedBy', label: 'Deleted By', category: 'Audit Log', default: false, getValue: (c) => (typeof c.deletedBy === 'object' ? c.deletedBy?.name : (c.deletedBy || '')) },
+      ],
+      currentPresets: [
+        {
+          id: 'master-core',
+          label: 'Core Summary (8 cols)',
+          columns: ['complaintId', 'department', 'priority', 'status', 'findingDescription', 'assignedTo', 'createdAt', 'slaCondition'],
+        },
+        {
+          id: 'master-capa',
+          label: 'CAPA & Root Cause (8 cols)',
+          columns: ['complaintId', 'findingDescription', 'immediateCorrection', 'rootCause', 'correctiveAction', 'preventiveAction', 'capTargetDate', 'capStatus'],
+        },
+        {
+          id: 'master-sla',
+          label: 'SLA & Timelines (8 cols)',
+          columns: ['complaintId', 'department', 'status', 'createdAt', 'deadlineTimestamp', 'deadlineHours', 'slaCondition', 'actualCompletedAt'],
+        },
+        {
+          id: 'master-ownership',
+          label: 'Auditor & Ownership (8 cols)',
+          columns: ['complaintId', 'department', 'auditorName', 'auditorEmpId', 'assignedTo', 'assignedEmpId', 'assignedDesignation', 'status'],
+        },
+      ],
+    };
+  }, [
+    activeReportTab,
+    selectedDeptDetail,
+    selectedCategoryDetail,
+    departmentStatsList,
+    categoryStatsList,
+    memberStatsList,
+    activeMember,
+    activeMemberComplaints,
+    datasetToExport,
+  ]);
+
+  // Open Export Checklist Modal
+  const handleOpenExportModal = (targetFormat = 'CSV') => {
+    setExportModalFormat(targetFormat);
+    setIsExportModalOpen(true);
+  };
+
+  // Execute export with customized columns
+  const handleExecuteExport = async ({ format: targetFormat, selectedColumnIds, includePhotos }) => {
+    setIsExportModalOpen(false);
+    if (targetFormat === 'PDF') {
+      await handleExportPDF({ selectedColumnIds, includePhotos });
+    } else {
+      handleExportCSV({ selectedColumnIds });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // DYNAMIC PDF EXPORT (With Column Selection Checklist)
+  // ---------------------------------------------------------------------------
+  const handleExportPDF = async (options = {}) => {
     setDownloadingPDF(true);
     try {
+      const selectedColumnIds = options.selectedColumnIds;
+      const includePhotos = options.includePhotos !== false;
+
+      let selectedCols = currentAvailableColumns;
+      if (Array.isArray(selectedColumnIds) && selectedColumnIds.length > 0) {
+        selectedCols = currentAvailableColumns.filter((col) => selectedColumnIds.includes(col.id));
+      }
+      if (selectedCols.length === 0) {
+        selectedCols = currentAvailableColumns;
+      }
+
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'pt',
@@ -1071,79 +1402,6 @@ export const ReportsView = ({
         reportTitle = selectedCategoryDetail
           ? `Defect Category Audit Report: ${selectedCategoryDetail}`
           : 'Category-wise Defect & CAPA Performance Register';
-      } else if (activeReportTab === 'category-report') {
-        if (selectedCategoryDetail) {
-          const safeName = selectedCategoryDetail.replace(/[^a-zA-Z0-9]/g, '_');
-          filename = `Garment_QMS_Category_${safeName}_NC_Report_${new Date().toISOString().slice(0, 10)}.csv`;
-          const currentCat = categoryStatsList.find((cat) => norm(cat.category) === norm(selectedCategoryDetail));
-          const catComplaints = currentCat ? currentCat.complaints : [];
-          headers = [
-            'Non-Conformance ID',
-            'Defect Category',
-            'Department',
-            'Plant Unit',
-            'Risk Severity',
-            'Lifecycle Status',
-            'Finding Description',
-            'Assigned Resolver',
-            'Logged Date',
-            'Target Due Date',
-            'Immediate Correction',
-            'Root Cause',
-            'Corrective Action (CAPA)',
-            'Preventive Action',
-            'Closed Date',
-          ];
-          rows = catComplaints.map((c) => [
-            `"${c.complaintId || ''}"`,
-            `"${getDefectCategory(c)}"`,
-            `"${c.department || ''}"`,
-            `"${c.unitName || (c.unitId === 'UNIT-2' ? 'Unit 2' : 'Unit 1')}"`,
-            `"${(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}"`,
-            `"${c.status || ''}"`,
-            `"${(getFindingText(c) || '').replace(/"/g, '""')}"`,
-            `"${getAssignedToName(c)}"`,
-            `"${c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''}"`,
-            `"${c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : ''}"`,
-            `"${(getImmediateCorrectionText(c) || '').replace(/"/g, '""')}"`,
-            `"${(getRootCauseText(c) || '').replace(/"/g, '""')}"`,
-            `"${(getCorrectiveActionText(c) || '').replace(/"/g, '""')}"`,
-            `"${(getPreventiveActionText(c) || '').replace(/"/g, '""')}"`,
-            `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleDateString() : ''}"`,
-          ]);
-        } else {
-          filename = `Garment_QMS_Defect_Category_Summary_${new Date().toISOString().slice(0, 10)}.csv`;
-          headers = [
-            'Defect Category',
-            'Total NCs Raised',
-            'Critical Risk NCs',
-            'Major Risk NCs',
-            'Minor Risk NCs',
-            'Observation NCs',
-            'Open NCs',
-            'CAPA Under Review',
-            'Verified & Closed NCs',
-            'Overdue SLA Breaches',
-            'Resolution Rate (%)',
-            'Affected Departments',
-            'Status Label',
-          ];
-          rows = categoryStatsList.map((cat) => [
-            `"${cat.category}"`,
-            `"${cat.totalNC}"`,
-            `"${cat.criticalNC}"`,
-            `"${cat.majorNC}"`,
-            `"${cat.minorNC}"`,
-            `"${cat.observationNC}"`,
-            `"${cat.openNC}"`,
-            `"${cat.pendingNC}"`,
-            `"${cat.closedNC}"`,
-            `"${cat.overdueNC}"`,
-            `"${cat.capRate}%"`,
-            `"${cat.departmentsSummary || ''}"`,
-            `"${cat.statusLabel}"`,
-          ]);
-        }
       } else if (activeReportTab === 'members-report') {
         reportTitle = 'Department Members NC & CAPA Accountability Report';
       } else if (activeReportTab === 'member-detail') {
@@ -1181,56 +1439,30 @@ export const ReportsView = ({
       // TAB 2: DEPARTMENT-WISE REPORT PDF
       // -----------------------------------------------------------------------
       if (activeReportTab === 'dept-report') {
-        const deptRows = departmentStatsList.map((d) => [
-          d.department,
-          d.manager || '—',
-          d.totalNC,
-          d.openNC,
-          d.closedNC,
-          d.pendingNC,
-          d.overdueNC,
-          `${d.capRate}%`,
-          d.capStatusLabel,
-        ]);
+        const deptRows = departmentStatsList.map((d) =>
+          selectedCols.map((col) => (col.getPdfValue ? col.getPdfValue(d) : col.getValue(d)))
+        );
 
         autoTable(doc, {
           startY,
-          head: [[
-            'Department',
-            'Manager / Responsible Person',
-            'Total NCs',
-            'Open',
-            'Closed',
-            'Pending',
-            'Overdue',
-            'CAP Rate',
-            'CAP Status',
-          ]],
+          head: [selectedCols.map((c) => c.label)],
           body: deptRows,
           theme: 'grid',
           headStyles: {
             fillColor: [37, 99, 235],
             textColor: [255, 255, 255],
-            fontSize: 8,
+            fontSize: selectedCols.length > 8 ? 6.5 : 8,
             fontStyle: 'bold',
           },
           styles: {
-            fontSize: 7.5,
+            fontSize: selectedCols.length > 8 ? 6 : 7.5,
             cellPadding: 4,
-          },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 100 },
-            2: { halign: 'center', fontStyle: 'bold' },
-            3: { halign: 'center', textColor: [217, 119, 6] },
-            4: { halign: 'center', textColor: [16, 185, 129] },
-            5: { halign: 'center', textColor: [124, 58, 237] },
-            6: { halign: 'center', textColor: [225, 29, 72] },
-            7: { halign: 'center', fontStyle: 'bold' },
           },
         });
 
         // If department drilled down or filtered, print its NC register and photo evidence
         const targetDept = selectedDeptDetail || (departmentFilter !== 'ALL' ? departmentFilter : null);
+        const deptObj = targetDept ? departmentStatsList.find((d) => norm(d.department) === norm(targetDept)) : null;
         const ncListToDraw = deptObj ? deptObj.complaints : (datasetToExport.length > 0 ? datasetToExport : []);
 
         if (ncListToDraw.length > 0) {
@@ -1260,19 +1492,21 @@ export const ReportsView = ({
           });
 
           // Detailed photographic evidence for department NCs
-          doc.addPage();
-          let deptPhotoY = margin + 15;
-          doc.setFillColor(...brandPrimary);
-          doc.roundedRect(margin, deptPhotoY, contentWidth, 24, 4, 4, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(255, 255, 255);
-          doc.text(`Photographic Defect & Corrective Verification Evidence (${targetDept || 'Department'})`, margin + 10, deptPhotoY + 16);
-          deptPhotoY += 34;
+          if (includePhotos) {
+            doc.addPage();
+            let deptPhotoY = margin + 15;
+            doc.setFillColor(...brandPrimary);
+            doc.roundedRect(margin, deptPhotoY, contentWidth, 24, 4, 4, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(255, 255, 255);
+            doc.text(`Photographic Defect & Corrective Verification Evidence (${targetDept || 'Department'})`, margin + 10, deptPhotoY + 16);
+            deptPhotoY += 34;
 
-          for (let idx = 0; idx < ncListToDraw.length; idx++) {
-            const c = ncListToDraw[idx];
-            deptPhotoY = await drawNCWithPhotos(doc, c, deptPhotoY, pageWidth, margin, contentWidth, idx);
+            for (let idx = 0; idx < ncListToDraw.length; idx++) {
+              const c = ncListToDraw[idx];
+              deptPhotoY = await drawNCWithPhotos(doc, c, deptPhotoY, pageWidth, margin, contentWidth, idx);
+            }
           }
         }
 
@@ -1282,109 +1516,64 @@ export const ReportsView = ({
       // TAB: DEFECT CATEGORY WISE REPORT PDF
       // -----------------------------------------------------------------------
       else if (activeReportTab === 'category-report') {
-        const catRows = categoryStatsList.map((cat, idx) => [
-          idx + 1,
-          cat.category,
-          cat.totalNC,
-          cat.criticalNC,
-          cat.openNC,
-          cat.pendingNC,
-          cat.closedNC,
-          cat.overdueNC,
-          `${cat.capRate}%`,
-          cat.statusLabel,
-          cat.departmentsSummary || '—',
-        ]);
-
-        autoTable(doc, {
-          startY,
-          head: [[
-            '#',
-            'Defect Category',
-            'Total',
-            'Critical',
-            'Open',
-            'Pending',
-            'Closed',
-            'Overdue',
-            'CAPA Rate',
-            'Status',
-            'Affected Departments',
-          ]],
-          body: catRows,
-          theme: 'grid',
-          headStyles: {
-            fillColor: [217, 119, 6],
-            textColor: [255, 255, 255],
-            fontSize: 7.5,
-            fontStyle: 'bold',
-          },
-          styles: {
-            fontSize: 7,
-            cellPadding: 3.5,
-          },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 15 },
-            1: { fontStyle: 'bold', cellWidth: 85 },
-            2: { halign: 'center', fontStyle: 'bold' },
-            3: { halign: 'center', textColor: [225, 29, 72], fontStyle: 'bold' },
-            4: { halign: 'center', textColor: [217, 119, 6] },
-            5: { halign: 'center', textColor: [124, 58, 237] },
-            6: { halign: 'center', textColor: [16, 185, 129] },
-            7: { halign: 'center', textColor: [225, 29, 72] },
-            8: { halign: 'center', fontStyle: 'bold' },
-            9: { halign: 'center' },
-            10: { cellWidth: 90 },
-          },
-        });
-
-        const targetCat = selectedCategoryDetail || (categoryFilter !== 'ALL' ? categoryFilter : null);
-        const catObj = targetCat ? categoryStatsList.find((c) => norm(c.category) === norm(targetCat)) : null;
-        const ncListToDraw = catObj ? catObj.complaints : (datasetToExport.length > 0 ? datasetToExport : []);
-
-        if (ncListToDraw.length > 0) {
-          const nextY = doc.lastAutoTable.finalY + 16;
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10.5);
-          doc.setTextColor(...brandDark);
-          doc.text(`Non-Conformance Register for Category: ${targetCat || 'All Defect Categories'}`, margin, nextY);
-
-          const ncRows = ncListToDraw.map((c) => [
-            c.complaintId || 'NC-N/A',
-            getDefectCategory(c).slice(0, 25),
-            c.department || '—',
-            getFindingText(c).slice(0, 45),
-            getAssignedToName(c),
-            (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase(),
-            c.status,
-            c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A',
-            c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleDateString() : 'N/A',
-          ]);
+        if (selectedCategoryDetail) {
+          const currentCat = categoryStatsList.find((cat) => norm(cat.category) === norm(selectedCategoryDetail));
+          const catComplaints = currentCat ? currentCat.complaints : [];
+          const catRows = catComplaints.map((c) =>
+            selectedCols.map((col) => (col.getPdfValue ? col.getPdfValue(c) : col.getValue(c)))
+          );
 
           autoTable(doc, {
-            startY: nextY + 6,
-            head: [['NC ID', 'Category', 'Dept', 'Finding Description', 'Assigned', 'Risk', 'Status', 'Logged', 'Target']],
-            body: ncRows,
-            theme: 'striped',
-            headStyles: { fillColor: [15, 23, 42], fontSize: 7 },
-            styles: { fontSize: 6.5, cellPadding: 2.5 },
+            startY,
+            head: [selectedCols.map((c) => c.label)],
+            body: catRows,
+            theme: 'grid',
+            headStyles: {
+              fillColor: [217, 119, 6],
+              textColor: [255, 255, 255],
+              fontSize: selectedCols.length > 8 ? 6.5 : 7.5,
+              fontStyle: 'bold',
+            },
+            styles: { fontSize: selectedCols.length > 8 ? 6 : 7, cellPadding: 3.5 },
           });
 
-          // Photographic evidence for category NCs
-          doc.addPage();
-          let catPhotoY = margin + 15;
-          doc.setFillColor(...brandPrimary);
-          doc.roundedRect(margin, catPhotoY, contentWidth, 24, 4, 4, 'F');
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.setTextColor(255, 255, 255);
-          doc.text(`Photographic Defect & Corrective Verification Evidence (${targetCat || 'Category'})`, margin + 10, catPhotoY + 16);
-          catPhotoY += 34;
+          if (includePhotos && catComplaints.length > 0) {
+            doc.addPage();
+            let catPhotoY = margin + 15;
+            doc.setFillColor(...brandPrimary);
+            doc.roundedRect(margin, catPhotoY, contentWidth, 24, 4, 4, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(255, 255, 255);
+            doc.text(`Photographic Defect & Corrective Verification Evidence (${selectedCategoryDetail})`, margin + 10, catPhotoY + 16);
+            catPhotoY += 34;
 
-          for (let idx = 0; idx < ncListToDraw.length; idx++) {
-            const c = ncListToDraw[idx];
-            catPhotoY = await drawNCWithPhotos(doc, c, catPhotoY, pageWidth, margin, contentWidth, idx);
+            for (let idx = 0; idx < catComplaints.length; idx++) {
+              const c = catComplaints[idx];
+              catPhotoY = await drawNCWithPhotos(doc, c, catPhotoY, pageWidth, margin, contentWidth, idx);
+            }
           }
+        } else {
+          const catRows = categoryStatsList.map((cat, idx) =>
+            selectedCols.map((col) => {
+              if (col.id === 'index') return String(idx + 1);
+              return col.getPdfValue ? col.getPdfValue(cat) : col.getValue(cat);
+            })
+          );
+
+          autoTable(doc, {
+            startY,
+            head: [selectedCols.map((c) => c.label)],
+            body: catRows,
+            theme: 'grid',
+            headStyles: {
+              fillColor: [217, 119, 6],
+              textColor: [255, 255, 255],
+              fontSize: selectedCols.length > 8 ? 6.5 : 7.5,
+              fontStyle: 'bold',
+            },
+            styles: { fontSize: selectedCols.length > 8 ? 6 : 7, cellPadding: 3.5 },
+          });
         }
 
         doc.save(`Garment_QMS_Defect_Category_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
@@ -1393,53 +1582,25 @@ export const ReportsView = ({
       // TAB 3: DEPARTMENT MEMBERS REPORT PDF
       // -----------------------------------------------------------------------
       else if (activeReportTab === 'members-report') {
-        const memRows = memberStatsList.map((m) => [
-          m.name,
-          m.employeeId || 'N/A',
-          m.department,
-          m.designation || '—',
-          m.totalNC,
-          m.openNC,
-          m.closedNC,
-          m.pendingNC,
-          `${m.capRate}%`,
-          m.capStatusLabel,
-        ]);
+        const memRows = memberStatsList.map((m) =>
+          selectedCols.map((col) => (col.getPdfValue ? col.getPdfValue(m) : col.getValue(m)))
+        );
 
         autoTable(doc, {
           startY,
-          head: [[
-            'Member Name',
-            'Employee ID',
-            'Department',
-            'Designation',
-            'Total NCs',
-            'Open',
-            'Closed',
-            'Pending',
-            'CAP Rate',
-            'Accountability Status',
-          ]],
+          head: [selectedCols.map((c) => c.label)],
           body: memRows,
           theme: 'grid',
           headStyles: {
             fillColor: [79, 70, 229],
             textColor: [255, 255, 255],
-            fontSize: 8,
+            fontSize: selectedCols.length > 8 ? 6.5 : 8,
             fontStyle: 'bold',
           },
-          styles: { fontSize: 7.5, cellPadding: 4 },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 90 },
-            4: { halign: 'center', fontStyle: 'bold' },
-            5: { halign: 'center', textColor: [217, 119, 6] },
-            6: { halign: 'center', textColor: [16, 185, 129] },
-            7: { halign: 'center', textColor: [124, 58, 237] },
-            8: { halign: 'center', fontStyle: 'bold' },
-          },
+          styles: { fontSize: selectedCols.length > 8 ? 6 : 7.5, cellPadding: 4 },
         });
 
-        if (datasetToExport.length > 0) {
+        if (includePhotos && datasetToExport.length > 0) {
           doc.addPage();
           let memPhotoY = margin + 15;
           doc.setFillColor(...brandPrimary);
@@ -1497,16 +1658,33 @@ export const ReportsView = ({
           doc.setTextColor(...brandMuted);
           doc.text('No Non-Conformances currently assigned to this member.', margin, currentY + 20);
         } else {
-          for (let idx = 0; idx < ncList.length; idx++) {
-            const c = ncList[idx];
-            currentY = await drawNCWithPhotos(doc, c, currentY, pageWidth, margin, contentWidth, idx);
+          const memberNcRows = ncList.map((c) =>
+            selectedCols.map((col) => (col.getPdfValue ? col.getPdfValue(c) : col.getValue(c)))
+          );
+
+          autoTable(doc, {
+            startY: currentY,
+            head: [selectedCols.map((c) => c.label)],
+            body: memberNcRows,
+            theme: 'grid',
+            headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold' },
+            styles: { fontSize: 7, cellPadding: 3 },
+          });
+
+          if (includePhotos) {
+            doc.addPage();
+            let photoY = margin + 15;
+            for (let idx = 0; idx < ncList.length; idx++) {
+              const c = ncList[idx];
+              photoY = await drawNCWithPhotos(doc, c, photoY, pageWidth, margin, contentWidth, idx);
+            }
           }
         }
 
         doc.save(`Garment_QMS_Member_${targetMem?.name || 'User'}_NC_Dossier_${new Date().toISOString().slice(0, 10)}.pdf`);
       }
       // -----------------------------------------------------------------------
-      // TAB 1: MASTER AUDIT REGISTER PDF (Existing implementation intact)
+      // TAB 1: MASTER AUDIT REGISTER PDF (With Custom Selected Columns)
       // -----------------------------------------------------------------------
       else {
         // Executive Metrics Scorecard Banner
@@ -1546,69 +1724,36 @@ export const ReportsView = ({
           }
         });
 
-        // Summary Table
-        const tableRows = datasetToExport.map((c) => {
-          const isOverdue =
-            c.status !== 'Closed' &&
-            c.status !== 'Verified' &&
-            c.deadlineTimestamp &&
-            Date.now() > new Date(c.deadlineTimestamp).getTime();
-
-          const cRisk = (c.priority || c.riskSeverity || 'MEDIUM').toUpperCase();
-          const findingSummary = getFindingText(c).slice(0, 45);
-
-          return [
-            c.complaintId || 'NC-N/A',
-            c.department || '—',
-            cRisk,
-            c.isDeleted ? `Deleted (${c.status})` : c.status,
-            findingSummary,
-            getAssignedToName(c),
-            c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A',
-            isOverdue ? 'Overdue Breach' : 'Within SLA',
-          ];
-        });
+        // Summary Table with Selected Columns
+        const tableRows = datasetToExport.map((c) =>
+          selectedCols.map((col) => {
+            if (col.getPdfValue) return col.getPdfValue(c);
+            const val = col.getValue(c);
+            return typeof val === 'string' && val.length > 55 ? `${val.slice(0, 55)}...` : val;
+          })
+        );
 
         autoTable(doc, {
           startY: 182,
-          head: [[
-            'NC ID',
-            'Dept',
-            'Risk',
-            'Status',
-            'Finding Description',
-            'Responsible Person',
-            'Date',
-            'SLA Condition',
-          ]],
+          head: [selectedCols.map((c) => c.label)],
           body: tableRows,
           theme: 'grid',
           headStyles: {
             fillColor: [15, 23, 42],
             textColor: [255, 255, 255],
-            fontSize: 7.5,
+            fontSize: selectedCols.length > 8 ? 6.5 : 7.5,
             fontStyle: 'bold',
           },
           styles: {
-            fontSize: 7,
-            cellPadding: 3,
-          },
-          columnStyles: {
-            0: { fontStyle: 'bold', cellWidth: 60 },
-            1: { cellWidth: 60 },
-            2: { cellWidth: 45 },
-            3: { cellWidth: 55 },
-            4: { cellWidth: 130 },
-            5: { cellWidth: 75 },
-            6: { cellWidth: 50 },
-            7: { cellWidth: 65 },
+            fontSize: selectedCols.length > 8 ? 6 : 7,
+            cellPadding: selectedCols.length > 8 ? 2.5 : 3.5,
           },
         });
 
         // -----------------------------------------------------------------------
         // PHOTOGRAPHIC EVIDENCE & NC DOSSIER SECTION (Before & After Photos)
         // -----------------------------------------------------------------------
-        if (datasetToExport.length > 0) {
+        if (includePhotos && datasetToExport.length > 0) {
           doc.addPage();
           let photoSectionY = margin + 15;
 
@@ -1637,209 +1782,55 @@ export const ReportsView = ({
   };
 
   // ---------------------------------------------------------------------------
-  // CSV EXPORT HANDLER (Dispatched dynamically based on active report mode)
+  // CSV EXPORT HANDLER (With Column Selection Checklist)
   // ---------------------------------------------------------------------------
-  const handleExportCSV = () => {
+  const handleExportCSV = (options = {}) => {
     setDownloadingCSV(true);
     try {
-      let headers = [];
-      let rows = [];
+      const selectedColumnIds = options.selectedColumnIds;
+      let selectedCols = currentAvailableColumns;
+      if (Array.isArray(selectedColumnIds) && selectedColumnIds.length > 0) {
+        selectedCols = currentAvailableColumns.filter((col) => selectedColumnIds.includes(col.id));
+      }
+      if (selectedCols.length === 0) {
+        selectedCols = currentAvailableColumns;
+      }
+
       let filename = 'Garment_QMS_Report.csv';
+      let dataRows = [];
 
       if (activeReportTab === 'dept-report') {
         filename = `Garment_QMS_Department_NC_Summary_${new Date().toISOString().slice(0, 10)}.csv`;
-        headers = [
-          'Department Name',
-          'Department Code',
-          'Department Manager / Responsible Person',
-          'Factory Headcount',
-          'Total NCs Raised',
-          'Open / In Progress NCs',
-          'Verified & Closed NCs',
-          'Pending CAP Review NCs',
-          'Overdue SLA Breaches',
-          'Critical Risk NCs',
-          'CAP Completion Rate (%)',
-          'CAP Status Label',
-        ];
-        rows = departmentStatsList.map((d) => [
-          `"${d.department}"`,
-          `"${d.code || ''}"`,
-          `"${d.manager || ''}"`,
-          `"${d.headcount || 0}"`,
-          `"${d.totalNC}"`,
-          `"${d.openNC}"`,
-          `"${d.closedNC}"`,
-          `"${d.pendingNC}"`,
-          `"${d.overdueNC}"`,
-          `"${d.criticalNC}"`,
-          `"${d.capRate}%"`,
-          `"${d.capStatusLabel}"`,
-        ]);
+        dataRows = departmentStatsList;
+      } else if (activeReportTab === 'category-report') {
+        if (selectedCategoryDetail) {
+          const safeName = selectedCategoryDetail.replace(/[^a-zA-Z0-9]/g, '_');
+          filename = `Garment_QMS_Category_${safeName}_NC_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+          const currentCat = categoryStatsList.find((cat) => norm(cat.category) === norm(selectedCategoryDetail));
+          dataRows = currentCat ? currentCat.complaints : [];
+        } else {
+          filename = `Garment_QMS_Defect_Category_Summary_${new Date().toISOString().slice(0, 10)}.csv`;
+          dataRows = categoryStatsList;
+        }
       } else if (activeReportTab === 'members-report') {
         filename = `Garment_QMS_Department_Members_Report_${new Date().toISOString().slice(0, 10)}.csv`;
-        headers = [
-          'Member Name',
-          'Employee ID',
-          'Assigned Department',
-          'Designation',
-          'User Role',
-          'Contact Mobile Number',
-          'Email Address',
-          'Total NCs Assigned',
-          'Open / In Progress NCs',
-          'Closed & Verified NCs',
-          'Pending CAP Review NCs',
-          'Overdue SLA NCs',
-          'CAP Completion Rate (%)',
-          'Accountability Status',
-        ];
-        rows = memberStatsList.map((m) => [
-          `"${m.name}"`,
-          `"${m.employeeId || ''}"`,
-          `"${m.department}"`,
-          `"${m.designation || '—'}"`,
-          `"${m.role || 'ACTION_PERSON'}"`,
-          `"${m.mobileNumber || ''}"`,
-          `"${m.email || ''}"`,
-          `"${m.totalNC}"`,
-          `"${m.openNC}"`,
-          `"${m.closedNC}"`,
-          `"${m.pendingNC}"`,
-          `"${m.overdueNC}"`,
-          `"${m.capRate}%"`,
-          `"${m.capStatusLabel}"`,
-        ]);
+        dataRows = memberStatsList;
       } else if (activeReportTab === 'member-detail') {
         const memName = activeMember ? activeMember.name.replace(/\s+/g, '_') : 'Member';
         filename = `Garment_QMS_Member_${memName}_NC_Register_${new Date().toISOString().slice(0, 10)}.csv`;
-        headers = [
-          'Non-Conformance ID',
-          'Assigned Member Name',
-          'Member Employee ID',
-          'Department',
-          'Plant Location',
-          'Risk Severity',
-          'Current Lifecycle Status',
-          'Finding Description',
-          'Quality Requirement / Standard',
-          'NC Creation Date',
-          'Auditor Name',
-          '5-Why Root Cause',
-          'Immediate Containment Action',
-          'Permanent Corrective Action',
-          'Preventive Recurrence Plan',
-          'CAP Target Due Date',
-          'Verification Method',
-          'Auditor Readiness Notes',
-          'Approved Closure Date',
-          'Before Photo Status',
-          'After Photo Status',
-        ];
-        rows = activeMemberComplaints.map((c) => [
-          `"${c.complaintId || ''}"`,
-          `"${activeMember?.name || getAssignedToName(c)}"`,
-          `"${activeMember?.employeeId || c.assignedTo?.employeeId || ''}"`,
-          `"${c.department || ''}"`,
-          `"${c.location || ''}"`,
-          `"${c.priority || c.riskSeverity || 'Medium'}"`,
-          `"${c.status || 'Open'}"`,
-          `"${getFindingText(c).replace(/"/g, '""')}"`,
-          `"${(c.requirement || '—').replace(/"/g, '""')}"`,
-          `"${c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}"`,
-          `"${getAuditorName(c).replace(/"/g, '""')}"`,
-          `"${getRootCauseText(c).replace(/"/g, '""')}"`,
-          `"${getImmediateCorrectionText(c).replace(/"/g, '""')}"`,
-          `"${getCorrectiveActionText(c).replace(/"/g, '""')}"`,
-          `"${getPreventiveActionText(c).replace(/"/g, '""')}"`,
-          `"${getCapTargetDate(c)}"`,
-          `"${c.verificationMethod || '—'}"`,
-          `"${(c.cap?.verificationReadinessNotes || '').replace(/"/g, '""')}"`,
-          `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure'}"`,
-          `"${c.beforePhoto ? 'Yes (Photo Attached)' : 'No'}"`,
-          `"${c.afterPhoto ? 'Yes (Proof Attached)' : 'Pending'}"`,
-        ]);
+        dataRows = activeMemberComplaints;
       } else {
-        // Master Register CSV (all 33 columns intact)
         filename = `Garment_QMS_Master_Register_${new Date().toISOString().slice(0, 10)}.csv`;
-        headers = [
-          'Non-Conformance ID',
-          'Record Status',
-          'Lifecycle Status',
-          'Risk Severity / Priority',
-          'Department',
-          'Plant Location / Station',
-          'Creation Timestamp',
-          'Deleted Timestamp',
-          'Deleted By',
-          'Auditor Name',
-          'Auditor Employee ID',
-          'Defect Finding Description',
-          'Quality Requirement',
-          'Issue Occurrence Frequency',
-          'Ticket Aging Duration',
-          'Before Photo Attached Status',
-          'Assigned To (Responsible for Resolving)',
-          'Assigned Supervisor Employee ID',
-          'Assigned Supervisor Designation',
-          'SLA Target Duration (Hours)',
-          'Target SLA Deadline Date',
-          'SLA Condition Status',
-          'CAP Requirement',
-          'CAP Lifecycle Status',
-          'Immediate Correction (Containment)',
-          'Root Cause (5-Why Analysis)',
-          'Corrective Action (Permanent Fix)',
-          'Preventive Action Plan',
-          'CAP Target Date',
-          'After Proof Photo Evidence',
-          'Approved Closure Date',
-        ];
-
-        rows = datasetToExport.map((c) => {
-          const isOverdue =
-            c.status !== 'Closed' &&
-            c.status !== 'Verified' &&
-            c.deadlineTimestamp &&
-            Date.now() > new Date(c.deadlineTimestamp).getTime();
-
-          const deletedByName = typeof c.deletedBy === 'object' ? c.deletedBy?.name : (c.deletedBy || '');
-
-          return [
-            `"${c.complaintId || ''}"`,
-            `"${c.isDeleted ? 'Deleted NC' : 'Active NC'}"`,
-            `"${c.status || 'Open'}"`,
-            `"${c.priority || c.riskSeverity || 'Medium'}"`,
-            `"${c.department || ''}"`,
-            `"${c.location || ''}"`,
-            `"${c.createdAt ? new Date(c.createdAt).toLocaleString() : ''}"`,
-            `"${c.deletedAt ? new Date(c.deletedAt).toLocaleString() : ''}"`,
-            `"${(deletedByName || '').replace(/"/g, '""')}"`,
-            `"${getAuditorName(c).replace(/"/g, '""')}"`,
-            `"${c.createdBy?.employeeId || ''}"`,
-            `"${getFindingText(c).replace(/"/g, '""')}"`,
-            `"${(c.requirement || '—').replace(/"/g, '""')}"`,
-            `"${getIssueFrequency(c)}"`,
-            `"${getTicketAgeLabel(c)}"`,
-            `"${c.beforePhoto ? 'Yes (Photo Captured)' : 'No Photo'}"`,
-            `"${getAssignedToName(c).replace(/"/g, '""')}"`,
-            `"${c.assignedTo?.employeeId || ''}"`,
-            `"${(c.assignedTo?.designation || '').replace(/"/g, '""')}"`,
-            `"${c.deadlineHours || 24}"`,
-            `"${c.deadlineTimestamp ? new Date(c.deadlineTimestamp).toLocaleString() : ''}"`,
-            `"${isOverdue ? 'Overdue Breach' : 'Within SLA'}"`,
-            `"${c.capRequired ? 'Mandatory CAP' : 'Direct Correction'}"`,
-            `"${c.cap?.status || (c.status === 'Closed' ? 'VERIFIED_EFFECTIVE' : 'IN_PROGRESS')}"`,
-            `"${getImmediateCorrectionText(c).replace(/"/g, '""')}"`,
-            `"${getRootCauseText(c).replace(/"/g, '""')}"`,
-            `"${getCorrectiveActionText(c).replace(/"/g, '""')}"`,
-            `"${getPreventiveActionText(c).replace(/"/g, '""')}"`,
-            `"${getCapTargetDate(c)}"`,
-            `"${c.afterPhoto ? 'Yes (Proof Uploaded)' : 'Pending After Proof'}"`,
-            `"${c.actualCompletedAt ? new Date(c.actualCompletedAt).toLocaleString() : 'Pending Closure'}"`,
-          ];
-        });
+        dataRows = datasetToExport;
       }
+
+      const headers = selectedCols.map((c) => c.label);
+      const rows = dataRows.map((item) =>
+        selectedCols.map((col) => {
+          const val = col.getValue ? col.getValue(item) : '';
+          return `"${String(val ?? '').replace(/"/g, '""')}"`;
+        })
+      );
 
       const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1885,22 +1876,20 @@ export const ReportsView = ({
               <button
                 type="button"
                 onClick={() => setExportScope('FILTERED')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  exportScope === 'FILTERED'
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${exportScope === 'FILTERED'
                     ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-                }`}
+                  }`}
               >
                 Filtered ({filteredCount})
               </button>
               <button
                 type="button"
                 onClick={() => setExportScope('ALL')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  exportScope === 'ALL'
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${exportScope === 'ALL'
                     ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs font-bold'
                     : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
-                }`}
+                  }`}
               >
                 All ({totalNC})
               </button>
@@ -1910,48 +1899,48 @@ export const ReportsView = ({
           <button
             type="button"
             id="btn-download-pdf-top"
-            onClick={handleExportPDF}
+            onClick={() => handleOpenExportModal('PDF')}
             disabled={downloadingPDF}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            title="Download PDF Audit Report"
+            title="Configure columns & download PDF Audit Report"
           >
             <FileText className="w-3.5 h-3.5" />
             <span>
               {downloadingPDF
                 ? 'Compiling PDF...'
                 : activeReportTab === 'category-report'
-                ? `Export Category PDF (${selectedCategoryDetail ? (categoryStatsList.find((c) => norm(c.category) === norm(selectedCategoryDetail))?.complaints.length || 0) : categoryStatsList.length})`
-                : activeReportTab === 'dept-report'
-                ? `Export Dept PDF (${departmentStatsList.length})`
-                : activeReportTab === 'members-report'
-                ? `Export Members PDF (${memberStatsList.length})`
-                : activeReportTab === 'member-detail'
-                ? `Export Dossier PDF (${activeMemberComplaints.length})`
-                : `Export PDF (${datasetToExport.length})`}
+                  ? `Export Category PDF (${selectedCategoryDetail ? (categoryStatsList.find((c) => norm(c.category) === norm(selectedCategoryDetail))?.complaints.length || 0) : categoryStatsList.length})`
+                  : activeReportTab === 'dept-report'
+                    ? `Export Dept PDF (${departmentStatsList.length})`
+                    : activeReportTab === 'members-report'
+                      ? `Export Members PDF (${memberStatsList.length})`
+                      : activeReportTab === 'member-detail'
+                        ? `Export Dossier PDF (${activeMemberComplaints.length})`
+                        : `Export PDF (${datasetToExport.length})`}
             </span>
           </button>
 
           <button
             type="button"
             id="btn-download-csv-top"
-            onClick={handleExportCSV}
+            onClick={() => handleOpenExportModal('CSV')}
             disabled={downloadingCSV}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-            title="Download CSV Report"
+            title="Configure columns & download CSV Spreadsheet"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>
               {downloadingCSV
                 ? 'Exporting CSV...'
                 : activeReportTab === 'category-report'
-                ? 'Export Category CSV'
-                : activeReportTab === 'dept-report'
-                ? 'Export Dept CSV'
-                : activeReportTab === 'members-report'
-                ? 'Export Members CSV'
-                : activeReportTab === 'member-detail'
-                ? 'Export Member CSV'
-                : `Export CSV (${datasetToExport.length})`}
+                  ? 'Export Category CSV'
+                  : activeReportTab === 'dept-report'
+                    ? 'Export Dept CSV'
+                    : activeReportTab === 'members-report'
+                      ? 'Export Members CSV'
+                      : activeReportTab === 'member-detail'
+                        ? 'Export Member CSV'
+                        : `Export CSV (${datasetToExport.length})`}
             </span>
           </button>
         </div>
@@ -1962,11 +1951,10 @@ export const ReportsView = ({
         <button
           type="button"
           onClick={() => setActiveReportTab('audit-register')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'audit-register'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeReportTab === 'audit-register'
               ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Layers className="w-4 h-4" />
           <span>Master NC Report</span>
@@ -1981,11 +1969,10 @@ export const ReportsView = ({
             setSelectedDeptDetail(null);
             setActiveReportTab('dept-report');
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'dept-report'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeReportTab === 'dept-report'
               ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Building2 className="w-4 h-4" />
           <span>Department-wise NC Report</span>
@@ -1997,11 +1984,10 @@ export const ReportsView = ({
         <button
           type="button"
           onClick={() => setActiveReportTab('members-report')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'members-report'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeReportTab === 'members-report'
               ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <Users className="w-4 h-4" />
           <span>Department Members Report</span>
@@ -2013,11 +1999,10 @@ export const ReportsView = ({
         <button
           type="button"
           onClick={() => setActiveReportTab('member-detail')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeReportTab === 'member-detail'
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeReportTab === 'member-detail'
               ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-cyan-400 shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
+            }`}
         >
           <User className="w-4 h-4" />
           <span>Individual Member NC Details</span>
@@ -2075,11 +2060,10 @@ export const ReportsView = ({
             id="filter-record-status"
             value={recordStatusFilter}
             onChange={(e) => setRecordStatusFilter(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              recordStatusFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${recordStatusFilter !== 'ALL'
                 ? 'bg-rose-50/90 border-rose-300 text-rose-900 dark:bg-rose-950/70 dark:border-rose-700 dark:text-rose-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
             title="Filter by Record Status (All Records, Active NC, Deleted NC)"
           >
             <option value="ALL">Record Status: All Records ({complaints.length})</option>
@@ -2091,11 +2075,10 @@ export const ReportsView = ({
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              categoryFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${categoryFilter !== 'ALL'
                 ? 'bg-amber-50/70 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
             title="Filter by Defect Category"
           >
             <option value="ALL">All Categories ({allDefectCategories.length})</option>
@@ -2110,11 +2093,10 @@ export const ReportsView = ({
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              departmentFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${departmentFilter !== 'ALL'
                 ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
           >
             <option value="ALL">All Departments ({consolidatedDepartmentsList.length})</option>
             {consolidatedDepartmentsList.map((d) => (
@@ -2132,11 +2114,10 @@ export const ReportsView = ({
               setMemberFilter(val);
               if (val !== 'ALL') setSelectedMemberId(val);
             }}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              memberFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${memberFilter !== 'ALL'
                 ? 'bg-purple-50/70 border-purple-300 text-purple-900 dark:bg-purple-950/60 dark:border-purple-700 dark:text-purple-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
           >
             <option value="ALL">All Members ({consolidatedMembersList.length})</option>
             {consolidatedMembersList.map((m) => {
@@ -2153,11 +2134,10 @@ export const ReportsView = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              statusFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${statusFilter !== 'ALL'
                 ? 'bg-emerald-50/70 border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
           >
             <option value="ALL">All Statuses</option>
             <option value="OPEN">Open Actions</option>
@@ -2172,11 +2152,10 @@ export const ReportsView = ({
           <select
             value={reworkFilter}
             onChange={(e) => setReworkFilter(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              reworkFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${reworkFilter !== 'ALL'
                 ? 'bg-rose-50/90 border-rose-300 text-rose-900 dark:bg-rose-950/70 dark:border-rose-700 dark:text-rose-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
             title="Filter by Reject &amp; Rework Status"
           >
             <option value="ALL">Reject &amp; Rework: All</option>
@@ -2191,11 +2170,10 @@ export const ReportsView = ({
           <select
             value={riskFilter}
             onChange={(e) => setRiskFilter(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              riskFilter !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${riskFilter !== 'ALL'
                 ? 'bg-amber-50/70 border-amber-300 text-amber-900 dark:bg-amber-950/60 dark:border-amber-700 dark:text-amber-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
           >
             <option value="ALL">All Risks</option>
             <option value="CRITICAL">Critical</option>
@@ -2208,11 +2186,10 @@ export const ReportsView = ({
           <select
             value={datePreset}
             onChange={(e) => setDatePreset(e.target.value)}
-            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${
-              datePreset !== 'ALL'
+            className={`px-3 py-1.5 text-xs rounded-xl border font-medium cursor-pointer transition-colors ${datePreset !== 'ALL'
                 ? 'bg-indigo-50/70 border-indigo-300 text-indigo-900 dark:bg-indigo-950/60 dark:border-indigo-700 dark:text-cyan-200 font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-            }`}
+              }`}
           >
             <option value="ALL">All Time</option>
             <option value="TODAY">Today</option>
@@ -2226,11 +2203,10 @@ export const ReportsView = ({
           <button
             type="button"
             onClick={() => setShowFiltersExpanded(!showFiltersExpanded)}
-            className={`px-2.5 py-1.5 text-xs rounded-xl border font-medium flex items-center gap-1 transition-colors cursor-pointer ${
-              showFiltersExpanded
+            className={`px-2.5 py-1.5 text-xs rounded-xl border font-medium flex items-center gap-1 transition-colors cursor-pointer ${showFiltersExpanded
                 ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold'
                 : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
+              }`}
             title="More filter parameters"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -2364,9 +2340,8 @@ export const ReportsView = ({
 
             <div
               onClick={() => setStatusFilter('OPEN')}
-              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-amber-400 cursor-pointer transition-all flex items-center justify-between ${
-                statusFilter === 'OPEN' ? 'border-amber-500 ring-1 ring-amber-500/30 bg-amber-50/20' : 'border-slate-200/90 dark:border-slate-800'
-              }`}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-amber-400 cursor-pointer transition-all flex items-center justify-between ${statusFilter === 'OPEN' ? 'border-amber-500 ring-1 ring-amber-500/30 bg-amber-50/20' : 'border-slate-200/90 dark:border-slate-800'
+                }`}
               title="Filter by Open NCs"
             >
               <div>
@@ -2380,9 +2355,8 @@ export const ReportsView = ({
 
             <div
               onClick={() => setStatusFilter('UNDER_REVIEW')}
-              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-purple-400 cursor-pointer transition-all flex items-center justify-between ${
-                statusFilter === 'UNDER_REVIEW' ? 'border-purple-500 ring-1 ring-purple-500/30 bg-purple-50/20' : 'border-slate-200/90 dark:border-slate-800'
-              }`}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-purple-400 cursor-pointer transition-all flex items-center justify-between ${statusFilter === 'UNDER_REVIEW' ? 'border-purple-500 ring-1 ring-purple-500/30 bg-purple-50/20' : 'border-slate-200/90 dark:border-slate-800'
+                }`}
               title="Filter by Under Review NCs"
             >
               <div>
@@ -2396,9 +2370,8 @@ export const ReportsView = ({
 
             <div
               onClick={() => setStatusFilter('CLOSED')}
-              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-emerald-400 cursor-pointer transition-all flex items-center justify-between ${
-                statusFilter === 'CLOSED' ? 'border-emerald-500 ring-1 ring-emerald-500/30 bg-emerald-50/20' : 'border-slate-200/90 dark:border-slate-800'
-              }`}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-emerald-400 cursor-pointer transition-all flex items-center justify-between ${statusFilter === 'CLOSED' ? 'border-emerald-500 ring-1 ring-emerald-500/30 bg-emerald-50/20' : 'border-slate-200/90 dark:border-slate-800'
+                }`}
               title="Filter by Closed & Verified NCs"
             >
               <div>
@@ -2412,9 +2385,8 @@ export const ReportsView = ({
 
             <div
               onClick={() => setStatusFilter('OVERDUE')}
-              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-rose-400 cursor-pointer transition-all flex items-center justify-between ${
-                statusFilter === 'OVERDUE' ? 'border-rose-500 ring-1 ring-rose-500/30 bg-rose-50/20' : 'border-slate-200/90 dark:border-slate-800'
-              }`}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-rose-400 cursor-pointer transition-all flex items-center justify-between ${statusFilter === 'OVERDUE' ? 'border-rose-500 ring-1 ring-rose-500/30 bg-rose-50/20' : 'border-slate-200/90 dark:border-slate-800'
+                }`}
               title="Filter by Overdue SLA NCs"
             >
               <div>
@@ -2428,9 +2400,8 @@ export const ReportsView = ({
 
             <div
               onClick={() => setRiskFilter('CRITICAL')}
-              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-red-400 cursor-pointer transition-all flex items-center justify-between ${
-                riskFilter === 'CRITICAL' ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20' : 'border-slate-200/90 dark:border-slate-800'
-              }`}
+              className={`p-2.5 rounded-xl bg-white dark:bg-slate-900 border shadow-2xs hover:border-red-400 cursor-pointer transition-all flex items-center justify-between ${riskFilter === 'CRITICAL' ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20' : 'border-slate-200/90 dark:border-slate-800'
+                }`}
               title="Filter by Critical Risk NCs"
             >
               <div>
@@ -2518,11 +2489,10 @@ export const ReportsView = ({
                       return (
                         <tr
                           key={c._id || c.id || c.complaintId || idx}
-                          className={`transition-colors group ${
-                            c.isDeleted
+                          className={`transition-colors group ${c.isDeleted
                               ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40'
                               : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
-                          }`}
+                            }`}
                         >
                           {/* 1. # */}
                           <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
@@ -2636,13 +2606,12 @@ export const ReportsView = ({
                               </span>
                             ) : (
                               <span
-                                className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                  c.status === 'Closed' || c.status === 'Verified'
+                                className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${c.status === 'Closed' || c.status === 'Verified'
                                     ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                                     : c.status === 'CAP Submitted'
-                                    ? 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                                    : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                }`}
+                                      ? 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                      : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                  }`}
                               >
                                 {c.status}
                               </span>
@@ -2652,13 +2621,12 @@ export const ReportsView = ({
                           {/* 11. Risk */}
                           <td className="py-3 px-3 align-top text-center whitespace-nowrap">
                             <span
-                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                cRisk === 'CRITICAL'
+                              className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${cRisk === 'CRITICAL'
                                   ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
                                   : cRisk === 'HIGH'
-                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                              }`}
+                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                }`}
                             >
                               {cRisk}
                             </span>
@@ -2783,11 +2751,10 @@ export const ReportsView = ({
                             {deptComplaints.map((c, idx) => (
                               <tr
                                 key={c._id || c.id || c.complaintId || idx}
-                                className={`transition-colors ${
-                                  c.isDeleted
+                                className={`transition-colors ${c.isDeleted
                                     ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40'
                                     : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
-                                }`}
+                                  }`}
                               >
                                 <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
                                   {idx + 1}
@@ -2837,11 +2804,10 @@ export const ReportsView = ({
                                     </span>
                                   ) : (
                                     <span
-                                      className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                        c.status === 'Closed' || c.status === 'Verified'
+                                      className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${c.status === 'Closed' || c.status === 'Verified'
                                           ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                                           : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                                      }`}
+                                        }`}
                                     >
                                       {c.status}
                                     </span>
@@ -3001,13 +2967,12 @@ export const ReportsView = ({
                             </div>
                             <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                               <div
-                                className={`h-full transition-all duration-300 ${
-                                  d.capRate === 100
+                                className={`h-full transition-all duration-300 ${d.capRate === 100
                                     ? 'bg-emerald-500'
                                     : d.capRate >= 60
-                                    ? 'bg-indigo-500'
-                                    : 'bg-amber-500'
-                                }`}
+                                      ? 'bg-indigo-500'
+                                      : 'bg-amber-500'
+                                  }`}
                                 style={{ width: `${d.capRate}%` }}
                               />
                             </div>
@@ -3198,13 +3163,12 @@ export const ReportsView = ({
                             </div>
                             <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                               <div
-                                className={`h-full transition-all duration-300 ${
-                                  m.capRate === 100
+                                className={`h-full transition-all duration-300 ${m.capRate === 100
                                     ? 'bg-emerald-500'
                                     : m.capRate >= 60
-                                    ? 'bg-purple-500'
-                                    : 'bg-amber-500'
-                                }`}
+                                      ? 'bg-purple-500'
+                                      : 'bg-amber-500'
+                                  }`}
                                 style={{ width: `${m.capRate}%` }}
                               />
                             </div>
@@ -3342,11 +3306,10 @@ export const ReportsView = ({
                     {activeMemberComplaints.map((c, idx) => (
                       <tr
                         key={c._id || c.id || c.complaintId || idx}
-                        className={`transition-colors ${
-                          c.isDeleted
+                        className={`transition-colors ${c.isDeleted
                             ? 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40'
                             : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
-                        }`}
+                          }`}
                       >
                         <td className="py-3 px-3 text-center font-mono text-slate-400 text-[11px] align-top">
                           {idx + 1}
@@ -3412,11 +3375,10 @@ export const ReportsView = ({
                             </span>
                           ) : (
                             <span
-                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                c.status === 'Closed' || c.status === 'Verified'
+                              className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${c.status === 'Closed' || c.status === 'Verified'
                                   ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                                   : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                              }`}
+                                }`}
                             >
                               {c.status}
                             </span>
@@ -3713,13 +3675,12 @@ export const ReportsView = ({
                                       </span>
                                     </td>
                                     <td className="py-3 px-3 align-top text-center whitespace-nowrap">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                        (c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${(c.priority || c.riskSeverity || '').toUpperCase() === 'CRITICAL'
                                           ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300'
                                           : (c.priority || c.riskSeverity || '').toUpperCase() === 'HIGH'
-                                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
-                                          : 'bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300'
-                                      }`}>
+                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300'
+                                            : 'bg-blue-100 text-blue-700 dark:bg-blue-950/80 dark:text-blue-300'
+                                        }`}>
                                         {(c.priority || c.riskSeverity || 'MEDIUM').toUpperCase()}
                                       </span>
                                     </td>
@@ -3916,13 +3877,12 @@ export const ReportsView = ({
                             </div>
                             <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                               <div
-                                className={`h-full transition-all duration-300 ${
-                                  cat.capRate === 100
+                                className={`h-full transition-all duration-300 ${cat.capRate === 100
                                     ? 'bg-emerald-500'
                                     : cat.capRate >= 60
-                                    ? 'bg-amber-500'
-                                    : 'bg-rose-500'
-                                }`}
+                                      ? 'bg-amber-500'
+                                      : 'bg-rose-500'
+                                  }`}
                                 style={{ width: `${cat.capRate}%` }}
                               />
                             </div>
@@ -4034,14 +3994,13 @@ export const ReportsView = ({
                     {drilldownComplaint.complaintId}
                   </span>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      drilldownComplaint.isDeleted
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${drilldownComplaint.isDeleted
                         ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-200 border border-rose-300 dark:border-rose-800'
                         : drilldownComplaint.status === 'Closed' ||
                           drilldownComplaint.status === 'Verified'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-amber-100 text-amber-700'
-                    }`}
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}
                   >
                     {drilldownComplaint.isDeleted
                       ? `Deleted (${drilldownComplaint.status})`
@@ -4309,6 +4268,19 @@ export const ReportsView = ({
           </div>
         </div>
       )}
+      {/* Export Checklist & Column Selector Modal */}
+      <ExportColumnsModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialFormat={exportModalFormat}
+        activeReportTab={activeReportTab}
+        reportTitle={currentReportTitle}
+        availableColumns={currentAvailableColumns}
+        presets={currentPresets}
+        datasetCount={currentDatasetCount}
+        isExporting={downloadingCSV || downloadingPDF}
+        onExecuteExport={handleExecuteExport}
+      />
     </div>
   );
 };
