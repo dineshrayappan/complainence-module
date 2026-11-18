@@ -7,9 +7,12 @@ import {
   UploadCloud,
   CheckCircle2,
   AlertTriangle,
+  User,
+  UserCheck,
 } from 'lucide-react';
 import { publicComplaintService } from '../services/api';
 import { useCompany } from '../context/CompanyContext';
+import { useAuth } from '../context/AuthContext';
 import { compressImage } from '../utils/imageCompressor';
 
 // Quick Predefined Finding Phrases for Factory Floor
@@ -32,7 +35,28 @@ const RISK_LEVELS = [
 
 export const PublicRaiseComplaintPage = () => {
   const { companyName, companySlug, basePath } = useCompany();
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
+
+  // Preserve any draft entered before navigating to staff login
+  const handlePreserveDraft = () => {
+    if (description || department || selectedUnitId) {
+      try {
+        sessionStorage.setItem(
+          'pending_compliance_draft',
+          JSON.stringify({
+            description: description || '',
+            department: department || '',
+            priority: priority || 'MAJOR',
+            location: location || '',
+            unitId: selectedUnitId || 'UNIT-1',
+          })
+        );
+      } catch (e) {
+        console.warn('Failed to cache draft:', e);
+      }
+    }
+  };
 
   // Form States
   const [selectedUnitId, setSelectedUnitId] = useState('UNIT-1');
@@ -287,12 +311,31 @@ export const PublicRaiseComplaintPage = () => {
           </div>
         </div>
 
-        <Link
-          to={`${basePath}/login`}
-          className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-900 transition-colors"
-        >
-          <span>Staff Login</span>
-        </Link>
+        {user ? (
+          <Link
+            to={`${basePath}/nc-cap?action=new`}
+            state={{ openNewComplaint: true }}
+            className="text-xs text-indigo-300 hover:text-white flex items-center gap-1.5 font-bold px-3 py-1.5 rounded-xl border border-indigo-500/40 bg-indigo-950/60 hover:bg-indigo-900/60 transition-all shadow-md shadow-indigo-900/20"
+            title="Create Non-Conformance as Staff"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="text-right">
+              <span className="block leading-none text-[11px] font-extrabold">{user.name?.split(' ')[0] || 'Staff'}</span>
+              <span className="text-[9px] text-indigo-400 block leading-tight font-normal">Create NC Form &rarr;</span>
+            </div>
+          </Link>
+        ) : (
+          <Link
+            to={`${basePath}/login?redirect=new-compliance`}
+            state={{ from: { pathname: `${basePath}/nc-cap`, search: '?action=new' }, openNewNC: true }}
+            onClick={handlePreserveDraft}
+            className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 font-semibold px-3 py-1.5 rounded-xl border border-slate-700 hover:border-indigo-500 bg-slate-900 hover:bg-slate-800 transition-all shadow-sm"
+            title="Staff member? Log in to open the full compliance create page"
+          >
+            <User className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Staff Login</span>
+          </Link>
+        )}
       </header>
 
       {/* MAIN FORM CONTAINER */}

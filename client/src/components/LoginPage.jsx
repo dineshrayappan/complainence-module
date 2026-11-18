@@ -17,8 +17,13 @@ export const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  // If already authenticated, redirect to active workspace dashboard
+  // If already authenticated, redirect to active workspace dashboard or compliance creation
   if (user) {
+    const searchParams = new URLSearchParams(location.search);
+    const isCreateCompliance = searchParams.get('redirect') === 'new-compliance' || location.state?.openNewNC;
+    if (isCreateCompliance) {
+      return <Navigate to={`${basePath}/nc-cap?action=new`} replace state={{ openNewComplaint: true }} />;
+    }
     return <Navigate to={basePath} replace />;
   }
 
@@ -40,9 +45,13 @@ export const LoginPage = () => {
       if (res && res.success === false) {
         setError(res.message || 'Login failed. Please verify your credentials.');
       } else if (res && res.success) {
+        const searchParams = new URLSearchParams(location.search);
+        const isCreateCompliance = searchParams.get('redirect') === 'new-compliance' || location.state?.openNewNC;
         const from = location.state?.from;
-        const targetPath = from?.pathname ? `${from.pathname}${from.search || ''}` : basePath;
-        navigate(targetPath, { replace: true });
+        const targetPath = isCreateCompliance
+          ? `${basePath}/nc-cap?action=new`
+          : (from?.pathname ? `${from.pathname}${from.search || ''}` : basePath);
+        navigate(targetPath, { replace: true, state: { openNewComplaint: true } });
       }
     } catch (err) {
       setError(err.message || 'Login failed. Please verify your credentials.');
@@ -68,6 +77,17 @@ export const LoginPage = () => {
               /{companySlug}
             </span>
           </div>
+
+          {/* Staff QR Floor Flow Notice Banner */}
+          {(new URLSearchParams(location.search).get('redirect') === 'new-compliance' || location.state?.openNewNC) && (
+            <div className="mb-5 p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex items-start gap-2.5 text-xs animate-fadeIn">
+              <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold block text-indigo-900">Staff Non-Conformance Portal</strong>
+                <span className="text-[11px] text-indigo-700">Log in with your employee account to open the official Compliance &amp; NC creation form directly.</span>
+              </div>
+            </div>
+          )}
 
           {/* Heading */}
           <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight leading-tight">
