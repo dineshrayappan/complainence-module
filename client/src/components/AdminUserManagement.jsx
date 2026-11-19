@@ -1661,7 +1661,10 @@ export const AdminUserManagement = () => {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      Employee ID / Username *
+                      <span>Employee ID / Username *</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-1.5">
+                        (Duplicate usernames permitted)
+                      </span>
                     </label>
                     <input
                       type="text"

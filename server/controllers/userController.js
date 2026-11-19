@@ -431,21 +431,6 @@ const createUser = async (req, res) => {
         const TargetUserModel = isBothUnits ? getUserModel('UNIT-1') : getUserModel(cleanUnitId);
         const OtherModel = isBothUnits ? getUserModel('UNIT-2') : null;
 
-        // Check if employeeId or email already exists
-        const orChecks = [
-          { employeeId: new RegExp('^' + employeeId.trim() + '$', 'i') },
-          { email: email.trim().toLowerCase() },
-        ];
-        const existingEmp = await TargetUserModel.findOne({ $or: orChecks });
-        const existingOther = OtherModel ? await OtherModel.findOne({ $or: orChecks }) : null;
-
-        if (existingEmp || existingOther) {
-          return res.status(400).json({
-            success: false,
-            message: `Employee ID '${employeeId.trim()}' or email '${email}' is already registered.`,
-          });
-        }
-
         const newUserData = {
           employeeId: employeeId.trim(),
           name: name.trim(),
@@ -519,16 +504,6 @@ const createUser = async (req, res) => {
     }
 
     // Fallback in-memory
-    const existing = mockStore.getUsers().find(
-      (u) => (u.employeeId || '').toUpperCase() === employeeId.trim().toUpperCase()
-    );
-    if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: `A user with Employee ID '${employeeId.trim()}' already exists.`,
-      });
-    }
-
     const newUser = mockStore.createUser({
       employeeId: employeeId.trim(),
       name: name.trim(),

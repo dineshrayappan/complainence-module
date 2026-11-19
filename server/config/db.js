@@ -66,20 +66,27 @@ const connectDB = async () => {
       console.warn('⚠️ [Database] Default admin user initialization notice:', adminErr.message);
     }
 
-    // Automatically ensure legacy unique index on email is dropped to permit duplicate email accounts
+    // Automatically ensure legacy unique indexes on employeeId and email are dropped to permit duplicate accounts
     try {
-      const usersCol = mongoose.connection.db.collection('users');
-      const userIndexes = await usersCol.indexes();
-      const emailUniqueIdx = userIndexes.find(
-        (idx) => idx.name === 'email_1' && idx.unique === true
-      );
-      if (emailUniqueIdx) {
-        await usersCol.dropIndex('email_1');
-        console.log('✅ [Database] Dropped legacy unique index on email_1 to support duplicate emails');
-        await usersCol.createIndex({ email: 1 }, { background: true });
+      const userColls = ['unit1_users', 'unit2_users', 'users'];
+      for (const collName of userColls) {
+        try {
+          const col = mongoose.connection.db.collection(collName);
+          const indexes = await col.indexes();
+          for (const idx of indexes) {
+            if ((idx.name === 'employeeId_1' || idx.name === 'email_1') && idx.unique === true) {
+              await col.dropIndex(idx.name);
+              console.log(`✅ [Database] Dropped legacy unique index ${idx.name} on ${collName} to permit duplicates`);
+              const keyField = idx.name === 'employeeId_1' ? { employeeId: 1 } : { email: 1 };
+              await col.createIndex(keyField, { background: true });
+            }
+          }
+        } catch (colErr) {
+          // ignore if collection does not exist yet
+        }
       }
     } catch (idxErr) {
-      console.warn('⚠️ [Database] Email index migration notice:', idxErr.message);
+      console.warn('⚠️ [Database] User indexes migration notice:', idxErr.message);
     }
 
     // Automatically convert any legacy disk or non-base64 complaint photos to Base64 data URLs in database
