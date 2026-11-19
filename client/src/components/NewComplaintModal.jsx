@@ -291,10 +291,13 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     }
   }, [isOpen]);
 
-  // Apply prefill data if opened from an audit item
+  // Apply prefill data if opened from an audit item or from staff QR login flow
   useEffect(() => {
     if (isOpen) {
       if (prefillData) {
+        if (prefillData.unitId) {
+          setSelectedUnitId(prefillData.unitId);
+        }
         if (prefillData.department) {
           handleDepartmentChange(prefillData.department);
         }
@@ -306,6 +309,12 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
         }
         if (prefillData.description) {
           setDescription(prefillData.description);
+        }
+        if (prefillData.location) {
+          setLocation(prefillData.location);
+        }
+        if (prefillData.priority) {
+          setPriority(prefillData.priority);
         }
       } else {
         setDefectCategory(DEFECT_CATEGORIES[0]);

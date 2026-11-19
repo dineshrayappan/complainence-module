@@ -158,6 +158,34 @@ export const AppLayout = () => {
     loadData(!initialLoadedRef.current, false);
   }, [loadData]);
 
+  // Auto-open New Compliance creation modal if routed with action=new, create intent, or from staff login
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const hasCreateIntent =
+      params.get('action') === 'new' ||
+      params.get('create') === 'true' ||
+      params.get('new') === 'true' ||
+      location.state?.openNewComplaint === true;
+
+    if (hasCreateIntent) {
+      try {
+        const savedDraft = sessionStorage.getItem('pending_compliance_draft');
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && typeof parsed === 'object') {
+            setNcPrefillData(parsed);
+          }
+          sessionStorage.removeItem('pending_compliance_draft');
+        } else if (location.state?.prefill) {
+          setNcPrefillData(location.state.prefill);
+        }
+      } catch (err) {
+        console.warn('Error reading pending compliance draft:', err);
+      }
+      setIsNewModalOpen(true);
+    }
+  }, [location]);
+
   // Handle Start Progress (Line Supervisor)
   const handleStartProgress = async (complaint) => {
     try {
@@ -554,6 +582,9 @@ export const App = () => {
         >
           {/* Dynamic landing redirect based on persona */}
           <Route index element={<RoleBasedIndexRedirect />} />
+          <Route path="create" element={<RoleBasedIndexRedirect />} />
+          <Route path="create-compliance" element={<RoleBasedIndexRedirect />} />
+          <Route path="raise-nc" element={<RoleBasedIndexRedirect />} />
 
           {/* Dashboard (Executive / Plant Oversight) */}
           <Route
