@@ -67,17 +67,26 @@ const resolveUserRequestUnit = (req, explicitUnit) => {
   return getCanonicalUnitId(candidate);
 };
 
+// Helper: escape regex special characters safely
+const escapeRegex = (str) => String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // Helper to find a user document across unit collections (prefers targetUnit)
 const findUserInUnitOrAny = async (userId, preferredUnit = 'UNIT-1') => {
   const normPref = getCanonicalUnitId(preferredUnit);
   const otherUnit = normPref === 'UNIT-1' ? 'UNIT-2' : 'UNIT-1';
   const unitsToTry = [normPref, otherUnit];
 
+  const cleanId = String(userId || '').trim();
   const query = {
-    $or: [{ employeeId: userId }, { email: userId }],
+    $or: [
+      { employeeId: cleanId },
+      { employeeId: new RegExp('^' + escapeRegex(cleanId) + '$', 'i') },
+      { email: cleanId.toLowerCase() },
+      { email: new RegExp('^' + escapeRegex(cleanId) + '$', 'i') },
+    ],
   };
-  if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-    query.$or.unshift({ _id: userId });
+  if (cleanId && cleanId.match(/^[0-9a-fA-F]{24}$/)) {
+    query.$or.unshift({ _id: cleanId });
   }
 
   for (const u of unitsToTry) {
@@ -98,11 +107,17 @@ const findUserLeanInUnitOrAny = async (userId, preferredUnit = 'UNIT-1') => {
   const otherUnit = normPref === 'UNIT-1' ? 'UNIT-2' : 'UNIT-1';
   const unitsToTry = [normPref, otherUnit];
 
+  const cleanId = String(userId || '').trim();
   const query = {
-    $or: [{ employeeId: userId }, { email: userId }],
+    $or: [
+      { employeeId: cleanId },
+      { employeeId: new RegExp('^' + escapeRegex(cleanId) + '$', 'i') },
+      { email: cleanId.toLowerCase() },
+      { email: new RegExp('^' + escapeRegex(cleanId) + '$', 'i') },
+    ],
   };
-  if (userId && typeof userId === 'string' && userId.match(/^[0-9a-fA-F]{24}$/)) {
-    query.$or.unshift({ _id: userId });
+  if (cleanId && cleanId.match(/^[0-9a-fA-F]{24}$/)) {
+    query.$or.unshift({ _id: cleanId });
   }
 
   for (const u of unitsToTry) {
@@ -427,12 +442,12 @@ const createUser = async (req, res) => {
         if (existingEmp || existingOther) {
           return res.status(400).json({
             success: false,
-            message: `Employee ID '${employeeId.toUpperCase()}' or email '${email}' is already registered.`,
+            message: `Employee ID '${employeeId.trim()}' or email '${email}' is already registered.`,
           });
         }
 
         const newUserData = {
-          employeeId: employeeId.trim().toUpperCase(),
+          employeeId: employeeId.trim(),
           name: name.trim(),
           email: email.trim().toLowerCase(),
           password,
@@ -505,17 +520,17 @@ const createUser = async (req, res) => {
 
     // Fallback in-memory
     const existing = mockStore.getUsers().find(
-      (u) => u.employeeId.toUpperCase() === employeeId.trim().toUpperCase()
+      (u) => (u.employeeId || '').toUpperCase() === employeeId.trim().toUpperCase()
     );
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: `A user with Employee ID '${employeeId.toUpperCase()}' already exists.`,
+        message: `A user with Employee ID '${employeeId.trim()}' already exists.`,
       });
     }
 
     const newUser = mockStore.createUser({
-      employeeId: employeeId.trim().toUpperCase(),
+      employeeId: employeeId.trim(),
       name: name.trim(),
       email: email.trim().toLowerCase(),
       password,
@@ -877,7 +892,8 @@ const checkUserDependencies = async (req, res) => {
     let scheduledAudits = 0;
 
     const uId = String(targetUser._id || targetUser.id || '');
-    const uEmp = String(targetUser.employeeId || '').toUpperCase();
+    const uEmp = String(targetUser.employeeId || '').trim();
+    const uEmpVariants = [uEmp, uEmp.toUpperCase(), uEmp.toLowerCase()].filter(Boolean);
 
     if (isMongoConnected()) {
       try {
@@ -889,7 +905,7 @@ const checkUserDependencies = async (req, res) => {
         const tasks = await TaskModel.find({
           $or: [
             { 'assignedTo.userId': uId },
-            { 'assignedTo.employeeId': uEmp },
+            { 'assignedTo.employeeId': { $in: uEmpVariants } },
           ],
         }).lean();
         tasks.forEach((t) => {
@@ -901,9 +917,9 @@ const checkUserDependencies = async (req, res) => {
         const complaints = await ComplaintModel.find({
           $or: [
             { 'createdBy.userId': uId },
-            { 'createdBy.employeeId': uEmp },
+            { 'createdBy.employeeId': { $in: uEmpVariants } },
             { 'assignedTo.userId': uId },
-            { 'assignedTo.employeeId': uEmp },
+            { 'assignedTo.employeeId': { $in: uEmpVariants } },
           ],
           isDeleted: { $ne: true },
         }).lean();
@@ -916,7 +932,7 @@ const checkUserDependencies = async (req, res) => {
         scheduledAudits = await AuditModel.countDocuments({
           $or: [
             { 'auditor.userId': uId },
-            { 'auditor.employeeId': uEmp },
+            { 'auditor.employeeId': { $in: uEmpVariants } },
           ],
           status: { $ne: 'Completed' },
         });
@@ -1166,7 +1182,8 @@ const getArchivedUsers = async (req, res) => {
     const usersWithNcStats = await Promise.all(
       archivedUsers.map(async (u) => {
         const uId = String(u._id || u.id || '');
-        const uEmp = String(u.employeeId || '').toUpperCase();
+        const uEmp = String(u.employeeId || '').trim();
+        const uEmpVariants = [uEmp, uEmp.toUpperCase(), uEmp.toLowerCase()].filter(Boolean);
         let totalNcCount = 0;
         let createdNcCount = 0;
         let assignedNcCount = 0;
@@ -1174,17 +1191,17 @@ const getArchivedUsers = async (req, res) => {
         if (isMongoConnected()) {
           try {
             createdNcCount = await ComplaintModel.countDocuments({
-              $or: [{ 'createdBy.userId': uId }, { 'createdBy.employeeId': uEmp }],
+              $or: [{ 'createdBy.userId': uId }, { 'createdBy.employeeId': { $in: uEmpVariants } }],
             });
             assignedNcCount = await ComplaintModel.countDocuments({
-              $or: [{ 'assignedTo.userId': uId }, { 'assignedTo.employeeId': uEmp }],
+              $or: [{ 'assignedTo.userId': uId }, { 'assignedTo.employeeId': { $in: uEmpVariants } }],
             });
             totalNcCount = await ComplaintModel.countDocuments({
               $or: [
                 { 'createdBy.userId': uId },
-                { 'createdBy.employeeId': uEmp },
+                { 'createdBy.employeeId': { $in: uEmpVariants } },
                 { 'assignedTo.userId': uId },
-                { 'assignedTo.employeeId': uEmp },
+                { 'assignedTo.employeeId': { $in: uEmpVariants } },
               ],
             });
           } catch (e) {}
@@ -1260,7 +1277,8 @@ const getUserNcHistory = async (req, res) => {
     }
 
     const uId = String(targetUser._id || targetUser.id || '');
-    const uEmp = String(targetUser.employeeId || '').toUpperCase();
+    const uEmp = String(targetUser.employeeId || '').trim();
+    const uEmpVariants = [uEmp, uEmp.toUpperCase(), uEmp.toLowerCase()].filter(Boolean);
 
     let complaints = [];
     if (isMongoConnected()) {
@@ -1269,9 +1287,9 @@ const getUserNcHistory = async (req, res) => {
         complaints = await ComplaintModel.find({
           $or: [
             { 'createdBy.userId': uId },
-            { 'createdBy.employeeId': uEmp },
+            { 'createdBy.employeeId': { $in: uEmpVariants } },
             { 'assignedTo.userId': uId },
-            { 'assignedTo.employeeId': uEmp },
+            { 'assignedTo.employeeId': { $in: uEmpVariants } },
           ],
         })
           .sort({ createdAt: -1 })

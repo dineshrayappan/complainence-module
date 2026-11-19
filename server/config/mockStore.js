@@ -19,9 +19,10 @@ module.exports = {
     return mockUsers.filter((u) => {
       const uEmail = (u.email || '').toLowerCase();
       const uEmp = (u.employeeId || '').toLowerCase();
+      const uName = (u.name || '').toLowerCase();
       const uRole = (u.role || '').toLowerCase();
 
-      if (uEmail === term || uEmp === term) return true;
+      if (uEmail === term || uEmp === term || uName === term) return true;
       if (term === 'admin' && (uEmp === 'admin' || uEmp === 'adm-001' || uRole === 'admin' || uEmail.startsWith('admin@'))) return true;
       return false;
     });
@@ -32,9 +33,10 @@ module.exports = {
     return mockUsers.find((u) => {
       const uEmail = (u.email || '').toLowerCase();
       const uEmp = (u.employeeId || '').toLowerCase();
+      const uName = (u.name || '').toLowerCase();
       const uRole = (u.role || '').toLowerCase();
 
-      if (uEmail === term || uEmp === term) return true;
+      if (uEmail === term || uEmp === term || uName === term) return true;
       if (term === 'admin' && (uEmp === 'admin' || uEmp === 'adm-001' || uRole === 'admin' || uEmail.startsWith('admin@'))) return true;
       return false;
     });

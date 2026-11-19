@@ -26,12 +26,12 @@ const certificateSchema = new mongoose.Schema(
     },
     unitId: {
       type: String,
-      enum: ['UNIT-1', 'UNIT-2', 'UNASSIGNED', null],
-      default: 'UNASSIGNED',
+      enum: ['UNIT-1', 'UNIT-2', 'BOTH', 'UNASSIGNED', null],
+      default: 'BOTH',
     },
     unitName: {
       type: String,
-      default: 'Unassigned',
+      default: 'Both Units',
     },
     issuingAgency: {
       type: String,

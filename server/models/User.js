@@ -7,7 +7,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Employee ID is required'],
       unique: true,
-      uppercase: true,
       trim: true,
     },
     name: {

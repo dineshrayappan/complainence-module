@@ -24,8 +24,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'WRAP-HO-2026',
     issueDate: new Date('2026-07-24T00:00:00.000Z'),
     expiryDate: new Date('2027-07-24T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'Worldwide Responsible Accredited Production (WRAP)',
     description: 'WRAP Facility Accreditation for Head Office & Apparel Manufacturing Standards',
   },
@@ -46,8 +46,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'BSCI-2026-9812',
     issueDate: new Date('2026-06-16T00:00:00.000Z'),
     expiryDate: new Date('2028-01-23T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'amfori BSCI',
     description: 'Business Social Compliance Initiative Social Audit & Fair Workplace Standard',
   },
@@ -57,8 +57,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'GOTS-2026-4412',
     issueDate: new Date('2026-04-29T00:00:00.000Z'),
     expiryDate: new Date('2026-12-25T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'Global Organic Textile Standard',
     description: 'Global Organic Textile Standard for organic fiber ecology & social criteria',
   },
@@ -68,8 +68,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'OCS-GRS-2025-1102',
     issueDate: new Date('2025-12-26T00:00:00.000Z'),
     expiryDate: new Date('2026-12-25T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'Textile Exchange / Control Union',
     description: 'Organic Content Standard & Global Recycled Standard Dual Chain of Custody Accreditation',
   },
@@ -79,8 +79,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'GRTS-2026-3021',
     issueDate: new Date('2026-08-24T00:00:00.000Z'),
     expiryDate: new Date('2026-12-25T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'Global Recycled & Traceable Standard',
     description: 'Recycled fiber trace verification and environmental sustainability standard',
   },
@@ -90,8 +90,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'ISO-9001-2026-7781',
     issueDate: new Date('2026-09-21T00:00:00.000Z'),
     expiryDate: new Date('2027-09-02T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'International Organization for Standardization (ISO)',
     description: 'Quality Management System Requirements for Garment Manufacturing & Export',
   },
@@ -101,8 +101,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'ISO-14001-2026-7782',
     issueDate: new Date('2026-09-21T00:00:00.000Z'),
     expiryDate: new Date('2027-09-17T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'International Organization for Standardization (ISO)',
     description: 'Environmental Management System Standards for Sustainable Plant Operations',
   },
@@ -112,8 +112,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'FT-2022-5501',
     issueDate: new Date('2022-06-02T00:00:00.000Z'),
     expiryDate: new Date('2028-06-02T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'Fair Trade USA / Fairtrade International',
     description: 'Fair Trade Certified Ethical Production, Community Development & Worker Welfare',
   },
@@ -123,8 +123,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'OEKO-2026-8819',
     issueDate: new Date('2026-02-10T00:00:00.000Z'),
     expiryDate: new Date('2027-01-31T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'OEKO-TEX International Association',
     description: 'STANDARD 100 by OEKO-TEX Confidence in Textiles Testing for Harmful Substances',
   },
@@ -134,8 +134,8 @@ const INITIAL_CERTIFICATES = [
     certificateNumber: 'PEFC-2022-9904',
     issueDate: new Date('2022-09-13T00:00:00.000Z'),
     expiryDate: new Date('2027-09-12T23:59:59.999Z'),
-    unitId: 'UNASSIGNED',
-    unitName: 'Unassigned',
+    unitId: 'BOTH',
+    unitName: 'Both Units',
     issuingAgency: 'Programme for the Endorsement of Forest Certification',
     description: 'Chain of Custody for Sustainable Raw Material & Packaging Sourcing',
   },
@@ -203,14 +203,26 @@ function getInMemoryStore() {
   return inMemoryCertificates;
 }
 
+// Helper to normalize certificate unit assignment (Unit 1, Unit 2, Both Units, Unassigned)
+function normalizeCertificateUnit(unitId) {
+  if (!unitId) return { unitId: 'BOTH', unitName: 'Both Units' };
+  const upper = String(unitId).toUpperCase().trim();
+  if (upper === 'UNIT-1') return { unitId: 'UNIT-1', unitName: 'Unit 1' };
+  if (upper === 'UNIT-2') return { unitId: 'UNIT-2', unitName: 'Unit 2' };
+  if (upper === 'BOTH' || upper === 'BOTH_UNITS' || upper === 'BOTH UNITS') {
+    return { unitId: 'BOTH', unitName: 'Both Units' };
+  }
+  if (upper === 'UNASSIGNED') return { unitId: 'UNASSIGNED', unitName: 'Unassigned' };
+  return { unitId: 'BOTH', unitName: 'Both Units' };
+}
+
 // Helper to format certificate document
 function formatCertificate(doc) {
   if (!doc) return null;
   const obj = doc.toObject ? doc.toObject() : { ...doc };
   const { status, daysRemaining } = computeCertificateStatus(obj.expiryDate);
 
-  const cleanUnitId = obj.unitId === 'UNIT-2' ? 'UNIT-2' : obj.unitId === 'UNIT-1' ? 'UNIT-1' : 'UNASSIGNED';
-  const cleanUnitName = cleanUnitId === 'UNIT-2' ? 'Unit 2' : cleanUnitId === 'UNIT-1' ? 'Unit 1' : 'Unassigned';
+  const { unitId: cleanUnitId, unitName: cleanUnitName } = normalizeCertificateUnit(obj.unitId);
 
   // Expiry notification categories
   const isExpiring30 = daysRemaining >= 0 && daysRemaining <= 30;
@@ -263,9 +275,18 @@ const getCertificates = async (req, res) => {
 
         const filter = { isDeleted: { $ne: true } };
 
-        if (unitId && unitId !== 'ALL' && unitId !== 'BOTH') {
-          if (unitId === 'UNASSIGNED') {
+        if (unitId && unitId !== 'ALL') {
+          const upperU = String(unitId).toUpperCase().trim();
+          if (upperU === 'UNASSIGNED') {
             filter.$or = [{ unitId: 'UNASSIGNED' }, { unitId: null }, { unitId: '' }];
+          } else if (upperU === 'BOTH' || upperU === 'BOTH_UNITS') {
+            filter.unitId = 'BOTH';
+          } else if (upperU === 'UNIT-1') {
+            // Certifications common to both units also apply to Unit 1
+            filter.$or = [{ unitId: 'UNIT-1' }, { unitId: 'BOTH' }];
+          } else if (upperU === 'UNIT-2') {
+            // Certifications common to both units also apply to Unit 2
+            filter.$or = [{ unitId: 'UNIT-2' }, { unitId: 'BOTH' }];
           } else {
             filter.unitId = unitId;
           }
@@ -297,9 +318,16 @@ const getCertificates = async (req, res) => {
     if (!certificates || certificates.length === 0) {
       // In-Memory store fallback
       let memList = getInMemoryStore().filter((c) => !c.isDeleted);
-      if (unitId && unitId !== 'ALL' && unitId !== 'BOTH') {
-        if (unitId === 'UNASSIGNED') {
+      if (unitId && unitId !== 'ALL') {
+        const upperU = String(unitId).toUpperCase().trim();
+        if (upperU === 'UNASSIGNED') {
           memList = memList.filter((c) => !c.unitId || c.unitId === 'UNASSIGNED');
+        } else if (upperU === 'BOTH' || upperU === 'BOTH_UNITS') {
+          memList = memList.filter((c) => c.unitId === 'BOTH');
+        } else if (upperU === 'UNIT-1') {
+          memList = memList.filter((c) => c.unitId === 'UNIT-1' || c.unitId === 'BOTH');
+        } else if (upperU === 'UNIT-2') {
+          memList = memList.filter((c) => c.unitId === 'UNIT-2' || c.unitId === 'BOTH');
         } else {
           memList = memList.filter((c) => c.unitId === unitId);
         }
@@ -463,8 +491,7 @@ const createCertificate = async (req, res) => {
       });
     }
 
-    const normUnitId = unitId === 'UNIT-2' ? 'UNIT-2' : unitId === 'UNIT-1' ? 'UNIT-1' : 'UNASSIGNED';
-    const normUnitName = normUnitId === 'UNIT-2' ? 'Unit 2' : normUnitId === 'UNIT-1' ? 'Unit 1' : 'Unassigned';
+    const { unitId: normUnitId, unitName: normUnitName } = normalizeCertificateUnit(unitId);
 
     // Handle document upload (file from multer or base64 data URL)
     let docUrl = bodyDocUrl || null;
@@ -633,9 +660,9 @@ const updateCertificate = async (req, res) => {
     }
 
     if (typeof unitId !== 'undefined') {
-      const normUnitId = unitId === 'UNIT-2' ? 'UNIT-2' : unitId === 'UNIT-1' ? 'UNIT-1' : 'UNASSIGNED';
+      const { unitId: normUnitId, unitName: normUnitName } = normalizeCertificateUnit(unitId);
       existingDoc.unitId = normUnitId;
-      existingDoc.unitName = normUnitId === 'UNIT-2' ? 'Unit 2' : normUnitId === 'UNIT-1' ? 'Unit 1' : 'Unassigned';
+      existingDoc.unitName = normUnitName;
     }
 
     // Handle document upload / replacement

@@ -10,33 +10,32 @@ import {
   Upload,
   Download,
   Search,
-  Filter,
   Plus,
   Edit3,
   Trash2,
   Eye,
   RefreshCw,
   AlertCircle,
-  Check,
-  ExternalLink,
-  Layers,
   Clock,
-  ShieldCheck,
   X,
   FileCheck,
+  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
 } from 'lucide-react';
 import { certificateService } from '../services/api';
 
-// Helper to format date as DD/MM/YYYY
+// Helper to format date as DD Mon YYYY (e.g. 24 Jul 2026)
 const formatDate = (dateString) => {
   if (!dateString) return '—';
   try {
     const d = new Date(dateString);
     if (isNaN(d.getTime())) return '—';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
   } catch {
     return '—';
   }
@@ -71,7 +70,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'VALID' | 'EXPIRING_SOON' | 'EXPIRED'
-  const [unitFilter, setUnitFilter] = useState('ALL'); // 'ALL' | 'UNIT-1' | 'UNIT-2' | 'UNASSIGNED'
+  const [unitFilter, setUnitFilter] = useState('ALL'); // 'ALL' | 'BOTH' | 'UNIT-1' | 'UNIT-2' | 'UNASSIGNED'
 
   // Modals
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -87,7 +86,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
     certificateNumber: '',
     issueDate: '',
     expiryDate: '',
-    unitId: 'UNASSIGNED',
+    unitId: 'BOTH',
     issuingAgency: '',
     description: '',
   });
@@ -140,7 +139,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
       certificateNumber: '',
       issueDate: '',
       expiryDate: '',
-      unitId: 'UNASSIGNED',
+      unitId: 'BOTH',
       issuingAgency: '',
       description: '',
     });
@@ -157,7 +156,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
       certificateNumber: cert.certificateNumber || '',
       issueDate: formatDateForInput(cert.issueDate),
       expiryDate: formatDateForInput(cert.expiryDate),
-      unitId: cert.unitId || 'UNASSIGNED',
+      unitId: cert.unitId || 'BOTH',
       issuingAgency: cert.issuingAgency || '',
       description: cert.description || '',
     });
@@ -171,7 +170,6 @@ export const CertificateManagementPanel = ({ showToast }) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check size limit: 30MB
     if (file.size > 30 * 1024 * 1024) {
       if (showToast) showToast('File size exceeds 30MB limit.', 'error');
       return;
@@ -179,7 +177,6 @@ export const CertificateManagementPanel = ({ showToast }) => {
 
     setSelectedFile(file);
 
-    // Generate local preview if image or pdf
     if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (rev) => setFilePreview(rev.target?.result);
@@ -197,7 +194,14 @@ export const CertificateManagementPanel = ({ showToast }) => {
       });
       if (res.data?.success) {
         if (showToast) {
-          const uLabel = newUnitId === 'UNIT-2' ? 'Unit 2' : newUnitId === 'UNIT-1' ? 'Unit 1' : 'Unassigned';
+          const uLabel =
+            newUnitId === 'BOTH'
+              ? 'Both Units'
+              : newUnitId === 'UNIT-2'
+              ? 'Unit 2'
+              : newUnitId === 'UNIT-1'
+              ? 'Unit 1'
+              : 'Unassigned';
           showToast(`Assigned '${cert.name}' to ${uLabel}`);
         }
         fetchCertificates(true);
@@ -293,197 +297,178 @@ export const CertificateManagementPanel = ({ showToast }) => {
     document.body.removeChild(link);
   };
 
-  // Group expiring soon certificates for the alerts banner
+  // Group expiring soon certificates for the clean watchlist
   const expiringAlerts = useMemo(() => {
     const list = certificates.filter((c) => c.status === 'EXPIRING_SOON' || c.status === 'EXPIRED');
     return list.sort((a, b) => a.daysRemaining - b.daysRemaining);
   }, [certificates]);
 
   return (
-    <div className="space-y-6">
-      {/* Top Header Card */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/20 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0 shadow-inner">
-              <Award className="w-6 h-6 text-indigo-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight">Compliance Certification Management</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                  Admin Only
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Monitor factory accreditations, track validity windows & manage plant compliance records
-              </p>
-            </div>
+    <div className="space-y-4">
+      {/* 1. Clean Top Header Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+            <Award className="w-5 h-5" />
           </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => fetchCertificates(true)}
-              disabled={isRefreshing}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-slate-200 border border-white/10 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Refresh certificate status"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
-
-            <button
-              onClick={handleOpenCreateModal}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white shadow-lg shadow-indigo-500/25 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Certificate</span>
-            </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                Compliance Certification Management
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
+                Plant Accreditations
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Factory audit accreditations, multi-unit coverage & validity tracking across plant operations.
+            </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => fetchCertificates(true)}
+            disabled={isRefreshing}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
+            title="Refresh certificate status"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs transition-all cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Certificate</span>
+          </button>
         </div>
       </div>
 
-      {/* KPI Metric Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total */}
+      {/* 2. Top Metric Summary Cards (4 Clean, Uniform Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Total Accreditations */}
         <div
           onClick={() => setStatusFilter('ALL')}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl bg-white dark:bg-slate-900 border transition-all cursor-pointer shadow-xs ${
             statusFilter === 'ALL'
-              ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-500 shadow-sm ring-1 ring-indigo-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+              ? 'border-indigo-500 ring-2 ring-indigo-500/10'
+              : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Certificates
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <FileCheck className="w-4 h-4" />
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs mb-1.5">
+            <span className="font-medium">Total Accreditations</span>
+            <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <Award className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             {metrics.total}
           </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">Active project accreditations</span>
+          <p className="text-[11px] text-slate-400 mt-1">Active factory compliance records</p>
         </div>
 
-        {/* Valid */}
+        {/* Valid & Compliant */}
         <div
           onClick={() => setStatusFilter('VALID')}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl bg-white dark:bg-slate-900 border transition-all cursor-pointer shadow-xs ${
             statusFilter === 'VALID'
-              ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-500 shadow-sm ring-1 ring-emerald-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700'
+              ? 'border-emerald-500 ring-2 ring-emerald-500/10'
+              : 'border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-              Valid
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs mb-1.5">
+            <span className="font-medium">Valid & Compliant</span>
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
             {metrics.valid}
           </div>
-          <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 block font-medium">
-            &gt; 90 Days validity remaining
-          </span>
+          <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1">
+            &gt; 90 days validity window remaining
+          </p>
         </div>
 
         {/* Expiring Soon */}
         <div
           onClick={() => setStatusFilter('EXPIRING_SOON')}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl bg-white dark:bg-slate-900 border transition-all cursor-pointer shadow-xs ${
             statusFilter === 'EXPIRING_SOON'
-              ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-500 shadow-sm ring-1 ring-amber-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700'
+              ? 'border-amber-500 ring-2 ring-amber-500/10'
+              : 'border-slate-200/80 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-700'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-              Expiring Soon
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-4 h-4" />
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs mb-1.5">
+            <span className="font-medium">Expiring Soon</span>
+            <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400">
+              <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">
+          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">
             {metrics.expiringSoon}
           </div>
-          <span className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1 block font-medium">
-            Renewal needed (≤ 90 Days)
-          </span>
+          <p className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1">
+            Renewal needed within ≤ 90 days
+          </p>
         </div>
 
         {/* Expired */}
         <div
           onClick={() => setStatusFilter('EXPIRED')}
-          className={`p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-4 rounded-xl bg-white dark:bg-slate-900 border transition-all cursor-pointer shadow-xs ${
             statusFilter === 'EXPIRED'
-              ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-500 shadow-sm ring-1 ring-rose-500/20'
-              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-700'
+              ? 'border-rose-500 ring-2 ring-rose-500/10'
+              : 'border-slate-200/80 dark:border-slate-800 hover:border-rose-300 dark:hover:border-rose-700'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
-              Expired
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-900/40 flex items-center justify-center text-rose-600 dark:text-rose-400">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs mb-1.5">
+            <span className="font-medium">Expired</span>
+            <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/50 flex items-center justify-center text-rose-600 dark:text-rose-400">
               <XCircle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">
+          <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 font-mono">
             {metrics.expired}
           </div>
-          <span className="text-[11px] text-rose-600/80 dark:text-rose-400/80 mt-1 block font-medium">
-            {metrics.expired === 0 ? 'Zero expired records' : 'Requires immediate audit renewal'}
-          </span>
+          <p className="text-[11px] text-slate-400 mt-1">
+            {metrics.expired === 0 ? 'Zero expired records' : 'Requires immediate renewal action'}
+          </p>
         </div>
       </div>
 
-      {/* Renewal Notification Bar (90, 60, 30 days alerts) */}
+      {/* 3. Renewal Notification Watchlist (Neat & Clean Pill Strip) */}
       {expiringAlerts.length > 0 && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
+        <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 text-amber-900 dark:text-amber-200 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
               <AlertCircle className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-xs font-bold flex items-center gap-2">
-                <span>Expiry Notification Watchlist</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300">
-                  {expiringAlerts.length} Action Items
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-700 dark:text-amber-300/80 mt-0.5">
-                The following certificates require renewal coordination within 90, 60 or 30 days:
-              </p>
+              <span className="text-xs font-semibold">Expiry Watchlist:</span>{' '}
+              <span className="text-xs text-amber-800/90 dark:text-amber-300/90">
+                {expiringAlerts.length} certification{expiringAlerts.length > 1 ? 's' : ''} approaching renewal window
+              </span>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            {expiringAlerts.slice(0, 5).map((c) => {
+            {expiringAlerts.slice(0, 4).map((c) => {
               const isUrgent = c.daysRemaining <= 30;
-              const isWarning = c.daysRemaining > 30 && c.daysRemaining <= 60;
               return (
                 <button
                   key={c.id || c._id}
                   onClick={() => setViewingCert(c)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer ${
                     isUrgent
-                      ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-800'
-                      : isWarning
-                      ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-800'
-                      : 'bg-yellow-100 dark:bg-yellow-950/60 text-yellow-900 dark:text-yellow-200 border-yellow-300 dark:border-yellow-800'
+                      ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900 hover:bg-rose-100'
+                      : 'bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-slate-800'
                   }`}
                 >
-                  <Clock className="w-3 h-3" />
                   <span>{c.name}</span>
-                  <span className="font-mono font-bold">({c.daysRemaining}d)</span>
+                  <span className="font-mono font-bold text-[11px]">({c.daysRemaining}d)</span>
                 </button>
               );
             })}
@@ -491,100 +476,125 @@ export const CertificateManagementPanel = ({ showToast }) => {
         </div>
       )}
 
-      {/* Search and Filters Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by certification name, certificate #, or agency..."
-            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-          />
-        </div>
+      {/* 4. Sleek Search and Status Filter Toolbar */}
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by certification name, certificate #, or agency..."
+              className="w-full pl-9 pr-8 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {/* Unit Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0">
-              Unit:
-            </span>
+          {/* Unit Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-medium">Plant Unit:</span>
             <select
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
               className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
               <option value="ALL">All Units</option>
-              <option value="UNIT-1">Unit 1</option>
-              <option value="UNIT-2">Unit 2</option>
-              <option value="UNASSIGNED">Unassigned</option>
+              <option value="BOTH">🏢 Both Units</option>
+              <option value="UNIT-1">📍 Unit 1</option>
+              <option value="UNIT-2">📍 Unit 2</option>
+              <option value="UNASSIGNED">⚠️ Unassigned</option>
             </select>
-          </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider shrink-0">
-              Status:
-            </span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="VALID">Valid</option>
-              <option value="EXPIRING_SOON">Expiring Soon</option>
-              <option value="EXPIRED">Expired</option>
-            </select>
+            {(searchQuery || statusFilter !== 'ALL' || unitFilter !== 'ALL') && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('ALL');
+                  setUnitFilter('ALL');
+                }}
+                className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-all cursor-pointer"
+              >
+                Reset
+              </button>
+            )}
           </div>
+        </div>
 
-          {(searchQuery || statusFilter !== 'ALL' || unitFilter !== 'ALL') && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('ALL');
-                setUnitFilter('ALL');
-              }}
-              className="px-2.5 py-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-all cursor-pointer"
-            >
-              Reset
-            </button>
-          )}
+        {/* Clean Status Pill Tabs */}
+        <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800/60 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'ALL', label: 'All Certifications', count: metrics.total },
+            { id: 'VALID', label: 'Valid', count: metrics.valid },
+            { id: 'EXPIRING_SOON', label: 'Expiring Soon', count: metrics.expiringSoon },
+            { id: 'EXPIRED', label: 'Expired', count: metrics.expired },
+          ].map((tab) => {
+            const isActive = statusFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setStatusFilter(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    isActive
+                      ? 'bg-indigo-200/60 dark:bg-indigo-800/60 text-indigo-900 dark:text-indigo-100 font-bold'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Main Certificates Table */}
-      <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+      {/* 5. Main Certificates Table (High-Readability, Modern Styling) */}
+      <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                <th className="py-3.5 px-4 w-12 text-center">#</th>
-                <th className="py-3.5 px-4">Certification</th>
-                <th className="py-3.5 px-4">Certificate Number</th>
-                <th className="py-3.5 px-4">Plant Unit</th>
-                <th className="py-3.5 px-4">Valid From</th>
-                <th className="py-3.5 px-4">Valid To</th>
-                <th className="py-3.5 px-4">Validity Remaining</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-center">Document</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+              <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/75 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 font-semibold text-[11px]">
+                <th className="py-3 px-4 w-10 text-center">#</th>
+                <th className="py-3 px-4">Certification & Scope</th>
+                <th className="py-3 px-4">Certificate Number</th>
+                <th className="py-3 px-4">Plant Unit</th>
+                <th className="py-3 px-4">Validity Period</th>
+                <th className="py-3 px-4">Days Left</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-center">Attachment</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
                 <tr>
-                  <td colSpan="10" className="py-16 text-center text-slate-400 font-mono text-xs">
-                    <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto mb-3" />
+                  <td colSpan="9" className="py-16 text-center text-slate-400 font-mono text-xs">
+                    <div className="w-7 h-7 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin mx-auto mb-2" />
                     <span>Loading compliance certification records...</span>
                   </td>
                 </tr>
               ) : certificates.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="py-16 text-center text-slate-400 font-mono text-xs">
+                  <td colSpan="9" className="py-16 text-center text-slate-400 text-xs">
                     <Award className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                    <span>No certification records match your search or filter.</span>
+                    <p className="font-semibold text-slate-600 dark:text-slate-300">No certification records found</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Try adjusting your search query or unit filter</p>
                   </td>
                 </tr>
               ) : (
@@ -595,92 +605,84 @@ export const CertificateManagementPanel = ({ showToast }) => {
                   return (
                     <tr
                       key={cert.id || cert._id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors group"
+                      className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group"
                     >
                       {/* S.No */}
                       <td className="py-3.5 px-4 text-center font-mono text-slate-400 text-xs">
                         {cert.serialNo || index + 1}
                       </td>
 
-                      {/* Certification Name */}
+                      {/* Certification Name & Agency */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 font-bold text-xs border border-indigo-100 dark:border-indigo-800">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 font-bold text-xs border border-indigo-100 dark:border-indigo-900/50">
                             {cert.name.charAt(0)}
                           </div>
-                          <div>
-                            <span className="font-bold text-slate-900 dark:text-white block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-900 dark:text-white block truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                               {cert.name}
                             </span>
-                            {cert.issuingAgency && (
-                              <span className="text-[10px] text-slate-400 truncate block max-w-xs">
-                                {cert.issuingAgency}
-                              </span>
-                            )}
+                            <span className="text-[11px] text-slate-400 truncate block max-w-xs">
+                              {cert.issuingAgency || 'Standard Accreditation'}
+                            </span>
                           </div>
                         </div>
                       </td>
 
                       {/* Certificate Number */}
-                      <td className="py-3.5 px-4 font-mono font-semibold text-slate-700 dark:text-slate-300">
+                      <td className="py-3.5 px-4 font-mono font-medium text-slate-700 dark:text-slate-300">
                         {cert.certificateNumber || '—'}
                       </td>
 
-                      {/* Plant Unit with Quick Select */}
+                      {/* Plant Unit Select Chip */}
                       <td className="py-3.5 px-4">
                         <select
-                          value={cert.unitId || 'UNASSIGNED'}
+                          value={cert.unitId || 'BOTH'}
                           onChange={(e) => handleQuickUnitChange(cert, e.target.value)}
-                          className={`text-xs font-bold px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${
-                            cert.unitId === 'UNIT-1'
-                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                          className={`text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${
+                            cert.unitId === 'BOTH'
+                              ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60'
+                              : cert.unitId === 'UNIT-1'
+                              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60'
                               : cert.unitId === 'UNIT-2'
-                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-dashed border-slate-300 dark:border-slate-700'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
                           }`}
-                          title="Click to assign or change unit"
+                          title="Click to change plant unit assignment"
                         >
-                          <option value="UNASSIGNED">⚠️ Unassigned</option>
+                          <option value="BOTH">🏢 Both Units</option>
                           <option value="UNIT-1">📍 Unit 1</option>
                           <option value="UNIT-2">📍 Unit 2</option>
+                          <option value="UNASSIGNED">⚠️ Unassigned</option>
                         </select>
                       </td>
 
-                      {/* Valid From */}
-                      <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-400">
-                        {formatDate(cert.issueDate)}
+                      {/* Validity Period: Issue Date to Expiry Date */}
+                      <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                        <span>{formatDate(cert.issueDate)}</span>
+                        <span className="text-slate-400 mx-1.5">→</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">
+                          {formatDate(cert.expiryDate)}
+                        </span>
                       </td>
 
-                      {/* Valid To */}
-                      <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-white">
-                        {formatDate(cert.expiryDate)}
-                      </td>
-
-                      {/* Validity Remaining */}
-                      <td className="py-3.5 px-4">
+                      {/* Days Left */}
+                      <td className="py-3.5 px-4 font-mono text-xs">
                         {isExp ? (
-                          <span className="inline-flex items-center gap-1 font-mono font-bold text-rose-600 dark:text-rose-400 text-xs">
-                            <AlertCircle className="w-3.5 h-3.5" />
+                          <span className="text-rose-600 dark:text-rose-400 font-semibold">
                             Expired
                           </span>
                         ) : cert.daysRemaining <= 30 ? (
-                          <span className="inline-flex items-center gap-1 font-mono font-bold text-rose-600 dark:text-rose-400 text-xs bg-rose-50 dark:bg-rose-950/50 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
-                            <Clock className="w-3 h-3" />
-                            {cert.daysRemaining} days left (Urgent)
-                          </span>
-                        ) : cert.daysRemaining <= 60 ? (
-                          <span className="inline-flex items-center gap-1 font-mono font-bold text-amber-600 dark:text-amber-400 text-xs bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-900">
-                            <Clock className="w-3 h-3" />
-                            {cert.daysRemaining} days left (&lt; 60d)
+                          <span className="text-rose-600 dark:text-rose-400 font-semibold">
+                            {cert.daysRemaining}d left
                           </span>
                         ) : cert.daysRemaining <= 90 ? (
-                          <span className="inline-flex items-center gap-1 font-mono font-bold text-yellow-600 dark:text-yellow-400 text-xs bg-yellow-50 dark:bg-yellow-950/50 px-2 py-0.5 rounded-md border border-yellow-200 dark:border-yellow-900">
-                            <Clock className="w-3 h-3" />
-                            {cert.daysRemaining} days left (&lt; 90d)
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                            {cert.daysRemaining}d left
                           </span>
                         ) : (
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 text-xs">
-                            {cert.daysRemaining} days left
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            {cert.daysRemaining}d left
                           </span>
                         )}
                       </td>
@@ -688,35 +690,35 @@ export const CertificateManagementPanel = ({ showToast }) => {
                       {/* Status Badge */}
                       <td className="py-3.5 px-4">
                         {isExp ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
                             Expired
                           </span>
                         ) : isExpSoon ? (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
                             Expiring Soon
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900">
                             Valid
                           </span>
                         )}
                       </td>
 
-                      {/* Document Download / Upload */}
+                      {/* Attachment Button */}
                       <td className="py-3.5 px-4 text-center">
                         {cert.documentUrl ? (
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="inline-flex items-center gap-1">
                             <button
                               onClick={() => setViewingCert(cert)}
-                              className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors cursor-pointer"
-                              title="View Document Preview"
+                              className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Preview Document"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDownload(cert)}
-                              className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 transition-colors cursor-pointer"
-                              title="Download Certificate File"
+                              className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                              title="Download Document"
                             >
                               <Download className="w-3.5 h-3.5" />
                             </button>
@@ -724,35 +726,35 @@ export const CertificateManagementPanel = ({ showToast }) => {
                         ) : (
                           <button
                             onClick={() => handleOpenEditModal(cert)}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
                           >
                             <Upload className="w-3 h-3" />
-                            <span>Upload</span>
+                            <span>Attach</span>
                           </button>
                         )}
                       </td>
 
-                      {/* Actions */}
+                      {/* Row Actions */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingCert(cert)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             title="View Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleOpenEditModal(cert)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             title="Edit Certificate"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmCert(cert)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                            title="Archive / Delete Certificate"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Archive Certificate"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -769,13 +771,13 @@ export const CertificateManagementPanel = ({ showToast }) => {
 
       {/* MODAL 1: Add / Edit Certificate Modal */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-slate-850">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Award className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Award className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -790,18 +792,18 @@ export const CertificateManagementPanel = ({ showToast }) => {
               </div>
               <button
                 onClick={() => setIsFormModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSubmitForm} className="p-5 space-y-4 overflow-y-auto flex-1">
+            {/* Form */}
+            <form onSubmit={handleSubmitForm} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
               {/* Row 1: Certification Name & Certificate No. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Certification Name *
                   </label>
                   <input
@@ -810,12 +812,12 @@ export const CertificateManagementPanel = ({ showToast }) => {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g. WRAP (HO), BSCI, GOTS, ISO 9001..."
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Certificate Number
                   </label>
                   <input
@@ -823,7 +825,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
                     value={formData.certificateNumber}
                     onChange={(e) => setFormData({ ...formData, certificateNumber: e.target.value })}
                     placeholder="e.g. WRAP-2026-001, GOTS-4412..."
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-medium"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                   />
                 </div>
               </div>
@@ -831,22 +833,26 @@ export const CertificateManagementPanel = ({ showToast }) => {
               {/* Row 2: Plant Unit & Issuing Authority */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Plant Unit *
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Plant Unit Coverage *
                   </label>
                   <select
                     value={formData.unitId}
                     onChange={(e) => setFormData({ ...formData, unitId: e.target.value })}
                     className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-semibold cursor-pointer"
                   >
-                    <option value="UNASSIGNED">⚠️ Unassigned (Pending Assignment)</option>
+                    <option value="BOTH">🏢 Both Units</option>
                     <option value="UNIT-1">📍 Unit 1</option>
                     <option value="UNIT-2">📍 Unit 2</option>
+                    <option value="UNASSIGNED">⚠️ Unassigned (Pending Assignment)</option>
                   </select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Certifications common to plant operations apply across both Unit 1 and Unit 2.
+                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Issuing Authority / Agency
                   </label>
                   <input
@@ -862,7 +868,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
               {/* Row 3: Validity Window (Issue Date & Expiry Date) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Valid From (Issue Date) *
                   </label>
                   <input
@@ -870,12 +876,12 @@ export const CertificateManagementPanel = ({ showToast }) => {
                     required
                     value={formData.issueDate}
                     onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-medium cursor-pointer"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Valid To (Expiry Date) *
                   </label>
                   <input
@@ -883,14 +889,14 @@ export const CertificateManagementPanel = ({ showToast }) => {
                     required
                     value={formData.expiryDate}
                     onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono font-medium cursor-pointer"
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-mono cursor-pointer"
                   />
                 </div>
               </div>
 
               {/* Row 4: Description / Notes */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Description / Accreditation Scope
                 </label>
                 <textarea
@@ -904,12 +910,12 @@ export const CertificateManagementPanel = ({ showToast }) => {
 
               {/* Row 5: Certificate Document Upload (PDF or Image) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Upload Certificate Document (PDF or Image)
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-4 rounded-2xl border-2 border-dashed border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 hover:border-indigo-400 hover:bg-indigo-50/70 transition-all cursor-pointer text-center"
+                  className="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 hover:border-indigo-400 transition-all cursor-pointer text-center"
                 >
                   <input
                     type="file"
@@ -919,27 +925,25 @@ export const CertificateManagementPanel = ({ showToast }) => {
                     className="hidden"
                   />
                   {selectedFile ? (
-                    <div className="flex items-center justify-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                      <FileCheck className="w-5 h-5 text-emerald-500" />
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                      <FileCheck className="w-4 h-4 text-emerald-500" />
                       <span>{selectedFile.name}</span>
                       <span className="text-[10px] text-slate-400 font-mono">
                         ({(selectedFile.size / 1024).toFixed(1)} KB)
                       </span>
                     </div>
                   ) : filePreview ? (
-                    <div className="flex items-center justify-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                      <FileCheck className="w-5 h-5 text-emerald-500" />
+                    <div className="flex items-center justify-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                      <FileCheck className="w-4 h-4 text-emerald-500" />
                       <span>Document attached (Click to replace file)</span>
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <Upload className="w-6 h-6 text-indigo-500 mx-auto" />
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                        Click to browse or drag & drop certificate
+                      <Upload className="w-5 h-5 text-indigo-500 mx-auto" />
+                      <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                        Click to browse or drop certificate file
                       </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        Supports PDF, PNG, JPG up to 30MB
-                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono">Supports PDF, PNG, JPG up to 30MB</p>
                     </div>
                   )}
                 </div>
@@ -957,7 +961,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   {submitting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   <span>{editingCert ? 'Save Changes' : 'Create Certificate'}</span>
@@ -968,26 +972,26 @@ export const CertificateManagementPanel = ({ showToast }) => {
         </div>
       )}
 
-      {/* MODAL 2: View Certificate Details & Document Viewer Modal */}
+      {/* MODAL 2: View Certificate Details & Document Viewer */}
       {viewingCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 bg-slate-50/50 dark:bg-slate-850">
+            <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Award className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Award className="w-4 h-4" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <span>{viewingCert.name}</span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase ${
                         viewingCert.status === 'EXPIRED'
-                          ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300'
+                          ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900'
                           : viewingCert.status === 'EXPIRING_SOON'
-                          ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300'
-                          : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300'
+                          ? 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900'
+                          : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900'
                       }`}
                     >
                       {viewingCert.status === 'EXPIRING_SOON' ? 'Expiring Soon' : viewingCert.status}
@@ -1000,36 +1004,52 @@ export const CertificateManagementPanel = ({ showToast }) => {
               </div>
               <button
                 onClick={() => setViewingCert(null)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Content Details */}
+            {/* Details Content */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
               {/* Meta Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-800">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Plant Unit</span>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block">
-                    {viewingCert.unitName || 'Unassigned'}
-                  </span>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Plant Unit</span>
+                  <div className="mt-0.5">
+                    {viewingCert.unitId === 'BOTH' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        🏢 Both Units
+                      </span>
+                    ) : viewingCert.unitId === 'UNIT-1' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        📍 Unit 1
+                      </span>
+                    ) : viewingCert.unitId === 'UNIT-2' ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        📍 Unit 2
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+                        ⚠️ Unassigned
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Valid From</span>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Valid From</span>
                   <span className="font-mono text-slate-800 dark:text-slate-200 mt-0.5 block">
                     {formatDate(viewingCert.issueDate)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Valid To</span>
-                  <span className="font-mono text-slate-800 dark:text-slate-200 mt-0.5 block font-bold">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Valid To</span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200 mt-0.5 block font-semibold">
                     {formatDate(viewingCert.expiryDate)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Days Remaining</span>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Days Remaining</span>
                   <span
                     className={`font-mono font-bold mt-0.5 block ${
                       viewingCert.daysRemaining < 0
@@ -1046,7 +1066,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
 
               {viewingCert.issuingAgency && (
                 <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
                     Issuing Authority / Agency
                   </span>
                   <p className="text-slate-800 dark:text-slate-200 font-medium">{viewingCert.issuingAgency}</p>
@@ -1055,7 +1075,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
 
               {viewingCert.description && (
                 <div>
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-0.5">
                     Description & Scope
                   </span>
                   <p className="text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
@@ -1067,13 +1087,13 @@ export const CertificateManagementPanel = ({ showToast }) => {
               {/* Document Viewer Preview */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
                     Certificate Document Attachment
                   </span>
                   {viewingCert.documentUrl && (
                     <button
                       onClick={() => handleDownload(viewingCert)}
-                      className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download File</span>
@@ -1082,52 +1102,49 @@ export const CertificateManagementPanel = ({ showToast }) => {
                 </div>
 
                 {viewingCert.documentUrl ? (
-                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-900/5 dark:bg-slate-950 flex flex-col items-center justify-center p-3 min-h-[220px]">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-3 min-h-[200px]">
                     {viewingCert.documentUrl.startsWith('data:image/') ||
                     /\.(png|jpe?g|webp|gif)$/i.test(viewingCert.documentName || '') ? (
                       <img
                         src={viewingCert.documentUrl}
                         alt={viewingCert.name}
-                        className="max-h-72 object-contain rounded-xl shadow-xs"
+                        className="max-h-72 object-contain rounded-lg shadow-xs"
                       />
                     ) : (
-                      <div className="w-full flex flex-col items-center justify-center py-8 space-y-3">
-                        <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
-                          <FileText className="w-7 h-7" />
+                      <div className="w-full flex flex-col items-center justify-center py-6 space-y-3">
+                        <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
+                          <FileText className="w-6 h-6" />
                         </div>
                         <div className="text-center">
-                          <p className="font-bold text-slate-900 dark:text-white text-xs">
+                          <p className="font-semibold text-slate-900 dark:text-white text-xs">
                             {viewingCert.documentName || 'Certificate Document (PDF)'}
                           </p>
                           <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            Securely stored in compliance repository
+                            Compliance document available
                           </p>
                         </div>
                         <button
                           onClick={() => handleDownload(viewingCert)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>Download / Open Document</span>
+                          <span>Open Document</span>
                         </button>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-slate-400">
-                    <FileText className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-                    <p className="font-bold text-xs text-slate-600 dark:text-slate-400">
+                  <div className="p-6 text-center rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-200 dark:border-slate-700 text-slate-400">
+                    <FileText className="w-6 h-6 text-slate-300 dark:text-slate-600 mx-auto mb-1.5" />
+                    <p className="font-semibold text-xs text-slate-600 dark:text-slate-400">
                       No document attached yet
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      Click edit to upload the certificate PDF or scan image.
                     </p>
                     <button
                       onClick={() => {
                         setViewingCert(null);
                         handleOpenEditModal(viewingCert);
                       }}
-                      className="mt-3 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer"
+                      className="mt-2.5 px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/80 dark:border-indigo-800/60 hover:bg-indigo-100 transition-colors cursor-pointer"
                     >
                       Upload Now
                     </button>
@@ -1137,7 +1154,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850 flex items-center justify-end gap-2.5 shrink-0">
+            <div className="p-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850 flex items-center justify-end gap-2.5 shrink-0">
               <button
                 onClick={() => setViewingCert(null)}
                 className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -1150,7 +1167,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
                   setViewingCert(null);
                   handleOpenEditModal(cert);
                 }}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
               >
                 <Edit3 className="w-3.5 h-3.5" />
                 <span>Edit Certificate</span>
@@ -1162,19 +1179,19 @@ export const CertificateManagementPanel = ({ showToast }) => {
 
       {/* MODAL 3: Delete Confirmation Modal */}
       {deleteConfirmCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6 text-center animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-3.5">
-              <AlertTriangle className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-5 text-center">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-3">
+              <AlertTriangle className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
               Archive Certificate?
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-              Are you sure you want to remove <span className="font-bold text-slate-800 dark:text-slate-200">'{deleteConfirmCert.name}'</span>? This record will be archived.
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Are you sure you want to archive <span className="font-semibold text-slate-800 dark:text-slate-200">'{deleteConfirmCert.name}'</span>?
             </p>
 
-            <div className="mt-5 flex items-center justify-center gap-2.5">
+            <div className="mt-4 flex items-center justify-center gap-2">
               <button
                 onClick={() => setDeleteConfirmCert(null)}
                 className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -1184,7 +1201,7 @@ export const CertificateManagementPanel = ({ showToast }) => {
               <button
                 onClick={handleDeleteConfirm}
                 disabled={deleting}
-                className="px-5 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {deleting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 <span>Confirm Archive</span>
@@ -1198,4 +1215,3 @@ export const CertificateManagementPanel = ({ showToast }) => {
 };
 
 export default CertificateManagementPanel;
-

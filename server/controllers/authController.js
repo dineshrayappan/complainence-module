@@ -123,16 +123,21 @@ const login = async (req, res) => {
     }
     if (isMongoConnected()) {
       try {
+        const escapeRegex = (str) => String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const searchTerms = [queryIdentifier];
         const qLower = queryIdentifier.toLowerCase();
         if (qLower === 'admin' || qLower === 'adm-001') {
           searchTerms.push('admin@factory.com', 'admin@admin.com', 'ADMIN', 'ADM-001');
         }
 
-        const orFilters = searchTerms.flatMap((term) => [
-          { email: { $regex: new RegExp(`^${term}$`, 'i') } },
-          { employeeId: { $regex: new RegExp(`^${term}$`, 'i') } },
-        ]);
+        const orFilters = searchTerms.flatMap((term) => {
+          const escaped = escapeRegex(term);
+          return [
+            { email: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+            { employeeId: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+            { name: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+          ];
+        });
 
         let user = null;
         let targetUnit = requestedUnit || 'UNIT-1';
