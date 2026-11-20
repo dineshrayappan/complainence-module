@@ -7,6 +7,7 @@ const { logEvent } = require('../utils/eventLogger');
 const {
   getAuditLogModel,
   getUserModel,
+  getAttendanceModel,
   getCanonicalUnitId,
   getCanonicalUnitName,
 } = require('../models/unitModels');
@@ -553,28 +554,69 @@ const getMemberKpiStats = async (req, res) => {
     if (isMongoConnected()) {
       try {
         const queryUsers = { isDeleted: { $ne: true } };
-        if (unitId && unitId !== 'ALL') {
-          queryUsers.$or = [
-            { unitId: unitId },
-            { assignedUnits: unitId },
-          ];
+        // If supervisor requested, isolate to their department
+        if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON') && req.user.department) {
+          queryUsers.department = new RegExp('^' + req.user.department.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
         }
 
-        const [usersList, attendancesList] = await Promise.all([
-          User.find(queryUsers).sort({ name: 1 }).lean(),
-          Attendance.find({
-            date: { $gte: targetStartDate, $lte: targetEndDate },
-          }).lean(),
-        ]);
+        const isBothOrAll = !unitId || unitId === 'ALL' || unitId === 'BOTH';
+        let usersList = [];
+        let attendancesList = [];
+
+        if (isBothOrAll) {
+          const U1 = getUserModel('UNIT-1');
+          const U2 = getUserModel('UNIT-2');
+          const A1 = getAttendanceModel('UNIT-1');
+          const A2 = getAttendanceModel('UNIT-2');
+
+          const [u1List, u2List, a1List, a2List, aRootList] = await Promise.all([
+            U1.find(queryUsers).sort({ name: 1 }).lean(),
+            U2.find(queryUsers).sort({ name: 1 }).lean(),
+            A1.find({ date: { $gte: targetStartDate, $lte: targetEndDate } }).lean(),
+            A2.find({ date: { $gte: targetStartDate, $lte: targetEndDate } }).lean(),
+            Attendance.find({ date: { $gte: targetStartDate, $lte: targetEndDate } }).lean(),
+          ]);
+
+          const userMap = new Map();
+          [...(u1List || []), ...(u2List || [])].forEach((u) => {
+            const key = (u.employeeId || u._id.toString()).toUpperCase();
+            if (!userMap.has(key)) userMap.set(key, u);
+          });
+          usersList = Array.from(userMap.values());
+
+          const attMap = new Map();
+          [...(aRootList || []), ...(a1List || []), ...(a2List || [])].forEach((a) => {
+            const key = `${(a.employeeId || a.userId || '').toUpperCase()}_${a.date}`;
+            if (!attMap.has(key)) attMap.set(key, a);
+          });
+          attendancesList = Array.from(attMap.values());
+        } else {
+          const UserModel = getUserModel(unitId);
+          const AttendanceModel = getAttendanceModel(unitId);
+
+          const [uList, aList, aRootList] = await Promise.all([
+            UserModel.find(queryUsers).sort({ name: 1 }).lean(),
+            AttendanceModel.find({ date: { $gte: targetStartDate, $lte: targetEndDate } }).lean(),
+            Attendance.find({ date: { $gte: targetStartDate, $lte: targetEndDate } }).lean(),
+          ]);
+
+          usersList = uList || [];
+          const attMap = new Map();
+          [...(aRootList || []), ...(aList || [])].forEach((a) => {
+            const key = `${(a.employeeId || a.userId || '').toUpperCase()}_${a.date}`;
+            if (!attMap.has(key)) attMap.set(key, a);
+          });
+          attendancesList = Array.from(attMap.values());
+        }
 
         rawUsers = usersList;
         rangeAttendances = attendancesList;
       } catch (dbErr) {
         console.warn('⚠️ [AuditLogController:getMemberKpiStats] MongoDB error:', dbErr.message);
-        rawUsers = mockStore.getUsers();
+        rawUsers = [];
       }
     } else {
-      rawUsers = mockStore.getUsers();
+      rawUsers = [];
     }
 
     // Helper to format minutes as "Xh Ym" or "Ym"

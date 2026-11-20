@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Camera,
+  UploadCloud,
   CheckCircle2,
   AlertTriangle,
   FileCheck,
@@ -24,7 +25,8 @@ const FALLBACK_BEFORE_IMG =
 
 
 export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -480,7 +482,7 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
 
               <input
                 type="file"
-                ref={fileInputRef}
+                ref={cameraInputRef}
                 accept="image/*"
                 capture="environment"
                 onClick={(e) => {
@@ -490,59 +492,103 @@ export const ActionTakenModal = ({ complaint, isOpen, onClose, onSuccess }) => {
                 className="hidden"
                 id="camera-after-photo"
               />
+              <input
+                type="file"
+                ref={galleryInputRef}
+                accept="image/*"
+                onClick={(e) => {
+                  e.target.value = null;
+                }}
+                onChange={handlePhotoCapture}
+                className="hidden"
+                id="gallery-after-photo"
+              />
 
               {previewUrl ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  {/* Before Photo Comparison */}
-                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900">
-                    <img
-                      src={complaint.beforePhoto}
-                      alt="Before"
-                      className="w-full h-44 object-cover"
-                    />
-                    <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white shadow">
-                      Before Defect
-                    </span>
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Before Photo Comparison */}
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900">
+                      <img
+                        src={complaint.beforePhoto}
+                        alt="Before"
+                        className="w-full h-44 object-cover"
+                      />
+                      <span className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-600 text-white shadow">
+                        Before Defect
+                      </span>
+                    </div>
+
+                    {/* After Photo Proof */}
+                    <div className="relative rounded-2xl overflow-hidden border border-emerald-400 dark:border-emerald-600/80 bg-slate-100 dark:bg-slate-900">
+                      <img
+                        src={previewUrl}
+                        alt="After Resolution"
+                        className="w-full h-44 object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-2.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white shadow">
+                          After Proof Ready
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* After Photo Proof */}
-                  <div className="relative rounded-2xl overflow-hidden border border-emerald-400 dark:border-emerald-600/80 bg-slate-100 dark:bg-slate-900">
-                    <img
-                      src={previewUrl}
-                      alt="After Resolution"
-                      className="w-full h-44 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-2.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white shadow">
-                        After Proof Ready
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-2.5 py-1 rounded-lg bg-white/90 dark:bg-slate-900/90 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-1.5"
-                      >
-                        <Camera className="w-3 h-3 text-emerald-600" />
-                        Retake
-                      </button>
-                    </div>
+                  {/* Photo Action Chooser */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Retake (Camera)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-cyan-600" />
+                      <span>Choose from Gallery</span>
+                    </button>
                   </div>
                 </div>
               ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-36 border-2 border-dashed border-emerald-300 dark:border-emerald-700/60 hover:border-emerald-500 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col items-center justify-center cursor-pointer transition-all hover:bg-emerald-50/80 dark:hover:bg-emerald-950/30 group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white dark:bg-emerald-900/40 group-hover:bg-emerald-100 flex items-center justify-center mb-1.5 transition-colors border border-emerald-200 dark:border-emerald-700 shadow-xs">
-                    <Camera className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
-                    {compressing
-                      ? 'Compressing Photo...'
-                      : 'Tap to Open Camera / Upload Evidence Proof'}
-                  </span>
-                  <span className="text-[11px] text-emerald-700 dark:text-emerald-400/80 mt-0.5 font-mono">
-                    Mandatory Visual Proof of Correction
-                  </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={compressing}
+                    className="p-4 border-2 border-dashed border-emerald-300 dark:border-emerald-700/60 hover:border-emerald-500 rounded-2xl bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all hover:bg-emerald-50/80 dark:hover:bg-emerald-950/30 active:scale-95 disabled:opacity-50"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white dark:bg-emerald-900/40 flex items-center justify-center transition-colors border border-emerald-200 dark:border-emerald-700 shadow-xs">
+                      <Camera className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
+                      {compressing ? 'Processing...' : 'Take Photo'}
+                    </span>
+                    <span className="text-[11px] text-emerald-700 dark:text-emerald-400/80 font-mono">
+                      Open Mobile Camera
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={compressing}
+                    className="p-4 border-2 border-dashed border-cyan-300 dark:border-cyan-700/60 hover:border-cyan-500 rounded-2xl bg-cyan-50/40 dark:bg-cyan-950/20 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all hover:bg-cyan-50/80 dark:hover:bg-cyan-950/30 active:scale-95 disabled:opacity-50"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white dark:bg-cyan-900/40 flex items-center justify-center transition-colors border border-cyan-200 dark:border-cyan-700 shadow-xs">
+                      <UploadCloud className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-sm">
+                      {compressing ? 'Processing...' : 'Upload from Gallery'}
+                    </span>
+                    <span className="text-[11px] text-cyan-700 dark:text-cyan-400/80 font-mono">
+                      Select Image from Phone
+                    </span>
+                  </button>
                 </div>
               )}
             </div>

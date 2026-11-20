@@ -131,11 +131,15 @@ export const NcCapPage = () => {
       // 0. Exclude archived / soft-deleted records from active NC/CAPA workflow page
       if (c.isDeleted) return false;
 
-      // Strict Personal Assignment Isolation for Supervisor
+      // Department & Personal Assignment Isolation for Supervisor
       if (isSupervisor) {
+        const userDept = (user?.department || '').trim().toLowerCase();
+        const cDept = (c.department || '').trim().toLowerCase();
         const cEmp = (c.assignedTo?.employeeId || '').toUpperCase();
         const cUser = String(c.assignedTo?.userId || '');
-        if ((!cEmp || cEmp !== userEmpId) && (!cUser || cUser !== userId)) {
+        const isDeptMatch = Boolean(userDept && cDept && userDept === cDept);
+        const isAssigned = Boolean((userEmpId && cEmp && cEmp === userEmpId) || (cUser && cUser === userId));
+        if (!isDeptMatch && !isAssigned) {
           return false;
         }
       }

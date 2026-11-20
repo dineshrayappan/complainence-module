@@ -786,12 +786,16 @@ const getComplaints = async (req, res) => {
           query.isDeleted = { $ne: true };
         }
 
-        // RBAC filtering for Supervisor / Action Person (Strict Personal Assignment Isolation across ALL tabs)
+        // RBAC filtering for Supervisor / Action Person (Department & Personal Assignment Isolation across ALL tabs)
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
           const userEmpId = (req.user.employeeId || '').toUpperCase();
           const userId = String(req.user.id || req.user._id || '');
+          const userDept = (req.user.department || '').trim();
 
           const orConditions = [];
+          if (userDept) {
+            orConditions.push({ department: new RegExp('^' + userDept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
+          }
           if (userEmpId) orConditions.push({ 'assignedTo.employeeId': userEmpId });
           if (userId) orConditions.push({ 'assignedTo.userId': userId });
 
@@ -947,10 +951,12 @@ const getComplaintById = async (req, res) => {
             }
           }
 
-          // Strict RBAC Isolation: If requester is a Supervisor or Action Person, verify this specific NC was assigned to them
+          // Strict RBAC Isolation: If requester is a Supervisor or Action Person, verify this specific NC belongs to their department or is assigned to them
           if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON')) {
             const userEmpId = (req.user.employeeId || '').toUpperCase();
             const userId = String(req.user.id || req.user._id || '');
+            const userDept = (req.user.department || '').trim().toLowerCase();
+            const ncDept = (data.department || '').trim().toLowerCase();
             let assignedEmpId = '';
             let assignedUserId = '';
             if (data.assignedTo) {
@@ -960,10 +966,11 @@ const getComplaintById = async (req, res) => {
             }
             const isAssigned = (userEmpId && assignedEmpId && userEmpId === assignedEmpId) ||
                                (userId && assignedUserId && userId === assignedUserId);
-            if (!isAssigned) {
+            const isDeptMatch = Boolean(userDept && ncDept && userDept === ncDept);
+            if (!isAssigned && !isDeptMatch) {
               return res.status(403).json({
                 success: false,
-                message: "Access Denied: You are not authorized to view or access another supervisor's assigned NC record or CAP details.",
+                message: "Access Denied: You are not authorized to view or access an NC record outside your assigned department or personal assignment.",
               });
             }
           }
@@ -990,6 +997,8 @@ const getComplaintById = async (req, res) => {
     if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON')) {
       const userEmpId = (req.user.employeeId || '').toUpperCase();
       const userId = String(req.user.id || req.user._id || '');
+      const userDept = (req.user.department || '').trim().toLowerCase();
+      const ncDept = (complaint.department || '').trim().toLowerCase();
       let assignedEmpId = '';
       let assignedUserId = '';
       if (complaint.assignedTo) {
@@ -999,10 +1008,11 @@ const getComplaintById = async (req, res) => {
       }
       const isAssigned = (userEmpId && assignedEmpId && userEmpId === assignedEmpId) ||
                          (userId && assignedUserId && userId === assignedUserId);
-      if (!isAssigned) {
+      const isDeptMatch = Boolean(userDept && ncDept && userDept === ncDept);
+      if (!isAssigned && !isDeptMatch) {
         return res.status(403).json({
           success: false,
-          message: "Access Denied: You are not authorized to view or access another supervisor's assigned NC record or CAP details.",
+          message: "Access Denied: You are not authorized to view or access an NC record outside your assigned department or personal assignment.",
         });
       }
     }
@@ -1759,8 +1769,12 @@ const getKpiStats = async (req, res) => {
         if (req.user && (req.user.role === 'ACTION_PERSON' || req.user.role === 'SUPERVISOR')) {
           const userEmpId = (req.user.employeeId || '').toUpperCase();
           const userId = String(req.user.id || req.user._id || '');
+          const userDept = (req.user.department || '').trim();
 
           const orConditions = [];
+          if (userDept) {
+            orConditions.push({ department: new RegExp('^' + userDept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
+          }
           if (userEmpId) orConditions.push({ 'assignedTo.employeeId': userEmpId });
           if (userId) orConditions.push({ 'assignedTo.userId': userId });
 
@@ -1833,7 +1847,7 @@ const getKpiStats = async (req, res) => {
       }
     }
 
-    const allComplaints = mockStore.getComplaints().filter((c) => !c.isDeleted);
+    const allComplaints = mockStore.getComplaints({}, req.user).filter((c) => !c.isDeleted);
     const draftTickets = allComplaints.filter((c) => c.status === 'Draft').length;
     const openTickets = allComplaints.filter((c) => ['Open', 'Assigned', 'In Progress'].includes(c.status)).length;
     const capSubmitted = allComplaints.filter((c) => ['CAP Submitted', 'Under Verification'].includes(c.status)).length;
@@ -2466,9 +2480,17 @@ const getDepartmentComplianceStats = async (req, res) => {
       });
     }
 
-    const combinedDepts = foundDepts.size > 0
+    let combinedDepts = foundDepts.size > 0
       ? Array.from(foundDepts)
       : Array.from(new Set([...Array.from(foundDepts), ...standardDepts]));
+
+    if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON') && req.user.department) {
+      const uNorm = normalizeDeptName(req.user.department).toLowerCase();
+      combinedDepts = combinedDepts.filter((d) => d.toLowerCase() === uNorm);
+      if (combinedDepts.length === 0) {
+        combinedDepts = [normalizeDeptName(req.user.department)];
+      }
+    }
 
     const departmentStats = combinedDepts.map((deptName) => {
       const deptComplaints = allComplaints.filter((c) => {

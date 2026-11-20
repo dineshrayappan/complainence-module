@@ -115,19 +115,21 @@ module.exports = {
       result = result.filter((c) => !c.isDeleted);
     }
 
-    // Role-based filtering for Supervisor / Action Person (Strict Personal Assignment Isolation across ALL tabs)
+    // Role-based filtering for Supervisor / Action Person (Department & Personal Assignment Isolation)
     if (user && (user.role === 'ACTION_PERSON' || user.role === 'SUPERVISOR')) {
       const uEmp = (user.employeeId || '').toUpperCase();
       const uId = String(user._id || user.id || '');
+      const uDept = (user.department || '').trim().toLowerCase();
 
       result = result.filter((c) => {
         const cAssignedId = String(c.assignedTo?.userId || '');
         const cAssignedEmp = (c.assignedTo?.employeeId || '').toUpperCase();
+        const cDept = (c.department || '').trim().toLowerCase();
 
-        return (
-          (uEmp && cAssignedEmp === uEmp) ||
-          (uId && cAssignedId === uId)
-        );
+        const isDeptMatch = Boolean(uDept && cDept && uDept === cDept);
+        const isAssigned = (uEmp && cAssignedEmp === uEmp) || (uId && cAssignedId === uId);
+
+        return isDeptMatch || isAssigned;
       });
     }
 

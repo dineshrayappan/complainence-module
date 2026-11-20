@@ -139,7 +139,8 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     }
   }, [isOpen, activeUnitId, user]);
 
-  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
   // Form State - Left Column
   const [department, setDepartment] = useState('Production');
@@ -387,7 +388,8 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
     setBeforeFile(null);
     setPreviewUrl(null);
     setPhotoBase64(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
   if (!isOpen) return null;
@@ -760,29 +762,73 @@ export const NewComplaintModal = ({ isOpen, onClose, onSuccess, prefillData = nu
 
                 <input
                   type="file"
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   accept="image/*"
                   capture="environment"
                   onChange={handlePhotoCapture}
                   className="hidden"
                 />
+                <input
+                  type="file"
+                  ref={galleryInputRef}
+                  accept="image/*"
+                  onChange={handlePhotoCapture}
+                  className="hidden"
+                />
 
                 {previewUrl ? (
-                  <div className="relative rounded-xl overflow-hidden border border-emerald-300 dark:border-emerald-600 bg-slate-900 h-28 flex items-center justify-center">
-                    <img src={previewUrl} alt="Defect Snapshot" className="h-full w-full object-cover" />
-                    <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-600 text-white">
-                      Photo Attached
-                    </span>
+                  <div className="space-y-2">
+                    <div className="relative rounded-xl overflow-hidden border border-emerald-300 dark:border-emerald-600 bg-slate-900 h-28 flex items-center justify-center">
+                      <img src={previewUrl} alt="Defect Snapshot" className="h-full w-full object-cover" />
+                      <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-600 text-white">
+                        Photo Attached
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Retake (Camera)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => galleryInputRef.current?.click()}
+                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-cyan-500" />
+                        <span>From Gallery</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <UploadCloud className="w-4 h-4 text-indigo-500" />
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      {compressing ? 'Compressing photo...' : 'Click or tap to attach defect photo'}
-                    </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={compressing}
+                      className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 rounded-xl bg-white dark:bg-slate-900 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 active:scale-95 disabled:opacity-50"
+                    >
+                      <Camera className="w-5 h-5 text-indigo-500" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {compressing ? 'Processing...' : 'Take Photo'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">Open Camera</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
+                      disabled={compressing}
+                      className="p-3 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-cyan-500 rounded-xl bg-white dark:bg-slate-900 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all hover:bg-cyan-50/40 dark:hover:bg-cyan-950/20 active:scale-95 disabled:opacity-50"
+                    >
+                      <UploadCloud className="w-5 h-5 text-cyan-500" />
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {compressing ? 'Processing...' : 'Upload from Gallery'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">Select Image File</span>
+                    </button>
                   </div>
                 )}
               </div>

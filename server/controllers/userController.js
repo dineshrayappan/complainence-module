@@ -152,6 +152,10 @@ const getLineSupervisors = async (req, res) => {
           isDeleted: { $ne: true },
         };
 
+        if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON') && req.user.department) {
+          supervisorFilter.department = new RegExp('^' + req.user.department.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+        }
+
         let data = [];
         if (activeUnit === 'BOTH') {
           const U1 = getUserModel('UNIT-1');
@@ -190,15 +194,21 @@ const getLineSupervisors = async (req, res) => {
       }
     }
 
-    const supervisors = mockStore
+    let supervisors = mockStore
       .getUsers(false)
-      .filter((u) => (u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR') && u.isActive && !u.isDeleted)
-      .map((u) => formatUser(u, attendanceMap, todayDate));
+      .filter((u) => (u.role === 'ACTION_PERSON' || u.role === 'SUPERVISOR') && u.isActive && !u.isDeleted);
+
+    if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON') && req.user.department) {
+      const uDept = req.user.department.trim().toLowerCase();
+      supervisors = supervisors.filter((u) => (u.department || '').trim().toLowerCase() === uDept);
+    }
+
+    const formattedSupervisors = supervisors.map((u) => formatUser(u, attendanceMap, todayDate));
 
     res.status(200).json({
       success: true,
-      count: supervisors.length,
-      supervisors,
+      count: formattedSupervisors.length,
+      supervisors: formattedSupervisors,
     });
   } catch (error) {
     res.status(500).json({
@@ -247,7 +257,9 @@ const getAllUsers = async (req, res) => {
           }
         }
 
-        if (department) {
+        if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON') && req.user.department) {
+          query.department = new RegExp('^' + req.user.department.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+        } else if (department) {
           query.department = department;
         }
 
@@ -327,7 +339,10 @@ const getAllUsers = async (req, res) => {
         users = users.filter((u) => u.role === role);
       }
     }
-    if (department) {
+    if (req.user && (req.user.role === 'SUPERVISOR' || req.user.role === 'ACTION_PERSON') && req.user.department) {
+      const uDept = req.user.department.trim().toLowerCase();
+      users = users.filter((u) => (u.department || '').trim().toLowerCase() === uDept);
+    } else if (department) {
       users = users.filter((u) => u.department === department);
     }
     if (typeof isActive !== 'undefined') {

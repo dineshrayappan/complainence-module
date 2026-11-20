@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ClipboardList,
   Plus,
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Camera,
   Upload,
+  UploadCloud,
   AlertCircle,
   Clock,
   Eye,
@@ -79,6 +80,8 @@ const emptyForm = (defaultDept = 'Production', defaultUserId = '') => ({
 
 export const MyTasksPanel = ({ compact = false }) => {
   const { user, isAdmin, isAuditor } = useAuth();
+  const proofCameraRef = useRef(null);
+  const proofGalleryRef = useRef(null);
   const [tasks, setTasks] = useState([]);
   const [counts, setCounts] = useState({ overdue: 0, dueToday: 0, completed: 0 });
   const [loading, setLoading] = useState(true);
@@ -1043,54 +1046,94 @@ export const MyTasksPanel = ({ compact = false }) => {
                   <span className="text-[10px] text-rose-500 font-mono font-bold">Mandatory</span>
                 </label>
 
+                <input
+                  ref={proofCameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleProofImageChange}
+                  className="hidden"
+                />
+                <input
+                  ref={proofGalleryRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProofImageChange}
+                  className="hidden"
+                />
+
                 {proofPhotoPreview ? (
-                  <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/50 bg-slate-950 flex flex-col items-center group">
-                    <img
-                      src={proofPhotoPreview}
-                      alt="Completion proof"
-                      className="w-full max-h-56 object-contain bg-slate-900"
-                    />
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      <label
-                        htmlFor="proof-photo-replace"
-                        className="px-2.5 py-1 rounded-lg bg-black/70 hover:bg-black text-white text-[10px] font-bold cursor-pointer backdrop-blur-xs flex items-center gap-1"
-                      >
-                        <Camera className="w-3 h-3" />
-                        <span>Retake / Change</span>
-                      </label>
-                      <input
-                        id="proof-photo-replace"
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleProofImageChange}
-                        className="hidden"
+                  <div className="space-y-2">
+                    <div className="relative rounded-xl overflow-hidden border-2 border-emerald-500/50 bg-slate-950 flex flex-col items-center group">
+                      <img
+                        src={proofPhotoPreview}
+                        alt="Completion proof"
+                        className="w-full max-h-56 object-contain bg-slate-900"
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProofPhoto('');
+                          setProofPhotoPreview(null);
+                        }}
+                        className="absolute top-2 right-2 p-1 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 cursor-pointer"
+                        title="Remove image"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => proofCameraRef.current?.click()}
+                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Retake (Camera)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => proofGalleryRef.current?.click()}
+                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-cyan-600" />
+                        <span>Choose Gallery</span>
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  <label
-                    htmlFor="proof-photo-upload"
-                    className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-50/20 cursor-pointer transition-colors"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-2">
-                      <Upload className="w-6 h-6" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      Take Photo or Browse Device
-                    </span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">
-                      JPEG, PNG, WebP (camera auto-compressed)
-                    </span>
-                    <input
-                      id="proof-photo-upload"
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleProofImageChange}
-                      className="hidden"
-                    />
-                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => proofCameraRef.current?.click()}
+                      className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-emerald-300 dark:border-emerald-700 hover:border-emerald-500 rounded-2xl bg-emerald-50/30 dark:bg-emerald-950/20 cursor-pointer transition-all hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30 active:scale-95"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-1.5">
+                        <Camera className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Take Photo
+                      </span>
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono mt-0.5">
+                        Open Mobile Camera
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => proofGalleryRef.current?.click()}
+                      className="flex flex-col items-center justify-center p-5 border-2 border-dashed border-cyan-300 dark:border-cyan-700 hover:border-cyan-500 rounded-2xl bg-cyan-50/30 dark:bg-cyan-950/20 cursor-pointer transition-all hover:bg-cyan-50/60 dark:hover:bg-cyan-950/30 active:scale-95"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mb-1.5">
+                        <UploadCloud className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Upload from Gallery
+                      </span>
+                      <span className="text-[10px] text-cyan-700 dark:text-cyan-400 font-mono mt-0.5">
+                        Select Image from Device
+                      </span>
+                    </button>
+                  </div>
                 )}
               </div>
 

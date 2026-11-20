@@ -384,13 +384,17 @@ export const AppLayout = () => {
     const isSupervisor = user?.role === 'ACTION_PERSON' || user?.role === 'SUPERVISOR';
     const userEmpId = (user?.employeeId || '').toUpperCase();
     const userId = String(user?.id || user?._id || '');
+    const userDept = (user?.department || '').trim().toLowerCase();
 
     const activeList = complaints.filter((c) => !c.isDeleted);
     const userComplaints = isSupervisor
       ? activeList.filter((c) => {
+        const cDept = (c.department || '').trim().toLowerCase();
         const cEmp = (c.assignedTo?.employeeId || '').toUpperCase();
         const cUser = String(c.assignedTo?.userId || '');
-        return (cEmp && cEmp === userEmpId) || (cUser && cUser === userId);
+        const isDeptMatch = Boolean(userDept && cDept && userDept === cDept);
+        const isAssigned = Boolean((userEmpId && cEmp && cEmp === userEmpId) || (cUser && cUser === userId));
+        return isDeptMatch || isAssigned;
       })
       : activeList;
 
